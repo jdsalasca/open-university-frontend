@@ -1,10 +1,26 @@
 import { cleanup, render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it } from 'vitest'
 import { App } from './App'
 import { BrandingProvider } from './features/branding/BrandingProvider'
 import { DEFAULT_BRANDING } from './features/branding/contracts'
+import type { AcademicCatalogClient } from './features/academics/contracts'
 
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  window.history.replaceState(null, '', '#inicio')
+})
+
+function emptyAcademicCatalogClient(): AcademicCatalogClient {
+  return {
+    listPrograms: async () => [],
+    listCurricula: async () => [],
+    listDrafts: async () => [],
+    getCurriculum: async () => { throw new Error('Unexpected curriculum review') },
+    importCsv: async () => { throw new Error('Unexpected curriculum import') },
+    publishCurriculum: async () => { throw new Error('Unexpected curriculum publication') },
+  }
+}
 
 describe('App', () => {
   it('applies institution name, published logo, and module label to the application shell', async () => {
@@ -52,5 +68,29 @@ describe('App', () => {
     expect(screen.getByRole('button', { name: 'Publicar cambios' })).toBeDisabled()
     expect(screen.getByRole('status')).toHaveTextContent('La publicación requiere acceso institucional')
     expect(screen.getByRole('link', { name: 'Identidad visual' })).toBeVisible()
+  })
+
+  it('opens Programs as a keyboard accessible development preview while branding availability stays false', async () => {
+    // Arrange
+    const user = userEvent.setup()
+    render(
+      <BrandingProvider loader={async () => DEFAULT_BRANDING}>
+        <App catalogClient={emptyAcademicCatalogClient()} />
+      </BrandingProvider>,
+    )
+
+    // Act
+    const programsLink = await screen.findByRole('link', { name: /programas.*vista previa/i })
+    await user.tab()
+    await user.tab()
+    await user.tab()
+    expect(programsLink).toHaveFocus()
+    await user.keyboard('{Enter}')
+
+    // Assert
+    expect(await screen.findByRole('heading', { name: 'Programas de pregrado presencial' })).toBeVisible()
+    expect(programsLink).toHaveAttribute('aria-current', 'page')
+    expect(DEFAULT_BRANDING.modules.find((module) => module.key === 'programs')?.available).toBe(false)
+    expect(screen.getByText(/Este módulo es una vista previa y no está habilitado para operación institucional/i)).toBeVisible()
   })
 })
