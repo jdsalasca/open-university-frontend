@@ -5,6 +5,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type {
   AcademicCatalogClient,
   AcademicCurriculum,
+  AcademicCurriculumDraftsPage,
+  AcademicCurriculumDraftsPageQuery,
   AcademicCurriculumDetails,
   AcademicCurriculumEntriesPage,
   AcademicCurriculumEntriesPageQuery,
@@ -168,6 +170,20 @@ const authorization: CatalogAuthorization = {
   permissions: ['academic:catalog:read', 'academic:catalog:write'],
 }
 
+function createDraftsPage(
+  query: AcademicCurriculumDraftsPageQuery,
+  drafts: AcademicCurriculum[],
+  totalItems = drafts.length,
+  nextCursor: string | null = null,
+): AcademicCurriculumDraftsPage {
+  return {
+    pageSize: query.pageSize,
+    totalItems,
+    drafts,
+    nextCursor,
+  }
+}
+
 function createEntriesPage(
   query: AcademicCurriculumEntriesPageQuery,
   entries: AcademicCurriculumEntry[] = publicDetails.entries,
@@ -188,7 +204,7 @@ function createClient(overrides: Partial<AcademicCatalogClient> = {}): AcademicC
   return {
     listPrograms: vi.fn().mockResolvedValue([]),
     listCurricula: vi.fn().mockResolvedValue([]),
-    listDrafts: vi.fn().mockResolvedValue([]),
+    listDrafts: vi.fn().mockImplementation((_token, query) => Promise.resolve(createDraftsPage(query, []))),
     getCurriculum: vi.fn().mockResolvedValue(details),
     getPublishedCurriculum: vi.fn().mockResolvedValue(publishedCurriculum),
     listPublishedCurriculumEntries: vi.fn().mockImplementation((_id, query) => Promise.resolve(createEntriesPage(query))),
@@ -541,7 +557,7 @@ describe('AcademicCatalogPage', () => {
 
   it('lists drafts and loads a curriculum review before offering the protected publish action', async () => {
     // Arrange
-    const client = createClient({ listDrafts: vi.fn().mockResolvedValue([draft]) })
+    const client = createClient({ listDrafts: vi.fn().mockResolvedValue(createDraftsPage({ pageSize: 25 }, [draft])) })
     await renderCatalogPage({ client, authorization })
 
     // Act
@@ -549,10 +565,74 @@ describe('AcademicCatalogPage', () => {
     await userEvent.click(reviewButton)
 
     // Assert
-    expect(client.listDrafts).toHaveBeenCalledWith(authorization.accessToken, expect.any(AbortSignal))
+    expect(client.listDrafts).toHaveBeenCalledWith(authorization.accessToken, { pageSize: 25 }, expect.any(AbortSignal))
     expect(await screen.findByText('Cálculo I')).toBeVisible()
     expect(client.getCurriculum).toHaveBeenCalledWith(draft.id, authorization.accessToken)
     expect(screen.getByRole('button', { name: /publicar 2026-A/i })).toBeEnabled()
+  })
+
+  it('loads the next administrative draft page from the server', async () => {
+    // Arrange
+    const pageSize = 25
+    const firstPageDrafts = Array.from({ length: pageSize }, (_, index) => ({
+      ...draft,
+      id: `00000000-0000-4000-8000-${String(index + 1).padStart(12, '0')}`,
+      curriculumVersion: `2026-${String(index + 1).padStart(2, '0')}`,
+    }))
+    const finalDraft = { ...draft, id: '00000000-0000-4000-8000-000000000026', curriculumVersion: '2027-01' }
+    const listDrafts = vi.fn()
+      .mockResolvedValueOnce(createDraftsPage({ pageSize }, firstPageDrafts, 26, 'cursor-page-2'))
+      .mockResolvedValueOnce(createDraftsPage({ pageSize, after: 'cursor-page-2' }, [finalDraft], 26))
+    const client = createClient({
+      listDrafts: listDrafts as unknown as AcademicCatalogClient['listDrafts'],
+    })
+    await renderCatalogPage({ client, authorization })
+
+    // Act
+    const nextPage = await screen.findByRole('button', { name: /página siguiente de borradores/i })
+    expect(screen.getByText('Página 1 · 25 visibles · 26 pendientes')).toBeVisible()
+    await userEvent.click(nextPage)
+
+    // Assert
+    expect(await screen.findByRole('button', { name: /revisar 2027-01/i })).toBeVisible()
+    expect(screen.getByText('Página 2 · 1 visible · 26 pendientes')).toBeVisible()
+    expect(screen.queryByRole('button', { name: /revisar 2026-01/i })).not.toBeInTheDocument()
+    expect(listDrafts).toHaveBeenNthCalledWith(1, authorization.accessToken, { pageSize }, expect.any(AbortSignal))
+    expect(listDrafts).toHaveBeenNthCalledWith(2, authorization.accessToken, { pageSize, after: 'cursor-page-2' }, expect.any(AbortSignal))
+  })
+
+  it('returns to the first draft page when publication empties the current cursor position', async () => {
+    // Arrange
+    const pageSize = 25
+    const firstPageDrafts = Array.from({ length: pageSize }, (_, index) => ({
+      ...draft,
+      id: `00000000-0000-4000-8000-${String(index + 1).padStart(12, '0')}`,
+      curriculumVersion: `2026-${String(index + 1).padStart(2, '0')}`,
+    }))
+    const finalDraft = { ...draft, id: '00000000-0000-4000-8000-000000000026', curriculumVersion: '2027-01' }
+    const listDrafts = vi.fn()
+      .mockResolvedValueOnce(createDraftsPage({ pageSize }, firstPageDrafts, 26, 'cursor-page-2'))
+      .mockResolvedValueOnce(createDraftsPage({ pageSize, after: 'cursor-page-2' }, [finalDraft], 26))
+      .mockResolvedValueOnce(createDraftsPage({ pageSize, after: 'cursor-page-2' }, [], 25))
+      .mockResolvedValueOnce(createDraftsPage({ pageSize }, firstPageDrafts, 25, null))
+    const client = createClient({
+      listDrafts: listDrafts as unknown as AcademicCatalogClient['listDrafts'],
+      getCurriculum: vi.fn().mockResolvedValue({ ...details, curriculum: finalDraft }),
+    })
+    await renderCatalogPage({ client, authorization })
+    await userEvent.click(await screen.findByRole('button', { name: /página siguiente de borradores/i }))
+    await userEvent.click(await screen.findByRole('button', { name: /revisar 2027-01/i }))
+    await screen.findByRole('heading', { name: /2027-01/i })
+
+    // Act
+    await userEvent.click(screen.getByRole('button', { name: /publicar 2027-01/i }))
+
+    // Assert
+    expect(await screen.findByText(/currículo publicado/i)).toBeVisible()
+    expect(await screen.findByRole('button', { name: /revisar 2026-01/i })).toBeVisible()
+    expect(screen.queryByRole('navigation', { name: /paginación de borradores/i })).not.toBeInTheDocument()
+    expect(listDrafts).toHaveBeenNthCalledWith(3, authorization.accessToken, { pageSize, after: 'cursor-page-2' }, expect.any(AbortSignal))
+    expect(listDrafts).toHaveBeenNthCalledWith(4, authorization.accessToken, { pageSize }, expect.any(AbortSignal))
   })
 
   it.each([
@@ -574,7 +654,10 @@ describe('AcademicCatalogPage', () => {
 
   it('previews a valid CSV before creating its draft and adds the draft to the review queue', async () => {
     // Arrange
-    const client = createClient()
+    const listDrafts = vi.fn()
+      .mockImplementationOnce((_token, query) => Promise.resolve(createDraftsPage(query, [])))
+      .mockImplementationOnce((_token, query) => Promise.resolve(createDraftsPage(query, [draft])))
+    const client = createClient({ listDrafts: listDrafts as AcademicCatalogClient['listDrafts'] })
     await renderCatalogPage({ client, authorization })
     const input = await screen.findByLabelText(/archivo CSV/i)
     const file = new File(['header,row'], 'plan.csv', { type: 'text/csv' })
@@ -597,6 +680,7 @@ describe('AcademicCatalogPage', () => {
     expect(client.importCsv).toHaveBeenCalledWith(file, authorization.accessToken)
     expect(await screen.findByText(/borrador creado/i)).toBeVisible()
     expect(screen.getByRole('button', { name: /revisar 2026-A/i })).toBeVisible()
+    expect(listDrafts).toHaveBeenCalledTimes(2)
   })
 
   it('does not import when the preview is rejected', async () => {
@@ -689,7 +773,9 @@ describe('AcademicCatalogPage', () => {
   it('publishes a reviewed draft and refreshes the public list', async () => {
     // Arrange
     const client = createClient({
-      listDrafts: vi.fn().mockResolvedValue([draft]),
+      listDrafts: vi.fn()
+        .mockResolvedValueOnce(createDraftsPage({ pageSize: 25 }, [draft]))
+        .mockResolvedValue(createDraftsPage({ pageSize: 25 }, [])),
       listPrograms: vi.fn().mockResolvedValue([program]),
       listCurricula: vi.fn().mockResolvedValue([]),
     })
@@ -712,7 +798,10 @@ describe('AcademicCatalogPage', () => {
   ])('shows a useful publish error when the server rejects publication with %s', async (status, code, message) => {
     // Arrange
     const error = Object.assign(new Error('Rejected.'), { status, code, issues: [] })
-    const client = createClient({ listDrafts: vi.fn().mockResolvedValue([draft]), publishCurriculum: vi.fn().mockRejectedValue(error) })
+    const client = createClient({
+      listDrafts: vi.fn().mockResolvedValue(createDraftsPage({ pageSize: 25 }, [draft])),
+      publishCurriculum: vi.fn().mockRejectedValue(error),
+    })
     await renderCatalogPage({ client, authorization })
     await userEvent.click(await screen.findByRole('button', { name: /revisar 2026-A/i }))
     await screen.findByText('Cálculo I')
@@ -727,7 +816,7 @@ describe('AcademicCatalogPage', () => {
   it('does not show write controls to an authenticated catalog reader', async () => {
     // Arrange
     const reader = { accessToken: 'reader-token', permissions: ['academic:catalog:read'] as const }
-    const client = createClient({ listDrafts: vi.fn().mockResolvedValue([draft]) })
+    const client = createClient({ listDrafts: vi.fn().mockResolvedValue(createDraftsPage({ pageSize: 25 }, [draft])) })
     await renderCatalogPage({ client, authorization: reader })
 
     // Act

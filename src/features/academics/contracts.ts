@@ -61,6 +61,18 @@ export interface AcademicCurriculumEntriesPage {
   entries: AcademicCurriculumEntry[]
 }
 
+export interface AcademicCurriculumDraftsPage {
+  pageSize: number
+  totalItems: number
+  drafts: AcademicCurriculum[]
+  nextCursor: string | null
+}
+
+export interface AcademicCurriculumDraftsPageQuery {
+  pageSize: number
+  after?: string
+}
+
 export interface AcademicCurriculumEntriesPageQuery {
   page: number
   pageSize: number
@@ -100,6 +112,8 @@ export interface CurriculumImportPreview {
 
 export const MAX_PUBLIC_CURRICULUM_PAGE_SIZE = 100
 export const MAX_PUBLIC_CURRICULUM_SEARCH_CODE_POINTS = 120
+export const DEFAULT_ADMIN_DRAFT_PAGE_SIZE = 25
+export const MAX_ADMIN_DRAFT_PAGE_SIZE = 100
 
 export interface AcademicCatalogIssue {
   rowNumber: number | null
@@ -121,7 +135,11 @@ export interface AcademicCatalogClient {
     query: AcademicCurriculumEntriesPageQuery,
     signal?: AbortSignal
   ): Promise<AcademicCurriculumEntriesPage>
-  listDrafts(accessToken: string, signal?: AbortSignal): Promise<AcademicCurriculum[]>
+  listDrafts(
+    accessToken: string,
+    query: AcademicCurriculumDraftsPageQuery,
+    signal?: AbortSignal
+  ): Promise<AcademicCurriculumDraftsPage>
   getCurriculum(id: string, accessToken: string, signal?: AbortSignal): Promise<AcademicCurriculumDetails>
   previewCsv(file: File, accessToken: string, signal?: AbortSignal): Promise<CurriculumImportPreview>
   importCsv(file: File, accessToken: string, signal?: AbortSignal): Promise<AcademicCurriculum>
@@ -183,6 +201,38 @@ export function parseAcademicPrograms(input: unknown): AcademicProgram[] {
 export function parseAcademicCurricula(input: unknown): AcademicCurriculum[] {
   if (!Array.isArray(input)) throw malformedResponse()
   return input.map(parseAcademicCurriculum)
+}
+
+export function parseAcademicCurriculumDraftsPage(
+  input: unknown,
+  query: AcademicCurriculumDraftsPageQuery,
+): AcademicCurriculumDraftsPage {
+  if (!Number.isSafeInteger(query.pageSize)
+    || query.pageSize < 1
+    || query.pageSize > MAX_ADMIN_DRAFT_PAGE_SIZE
+    || (query.after !== undefined
+      && (typeof query.after !== 'string' || query.after.length === 0 || query.after.length > 256))
+    || !isRecord(input)
+    || !Number.isSafeInteger(input.pageSize)
+    || input.pageSize !== query.pageSize
+    || !isNonNegativeInteger(input.totalItems)
+    || !Array.isArray(input.drafts)
+    || input.drafts.length > input.pageSize
+    || !(input.nextCursor === null
+      || (typeof input.nextCursor === 'string'
+        && input.nextCursor.length > 0
+        && input.nextCursor.length <= 256
+        && input.drafts.length === input.pageSize))) throw malformedResponse()
+
+  const drafts = input.drafts.map(parseAcademicCurriculum)
+  if (drafts.some((draft) => draft.status !== 'DRAFT')) throw malformedResponse()
+
+  return {
+    pageSize: input.pageSize,
+    totalItems: input.totalItems,
+    drafts,
+    nextCursor: input.nextCursor,
+  }
 }
 
 export function parseAcademicCurriculumDetails(input: unknown): AcademicCurriculumDetails {

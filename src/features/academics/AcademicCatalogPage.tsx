@@ -5,6 +5,7 @@ import type {
   AcademicCatalogClient,
   AcademicCatalogIssue,
   AcademicCurriculum,
+  AcademicCurriculumDraftsPage,
   AcademicCurriculumDetails,
   AcademicCurriculumEntriesPage,
   AcademicProgram,
@@ -12,6 +13,7 @@ import type {
   CurriculumImportPreview,
 } from './contracts'
 import {
+  DEFAULT_ADMIN_DRAFT_PAGE_SIZE,
   MAX_PUBLIC_CURRICULUM_PAGE_SIZE,
   MAX_PUBLIC_CURRICULUM_SEARCH_CODE_POINTS,
   validateCurriculumCsvFile,
@@ -569,6 +571,9 @@ interface CatalogAdministrationProps {
 function CatalogAdministration({ accessToken, authorization, client, onPublished }: CatalogAdministrationProps) {
   const canWriteCatalog = authorization.permissions.includes('academic:catalog:write')
   const [drafts, setDrafts] = useState<AcademicCurriculum[]>([])
+  const [draftsPageData, setDraftsPageData] = useState<AcademicCurriculumDraftsPage | null>(null)
+  const [draftPage, setDraftPage] = useState(1)
+  const [draftCursors, setDraftCursors] = useState<Array<string | null>>([null])
   const [draftsState, setDraftsState] = useState<RequestState>('loading')
   const [draftsError, setDraftsError] = useState('')
   const [draftRefresh, setDraftRefresh] = useState(0)
@@ -584,9 +589,20 @@ function CatalogAdministration({ accessToken, authorization, client, onPublished
 
   useEffect(() => {
     const controller = new AbortController()
-    client.listDrafts(accessToken, controller.signal)
+    const after = draftCursors[draftPage - 1]
+    const query = {
+      pageSize: DEFAULT_ADMIN_DRAFT_PAGE_SIZE,
+      ...(after ? { after } : {}),
+    }
+    client.listDrafts(accessToken, query, controller.signal)
       .then((result) => {
-        setDrafts(result.filter((curriculum) => curriculum.status === 'DRAFT'))
+        if (result.drafts.length === 0 && draftPage > 1) {
+          setDraftCursors([null])
+          setDraftPage(1)
+          return
+        }
+        setDraftsPageData(result)
+        setDrafts(result.drafts)
         setDraftsState('ready')
       })
       .catch(() => {
@@ -595,7 +611,7 @@ function CatalogAdministration({ accessToken, authorization, client, onPublished
         setDraftsState('error')
       })
     return () => controller.abort()
-  }, [client, accessToken, draftRefresh])
+  }, [client, accessToken, draftCursors, draftPage, draftRefresh])
 
   function chooseFile(event: ChangeEvent<HTMLInputElement>) {
     const file = event.currentTarget.files?.[0] ?? null
@@ -634,12 +650,16 @@ function CatalogAdministration({ accessToken, authorization, client, onPublished
     setActionError(null)
     try {
       const created = await client.importCsv(selectedFile, accessToken)
-      setDrafts((current) => [created, ...current.filter((draft) => draft.id !== created.id)])
       selectedFileRef.current = null
       setSelectedFile(null)
       setFilePreview(null)
       setActionMessage(`Borrador creado: versión ${created.curriculumVersion}.`)
       setSelectedDraft(null)
+      setDraftsError('')
+      setDraftsState('loading')
+      setDraftCursors([null])
+      setDraftPage(1)
+      setDraftRefresh((current) => current + 1)
     } catch (error) {
       setActionError(asApiFailure(error))
     } finally {
@@ -668,7 +688,6 @@ function CatalogAdministration({ accessToken, authorization, client, onPublished
     setActionError(null)
     try {
       const published = await client.publishCurriculum(curriculumId, accessToken)
-      setDrafts((current) => current.filter((draft) => draft.id !== curriculumId))
       setSelectedDraft(null)
       setActionMessage(`Currículo publicado: versión ${published.curriculum.curriculumVersion}.`)
       setDraftsState('loading')
@@ -686,6 +705,19 @@ function CatalogAdministration({ accessToken, authorization, client, onPublished
     setDraftsError('')
     setDraftRefresh((count) => count + 1)
   }
+
+  function changeDraftPage(nextPage: number) {
+    if (nextPage > draftPage) {
+      const nextCursor = draftsPageData?.nextCursor
+      if (!nextCursor) return
+      setDraftCursors((current) => [...current.slice(0, draftPage), nextCursor])
+    }
+    setDraftsState('loading')
+    setDraftsError('')
+    setDraftPage(Math.max(1, nextPage))
+  }
+
+  const draftTotalItems = draftsPageData?.totalItems ?? 0
 
   return (
     <section className="catalog-admin" aria-labelledby="catalog-admin-title">
@@ -722,11 +754,11 @@ function CatalogAdministration({ accessToken, authorization, client, onPublished
         )}
 
         <section className="catalog-drafts-card" aria-labelledby="catalog-drafts-title">
-          <div className="catalog-drafts-heading"><div><p className="catalog-eyebrow">REVISIÓN</p><h3 id="catalog-drafts-title">Borradores</h3></div><span className="catalog-count">{drafts.length.toString().padStart(2, '0')}</span></div>
+          <div className="catalog-drafts-heading"><div><p className="catalog-eyebrow">REVISIÓN</p><h3 id="catalog-drafts-title">Borradores</h3></div><span className="catalog-count">{draftTotalItems.toLocaleString('es-CO').padStart(2, '0')}</span></div>
           {draftsState === 'loading' && <p className="catalog-loading" role="status">Cargando borradores…</p>}
           {draftsState === 'error' && <div className="catalog-inline-error" role="alert"><p>{draftsError}</p><button className="catalog-button catalog-button-secondary" onClick={retryDrafts} type="button">Reintentar</button></div>}
-          {draftsState === 'ready' && drafts.length === 0 && <p className="catalog-drafts-empty">No hay borradores pendientes de revisión.</p>}
-          {drafts.length > 0 && (
+          {draftsState === 'ready' && draftTotalItems === 0 && <p className="catalog-drafts-empty">No hay borradores pendientes de revisión.</p>}
+          {draftsState === 'ready' && drafts.length > 0 && (
             <ul className="catalog-draft-list">
               {drafts.map((draft) => (
                 <li className="catalog-draft-row" key={draft.id}>
@@ -739,6 +771,36 @@ function CatalogAdministration({ accessToken, authorization, client, onPublished
               ))}
             </ul>
           )}
+          {draftsState === 'ready' && draftsPageData
+            && (draftPage > 1 || Boolean(draftsPageData.nextCursor)) && (
+              <nav className="catalog-curriculum-pagination" aria-label="Paginación de borradores">
+                <span>
+                  Página {draftPage} · {drafts.length} {drafts.length === 1 ? 'visible' : 'visibles'}
+                  {' · '}{draftTotalItems} pendientes
+                </span>
+                <div>
+                  <button
+                    aria-label="Página anterior de borradores"
+                    className="catalog-button catalog-button-secondary"
+                    disabled={draftPage === 1}
+                    onClick={() => changeDraftPage(draftPage - 1)}
+                    type="button"
+                  >
+                    Anterior
+                  </button>
+                  <span aria-live="polite">Página {draftPage}</span>
+                  <button
+                    aria-label="Página siguiente de borradores"
+                    className="catalog-button catalog-button-secondary"
+                    disabled={!draftsPageData.nextCursor}
+                    onClick={() => changeDraftPage(draftPage + 1)}
+                    type="button"
+                  >
+                    Siguiente
+                  </button>
+                </div>
+              </nav>
+            )}
         </section>
       </div>
 

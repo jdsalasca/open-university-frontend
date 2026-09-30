@@ -207,16 +207,21 @@ describe('academic catalog client', () => {
     // Arrange
     const { createAcademicCatalogClient } = await loadClient()
     const fetcher = vi.fn()
-      .mockResolvedValueOnce(jsonResponse([curriculum]))
+      .mockResolvedValueOnce(jsonResponse({
+        pageSize: 25,
+        totalItems: 1,
+        nextCursor: null,
+        drafts: [{ ...curriculum, status: 'DRAFT', publishedAt: null }],
+      }))
       .mockResolvedValueOnce(jsonResponse({ curriculum, entries: [] }))
     const client = createAcademicCatalogClient(fetcher)
 
     // Act
-    await client.listDrafts('institutional-token')
+    await client.listDrafts('institutional-token', { pageSize: 25 })
     await client.getCurriculum(curriculum.id, 'institutional-token')
 
     // Assert
-    expect(fetcher).toHaveBeenNthCalledWith(1, '/api/v1/admin/academic-catalog/drafts', {
+    expect(fetcher).toHaveBeenNthCalledWith(1, '/api/v1/admin/academic-catalog/drafts?pageSize=25', {
       credentials: 'omit',
       headers: { Accept: 'application/json', Authorization: 'Bearer institutional-token' },
     })
@@ -224,6 +229,46 @@ describe('academic catalog client', () => {
       `/api/v1/admin/academic-catalog/curricula/${curriculum.id}`,
       expect.objectContaining({ headers: expect.objectContaining({ Authorization: 'Bearer institutional-token' }) }),
     )
+  })
+
+  it('requests and parses one bounded page of administrative drafts', async () => {
+    // Arrange
+    const { createAcademicCatalogClient } = await loadClient()
+    const draftPage = {
+      pageSize: 10,
+      totalItems: 11,
+      nextCursor: null,
+      drafts: [{ ...curriculum, status: 'DRAFT', publishedAt: null }],
+    }
+    const fetcher = vi.fn().mockResolvedValue(jsonResponse(draftPage))
+    const client = createAcademicCatalogClient(fetcher)
+
+    // Act + Assert
+    await expect(client.listDrafts('institutional-token', { pageSize: 10, after: 'cursor-from-page-1' }))
+      .resolves.toEqual(draftPage)
+    expect(fetcher).toHaveBeenCalledWith(
+      '/api/v1/admin/academic-catalog/drafts?pageSize=10&after=cursor-from-page-1',
+      expect.objectContaining({
+        credentials: 'omit',
+        headers: { Accept: 'application/json', Authorization: 'Bearer institutional-token' },
+      }),
+    )
+  })
+
+  it('rejects a published curriculum returned inside the protected draft queue', async () => {
+    // Arrange
+    const { createAcademicCatalogClient } = await loadClient()
+    const fetcher = vi.fn().mockResolvedValue(jsonResponse({
+      pageSize: 25,
+      totalItems: 1,
+      nextCursor: null,
+      drafts: [curriculum],
+    }))
+    const client = createAcademicCatalogClient(fetcher)
+
+    // Act + Assert
+    await expect(client.listDrafts('institutional-token', { pageSize: 25 }))
+      .rejects.toThrow('malformed')
   })
 
   it('rejects an unsupported CSV media type before making a request', async () => {
