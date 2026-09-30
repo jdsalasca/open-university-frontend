@@ -130,7 +130,7 @@ const importPreview: CurriculumImportPreview = {
     credits: 4,
     formationSpace: 'Disciplinar',
     component: 'Fundamentación',
-    choiceGroup: null,
+    choiceGroup: 'Electiva A',
   }],
 }
 
@@ -587,6 +587,7 @@ describe('AcademicCatalogPage', () => {
     expect(client.previewCsv).toHaveBeenCalledWith(file, authorization.accessToken)
     expect(client.importCsv).not.toHaveBeenCalled()
     expect(await screen.findByText('Cálculo I')).toBeVisible()
+    expect(screen.getByText('Electiva A')).toBeVisible()
     expect(screen.getByText(/3 semestres|1 semestre/i)).toBeVisible()
 
     // Act: the explicit confirmation makes the import request.
@@ -613,6 +614,32 @@ describe('AcademicCatalogPage', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('No fue posible validar el archivo.')
     expect(client.importCsv).not.toHaveBeenCalled()
 
+  })
+
+  it('allows retrying a failed preview with the same file', async () => {
+    // Arrange
+    const client = createClient({
+      previewCsv: vi.fn()
+        .mockRejectedValueOnce(new Error('Servicio temporalmente no disponible.'))
+        .mockResolvedValue(importPreview),
+    })
+    await renderCatalogPage({ client, authorization })
+    const input = await screen.findByLabelText(/archivo CSV/i)
+    const file = new File(['curriculum'], 'plan.csv', { type: 'text/csv' })
+    fireEvent.change(input, { target: { files: [file] } })
+    expect(input).toHaveValue('')
+
+    // Act
+    await userEvent.click(screen.getByRole('button', { name: /validar csv/i }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Servicio temporalmente no disponible.')
+    fireEvent.change(input, { target: { files: [file] } })
+    await userEvent.click(screen.getByRole('button', { name: /validar csv/i }))
+
+    // Assert
+    expect(client.previewCsv).toHaveBeenCalledTimes(2)
+    expect(client.previewCsv).toHaveBeenLastCalledWith(file, authorization.accessToken)
+    expect(await screen.findByText('Cálculo I')).toBeVisible()
+    expect(client.importCsv).not.toHaveBeenCalled()
   })
 
   it('clears a successful preview when another file is selected', async () => {

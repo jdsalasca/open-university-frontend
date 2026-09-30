@@ -599,6 +599,7 @@ function CatalogAdministration({ accessToken, authorization, client, onPublished
 
   function chooseFile(event: ChangeEvent<HTMLInputElement>) {
     const file = event.currentTarget.files?.[0] ?? null
+    event.currentTarget.value = ''
     selectedFileRef.current = file
     setSelectedFile(file)
     setFilePreview(null)
@@ -784,10 +785,10 @@ function CurriculumImportPreviewPanel({ preview }: { preview: CurriculumImportPr
       <div className="catalog-review-table-wrap">
         <table className="catalog-review-table">
           <caption>Muestra de hasta 10 asignaturas de la carga</caption>
-          <thead><tr><th scope="col">Fila</th><th scope="col">Semestre</th><th scope="col">Código</th><th scope="col">Asignatura</th><th scope="col">Créditos</th><th scope="col">Espacio</th><th scope="col">Componente</th></tr></thead>
+          <thead><tr><th scope="col">Fila</th><th scope="col">Semestre</th><th scope="col">Código</th><th scope="col">Asignatura</th><th scope="col">Créditos</th><th scope="col">Espacio</th><th scope="col">Componente</th><th scope="col">Grupo de opción</th></tr></thead>
           <tbody>{preview.sampleEntries.map((entry) => (
             <tr key={`${entry.sourceRowNumber}-${entry.rowOrder}`}>
-              <td>{entry.sourceRowNumber}</td><td>{entry.semester}</td><td>{entry.subjectCode}</td><td>{entry.subjectName}</td><td>{entry.credits}</td><td>{entry.formationSpace}</td><td>{entry.component}</td>
+              <td>{entry.sourceRowNumber}</td><td>{entry.semester}</td><td>{entry.subjectCode}</td><td>{entry.subjectName}</td><td>{entry.credits}</td><td>{entry.formationSpace}</td><td>{entry.component}</td><td>{entry.choiceGroup ?? '—'}</td>
             </tr>
           ))}</tbody>
         </table>
