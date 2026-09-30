@@ -201,6 +201,32 @@ describe('App', () => {
     expect(screen.getByRole('button', { name: 'Publicar cambios' })).toBeEnabled()
   })
 
+  it('keeps sign-out available when the permission lookup fails', async () => {
+    // Arrange
+    const user = userEvent.setup()
+    const manager = authenticatedSessionManager()
+    manager.getUser = vi.fn().mockResolvedValue({
+      access_token: 'synthetic-access-token',
+      expires_at: Math.floor(Date.now() / 1000) + 300,
+    })
+    manager.signoutRedirect = vi.fn().mockResolvedValue(undefined)
+    render(
+      <BrandingProvider loader={async () => DEFAULT_BRANDING}>
+        <App
+          oidcConfiguration={oidcConfiguration}
+          identityManager={manager}
+          currentIdentityClient={{ current: vi.fn().mockRejectedValue(new Error('service unavailable')) }}
+        />
+      </BrandingProvider>,
+    )
+
+    // Act + Assert: verification errors keep permissions closed and preserve a way to end the local session.
+    expect(await screen.findByText(/no fue posible verificar los permisos/i)).toBeVisible()
+    await user.click(screen.getByRole('button', { name: 'Cerrar sesión' }))
+    expect(manager.signoutRedirect).toHaveBeenCalledOnce()
+    expect(await screen.findByText('Sin sesión institucional')).toBeVisible()
+  })
+
   it('does not let an academic catalog permission publish visual identity changes', async () => {
     // Arrange
     const user = userEvent.setup()

@@ -64,18 +64,22 @@ export function AcademicOperationsPage({
     return () => controller.abort()
   }, [authorization?.accessToken, authorization?.canRead, client, loadPrograms, retryNumber])
 
-  const sortedUnits = useMemo(() => requestData
-    ? [...requestData.structure.units].filter((unit) => unit.status === 'ACTIVE').sort(compareUnits)
-    : [], [requestData])
-  const sortedSites = useMemo(() => requestData
-    ? [...requestData.structure.sites].filter((site) => site.status === 'ACTIVE').sort(compareSites)
-    : [], [requestData])
-  const sortedPeriods = useMemo(() => requestData
-    ? [...requestData.periods].sort((first, second) => first.startsOn.localeCompare(second.startsOn)
+  const administrativeDataExpired = requestData?.periodSource === 'admin' && authorization?.canRead !== true
+  const visibleRequestData = administrativeDataExpired ? null : requestData
+  const visibleRequestState = administrativeDataExpired && requestState === 'ready' ? 'loading' : requestState
+
+  const sortedUnits = useMemo(() => visibleRequestData
+    ? [...visibleRequestData.structure.units].filter((unit) => unit.status === 'ACTIVE').sort(compareUnits)
+    : [], [visibleRequestData])
+  const sortedSites = useMemo(() => visibleRequestData
+    ? [...visibleRequestData.structure.sites].filter((site) => site.status === 'ACTIVE').sort(compareSites)
+    : [], [visibleRequestData])
+  const sortedPeriods = useMemo(() => visibleRequestData
+    ? [...visibleRequestData.periods].sort((first, second) => first.startsOn.localeCompare(second.startsOn)
       || first.kind.localeCompare(second.kind)
       || first.code.localeCompare(second.code))
-    : [], [requestData])
-  const programById = useMemo(() => new Map((requestData?.programs ?? []).map((program) => [program.id, program])), [requestData])
+    : [], [visibleRequestData])
+  const programById = useMemo(() => new Map((visibleRequestData?.programs ?? []).map((program) => [program.id, program])), [visibleRequestData])
 
   function retry() {
     setRequestData(null)
@@ -124,11 +128,11 @@ export function AcademicOperationsPage({
           <span className="academic-hero-ring academic-hero-ring-two" />
           <span className="academic-hero-emblem">A</span>
         </div>
-        {requestState === 'ready' && requestData && (
+        {visibleRequestState === 'ready' && visibleRequestData && (
           <div className="academic-operations-stats" aria-label="Resumen de la vista">
             <div><strong>{sortedUnits.length}</strong><span>unidades</span></div>
             <div><strong>{sortedSites.length}</strong><span>sedes activas</span></div>
-            <div><strong>{requestData.programs.length}</strong><span>programas publicados</span></div>
+            <div><strong>{visibleRequestData.programs.length}</strong><span>programas publicados</span></div>
             <div><strong>{sortedPeriods.filter((period) => period.status === 'OPEN').length}</strong><span>periodos abiertos</span></div>
           </div>
         )}
@@ -141,21 +145,21 @@ export function AcademicOperationsPage({
           : 'Los cambios de estado requieren permiso institucional de escritura. El semestre de una malla curricular es distinto del periodo académico real.'}</p>
       </div>
 
-      {requestState === 'loading' && (
+      {visibleRequestState === 'loading' && (
         <div className="academic-loading" role="status">
           <span className="academic-loading-mark" aria-hidden="true" />
           <span>Consultando estructura, programas y periodos abiertos…</span>
         </div>
       )}
 
-      {requestState === 'error' && (
+      {visibleRequestState === 'error' && (
         <div className="academic-load-error" role="alert">
           <div><strong>No fue posible cargar la información académica.</strong><p>Comprueba la conexión y vuelve a intentarlo.</p></div>
           <button type="button" onClick={retry}>Intentar de nuevo</button>
         </div>
       )}
 
-      {requestState === 'ready' && requestData && (
+      {visibleRequestState === 'ready' && visibleRequestData && (
         <>
           <div className="academic-structure-grid">
             <section className="academic-panel academic-units-panel" aria-labelledby="academic-units-title">
@@ -168,8 +172,8 @@ export function AcademicOperationsPage({
                 ? <p className="academic-empty-state">No hay unidades cargadas en la estructura vigente.</p>
                 : <OrganizationTree
                     units={sortedUnits}
-                    relations={requestData.structure.organizationRelations}
-                    affiliations={requestData.structure.programAffiliations}
+                    relations={visibleRequestData.structure.organizationRelations}
+                    affiliations={visibleRequestData.structure.programAffiliations}
                     programs={programById}
                     sites={sortedSites}
                   />}
@@ -184,7 +188,7 @@ export function AcademicOperationsPage({
               </header>
               {sortedSites.length === 0
                 ? <p className="academic-empty-state">No hay sedes cargadas en la estructura vigente.</p>
-                : <SiteTree sites={sortedSites} relations={requestData.structure.siteRelations} />}
+                : <SiteTree sites={sortedSites} relations={visibleRequestData.structure.siteRelations} />}
               <p className="academic-panel-footnote">Las sedes se administran aparte de las facultades.</p>
             </section>
           </div>
@@ -192,12 +196,12 @@ export function AcademicOperationsPage({
           <section className="academic-panel academic-periods-panel" aria-labelledby="academic-periods-title">
             <header className="academic-panel-heading">
               <span className="academic-panel-icon academic-icon-periods" aria-hidden="true">◷</span>
-              <div><p className="academic-panel-kicker">CALENDARIO VIGENTE</p><h2 id="academic-periods-title">{requestData.periodSource === 'admin' ? 'Gestión de periodos académicos' : 'Periodos académicos abiertos'}</h2></div>
-              <span className="academic-open-badge"><span aria-hidden="true" />{requestData.periodSource === 'admin' ? 'Vista por estado' : 'Solo periodos abiertos'}</span>
+              <div><p className="academic-panel-kicker">CALENDARIO VIGENTE</p><h2 id="academic-periods-title">{visibleRequestData.periodSource === 'admin' ? 'Gestión de periodos académicos' : 'Periodos académicos abiertos'}</h2></div>
+              <span className="academic-open-badge"><span aria-hidden="true" />{visibleRequestData.periodSource === 'admin' ? 'Vista por estado' : 'Solo periodos abiertos'}</span>
             </header>
             {periodActionMessage && <p className={`academic-period-action-message is-${periodActionMessage.type}`} role={periodActionMessage.type === 'error' ? 'alert' : 'status'}>{periodActionMessage.text}</p>}
             {sortedPeriods.length === 0
-              ? <p className="academic-empty-state">{requestData.periodSource === 'admin' ? 'No hay periodos académicos registrados.' : 'No hay periodos académicos abiertos para consulta.'}</p>
+              ? <p className="academic-empty-state">{visibleRequestData.periodSource === 'admin' ? 'No hay periodos académicos registrados.' : 'No hay periodos académicos abiertos para consulta.'}</p>
               : <ul className="academic-period-list">
                   {sortedPeriods.map((period) => <PeriodCard
                     key={period.id}

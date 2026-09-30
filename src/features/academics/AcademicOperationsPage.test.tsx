@@ -403,6 +403,30 @@ describe('AcademicOperationsPage', () => {
     expect(screen.queryByRole('button', { name: /abrir periodo|cerrar periodo/i })).not.toBeInTheDocument()
   })
 
+  it('hides previously loaded administrative periods immediately when read permission is lost', async () => {
+    // Arrange
+    const { AcademicOperationsPage } = await loadPage()
+    const approved = { ...regularPeriod, status: 'APPROVED' as const }
+    const client = createClient({
+      getAdminPeriods: vi.fn().mockResolvedValue([approved]),
+      getOpenPeriods: vi.fn(() => new Promise<AcademicPeriod[]>(() => {})),
+    })
+    const { rerender } = render(<AcademicOperationsPage
+      client={client}
+      loadPrograms={async () => programs}
+      authorization={{ accessToken: 'synthetic-read-token', canRead: true, canWrite: false }}
+    />)
+    expect(await screen.findByText('Aprobado')).toBeVisible()
+
+    // Act: session expiry/logout removes authorization while the public reload is still pending.
+    rerender(<AcademicOperationsPage client={client} loadPrograms={async () => programs} authorization={null} />)
+
+    // Assert: stale administrative data is hidden in the same render, before the request resolves.
+    expect(screen.queryByText('Aprobado')).not.toBeInTheDocument()
+    expect(screen.queryByText('2026-2')).not.toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent(/consultando estructura/i)
+  })
+
   it('allows a write-only operator to close a public open period but not open a hidden approved period', async () => {
     // Arrange
     const user = userEvent.setup()

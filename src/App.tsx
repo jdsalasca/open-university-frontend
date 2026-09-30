@@ -81,6 +81,7 @@ function ApplicationShell({
   const isIdentityView = view === 'identity'
   const authenticatedIdentity = identity.status === 'authenticated' ? identity : null
   const hasInstitutionalSession = authenticatedIdentity !== null
+  const canEndInstitutionalSession = hasInstitutionalSession || (identity.status === 'error' && loginAvailable)
   const catalogAuthorization = authenticatedIdentity
     ? {
       accessToken: authenticatedIdentity.accessToken,
@@ -188,10 +189,10 @@ function ApplicationShell({
                 className="identity-session-button"
                 type="button"
                 disabled={!loginAvailable || identity.status === 'loading'}
-                onClick={() => void (hasInstitutionalSession ? logout() : login())}
+                onClick={() => void (canEndInstitutionalSession ? logout() : login())}
                 title={!loginAvailable ? 'El inicio de sesión requiere configuración institucional aprobada' : undefined}
               >
-                {hasInstitutionalSession ? 'Cerrar sesión' : 'Iniciar sesión'}
+                {canEndInstitutionalSession ? 'Cerrar sesión' : 'Iniciar sesión'}
               </button>
             </div>
           </div>
