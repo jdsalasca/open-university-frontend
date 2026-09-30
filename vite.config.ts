@@ -1,19 +1,26 @@
 import react from '@vitejs/plugin-react'
+import { loadEnv } from 'vite'
 import { defineConfig } from 'vitest/config'
 
 // https://vite.dev/config/
-export default defineConfig({
-  plugins: [react()],
-  server: {
-    proxy: {
-      '/api': 'http://localhost:8080',
-      '/assets': 'http://localhost:8080',
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), 'VITE_')
+  const backendTarget = env.VITE_API_TARGET ?? 'http://localhost:8080'
+
+  return {
+    plugins: [react()],
+    server: {
+      host: '0.0.0.0',
+      proxy: {
+        '/api': backendTarget,
+        '/assets': backendTarget,
+      },
     },
-  },
-  test: {
-    environment: 'jsdom',
-    setupFiles: ['./src/test/setup.ts'],
-    restoreMocks: true,
-    clearMocks: true,
-  },
+    test: {
+      environment: 'jsdom',
+      setupFiles: ['./src/test/setup.ts'],
+      restoreMocks: true,
+      clearMocks: true,
+    },
+  }
 })

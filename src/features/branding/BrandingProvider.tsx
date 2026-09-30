@@ -57,6 +57,18 @@ export function BrandingProvider({ children, loader = getPublicBranding, timeout
     })
   }, [branding.colors])
 
+  useEffect(() => {
+    document.title = `${branding.institutionName} · Plataforma Universitaria`
+    let favicon = document.querySelector<HTMLLinkElement>('link[rel~="icon"]')
+    if (!favicon) {
+      favicon = document.createElement('link')
+      favicon.rel = 'icon'
+      document.head.append(favicon)
+    }
+    favicon.removeAttribute('type')
+    favicon.href = branding.assets.favicon ? `/assets/${branding.assets.favicon}` : '/favicon.svg'
+  }, [branding.institutionName, branding.assets.favicon])
+
   const contextValue: BrandingContextValue = {
     branding,
     status,

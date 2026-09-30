@@ -37,6 +37,8 @@ afterEach(() => {
   vi.unstubAllGlobals()
   vi.useRealTimers()
   document.documentElement.removeAttribute('style')
+  document.title = 'frontend'
+  document.querySelectorAll('link[rel~="icon"]').forEach((link) => link.remove())
 })
 
 describe('BrandingProvider', () => {
@@ -48,9 +50,11 @@ describe('BrandingProvider', () => {
     render(<BrandingProvider><BrandingProbe /></BrandingProvider>)
 
     // Assert
-    await waitFor(() => expect(screen.getByLabelText('estado de identidad')).toHaveTextContent('ready:7:'))
-    expect(document.documentElement.style.getPropertyValue('--brand-primary')).toBe('#123456')
-    expect(document.documentElement.style.getPropertyValue('--brand-ink')).toBe('#1A1A1A')
+    await waitFor(() => {
+      expect(screen.getByLabelText('estado de identidad')).toHaveTextContent('ready:7:')
+      expect(document.documentElement.style.getPropertyValue('--brand-primary')).toBe('#123456')
+      expect(document.documentElement.style.getPropertyValue('--brand-ink')).toBe('#1A1A1A')
+    })
   })
 
   it('uses the official identity when the public API is unavailable', async () => {
@@ -80,6 +84,28 @@ describe('BrandingProvider', () => {
     // Assert
     await waitFor(() => expect(screen.getByLabelText('estado de identidad')).toHaveTextContent('ready:7:'))
     expect(document.documentElement.style.getPropertyValue('--brand-primary')).toBe('#FFCC29')
+  })
+
+  it('updates the document title and favicon from the validated public identity', async () => {
+    // Arrange
+    const favicon = document.createElement('link')
+    favicon.rel = 'icon'
+    favicon.href = '/favicon.svg'
+    document.head.append(favicon)
+    vi.stubGlobal('fetch', vi.fn().mockReturnValue(jsonResponse({
+      ...apiBranding,
+      institutionName: 'Universidad de prueba institucional',
+      assets: { ...apiBranding.assets, favicon: 'a7e7f06b-09a7-43db-a468-4c7b8ee3d301' },
+    })))
+
+    // Act
+    render(<BrandingProvider><BrandingProbe /></BrandingProvider>)
+
+    // Assert
+    await waitFor(() => {
+      expect(document.title).toBe('Universidad de prueba institucional · Plataforma Universitaria')
+      expect(favicon.getAttribute('href')).toBe('/assets/a7e7f06b-09a7-43db-a468-4c7b8ee3d301')
+    })
   })
 
   it('falls back and aborts a request that exceeds the loading timeout', async () => {
