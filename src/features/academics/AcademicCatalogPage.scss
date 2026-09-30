@@ -85,13 +85,18 @@
 .catalog-program-list { display: grid; gap: 7px; }
 .catalog-program-option { display: flex; width: 100%; align-items: center; gap: 10px; min-width: 0; padding: 10px; border: 1px solid transparent; border-radius: 10px; background: #fafaf7; color: inherit; cursor: pointer; text-align: left; transition: border-color .16s ease, background .16s ease, transform .16s ease; }
 .catalog-program-option:hover { border-color: #e4ddba; background: #fffef7; transform: translateY(-1px); }
-.catalog-program-option:focus-visible, .catalog-button:focus-visible, .catalog-file-picker:focus-visible { @include tokens.focus-ring; }
+.catalog-program-option:focus-visible, .catalog-button:focus-visible, .catalog-file-picker:focus-visible, .catalog-program-search input:focus-visible { @include tokens.focus-ring; }
 .catalog-program-option.is-selected { border-color: #e5d779; background: linear-gradient(105deg, #fff9d8, #fffef7); }
 .catalog-program-mark { display: grid; flex: 0 0 34px; width: 34px; height: 34px; place-items: center; border-radius: 11px; background: #252720; color: var(--brand-primary, #ffcc29); font-family: Georgia, serif; font-size: 17px; }
 .catalog-program-copy { display: grid; min-width: 0; gap: 4px; }
 .catalog-program-copy strong { overflow: hidden; color: #33352f; font-size: 10px; font-weight: 700; text-overflow: ellipsis; }
 .catalog-program-copy small { overflow: hidden; color: #87887f; font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
 .catalog-program-arrow { margin-left: auto; color: #a5a392; font-size: 15px; }
+.catalog-program-search { display: grid; gap: 5px; margin: 0 0 10px; color: #72736a; font-size: 9px; font-weight: 700; }
+.catalog-program-search input { width: 100%; min-height: 35px; padding: 0 10px; border: 1px solid #dedfd8; border-radius: 8px; background: #fff; color: #383a33; font: inherit; }
+.catalog-program-search input::placeholder { color: #9a9b93; }
+.catalog-program-list-empty { margin: 0; padding: 13px; border: 1px dashed #e3e3d9; border-radius: 9px; color: #77786f; font-size: 9px; line-height: 1.5; text-align: center; }
+.catalog-program-filter-context { margin: 9px 0 0; padding: 9px; border-radius: 8px; background: #f8f7ee; color: #77724d; font-size: 8px; line-height: 1.5; }
 .catalog-curricula-panel { background: linear-gradient(145deg, #fff, #fcfcf8); }
 .catalog-curricula-heading { align-items: flex-start; margin-bottom: 17px; }
 .catalog-curricula-heading h2 { max-width: 540px; font-size: 22px; }

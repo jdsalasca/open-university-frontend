@@ -40,6 +40,16 @@ const program: AcademicProgram = {
   campusName: 'Tunja',
 }
 
+const secondProgram: AcademicProgram = {
+  ...program,
+  id: '7efb9955-ec0b-40d6-8c67-f9188dc4c016',
+  programCode: 'PRE-002',
+  campusCode: 'SOGAMOSO',
+  programName: 'Física de Prueba',
+  faculty: 'Facultad de Ciencias',
+  campusName: 'Sogamoso',
+}
+
 const publishedCurriculum: AcademicCurriculum = {
   id: 'c376975f-016f-4a95-9279-bb50ff95bbd1',
   programId: program.id,
@@ -58,6 +68,20 @@ const publishedCurriculum: AcademicCurriculum = {
   entryCount: 42,
   createdAt: '2026-01-10T10:00:00Z',
   publishedAt: '2026-01-11T10:00:00Z',
+}
+
+const secondPublishedCurriculum: AcademicCurriculum = {
+  ...publishedCurriculum,
+  id: 'dfe01eae-2219-408c-8ae5-650e77e41d7f',
+  programId: secondProgram.id,
+  programCode: secondProgram.programCode,
+  campusCode: secondProgram.campusCode,
+  programName: secondProgram.programName,
+  faculty: secondProgram.faculty,
+  campusName: secondProgram.campusName,
+  curriculumVersion: '2025-B',
+  cohortFrom: '2025-2',
+  entryCount: 20,
 }
 
 const draft: AcademicCurriculum = { ...publishedCurriculum, id: '46e7938c-cbab-4f97-9dc5-0ad1ab04603d', status: 'DRAFT', publishedAt: null }
@@ -184,6 +208,56 @@ describe('AcademicCatalogPage', () => {
     expect(within(curriculumCard).getByText(/2026-1/)).toBeVisible()
     expect(within(curriculumCard).getByText(/42 actividades/i)).toBeVisible()
     expect(within(curriculumCard).getByText(/Publicado/i)).toBeVisible()
+  })
+
+  it('searches programs by unaccented text and loads a selected result', async () => {
+    // Arrange
+    const listCurricula = vi.fn().mockImplementation((programId: string) => Promise.resolve(
+      programId === secondProgram.id ? [secondPublishedCurriculum] : [publishedCurriculum],
+    ))
+    const client = createClient({
+      listPrograms: vi.fn().mockResolvedValue([program, secondProgram]),
+      listCurricula,
+    })
+    await renderCatalogPage({ client })
+    await screen.findByRole('button', { name: /Ingeniería de Prueba/i })
+
+    // Act
+    await userEvent.type(screen.getByRole('searchbox', { name: /buscar programa/i }), 'fisica')
+
+    // Assert: matching text can be found without its accent.
+    const matchingProgram = screen.getByRole('button', { name: /Física de Prueba/i })
+    expect(matchingProgram).toBeVisible()
+    expect(screen.queryByRole('button', { name: /Ingeniería de Prueba/i })).not.toBeInTheDocument()
+    expect(listCurricula).toHaveBeenCalledTimes(1)
+
+    // Act: select the result.
+    await userEvent.click(matchingProgram)
+
+    // Assert
+    expect(await screen.findByRole('heading', { name: 'Física de Prueba' })).toBeVisible()
+    expect(screen.getByText('2025-B')).toBeVisible()
+    expect(listCurricula).toHaveBeenCalledWith(secondProgram.id, expect.any(AbortSignal))
+  })
+
+  it('explains when no program matches and keeps the selected plan identifiable', async () => {
+    // Arrange
+    const client = createClient({
+      listPrograms: vi.fn().mockResolvedValue([program]),
+      listCurricula: vi.fn().mockResolvedValue([publishedCurriculum]),
+    })
+    await renderCatalogPage({ client })
+    await screen.findByRole('button', { name: /Ingeniería de Prueba/i })
+
+    // Act
+    await userEvent.type(screen.getByRole('searchbox', { name: /buscar programa/i }), 'NO-EXISTE')
+
+    // Assert
+    const programList = within(screen.getByRole('group', { name: /seleccionar programa/i }))
+    expect(programList.getByRole('status')).toHaveTextContent(/ningún programa coincide/i)
+    expect(screen.getByText(/el plan mostrado corresponde a ingeniería de prueba/i)).toBeVisible()
+    expect(screen.getByRole('heading', { name: 'Ingeniería de Prueba' })).toBeVisible()
+    expect(client.listCurricula).toHaveBeenCalledTimes(1)
   })
 
   it('opens the published curriculum and displays its subjects in a readable table', async () => {

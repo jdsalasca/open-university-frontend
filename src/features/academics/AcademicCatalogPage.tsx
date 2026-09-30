@@ -38,6 +38,7 @@ export function AcademicCatalogPage({
   const [programsState, setProgramsState] = useState<RequestState>('loading')
   const [programsError, setProgramsError] = useState('')
   const [programRetry, setProgramRetry] = useState(0)
+  const [programSearch, setProgramSearch] = useState('')
   const [selectedProgramId, setSelectedProgramId] = useState('')
   const [curricula, setCurricula] = useState<AcademicCurriculum[]>([])
   const [curriculaState, setCurriculaState] = useState<RequestState>('ready')
@@ -85,7 +86,17 @@ export function AcademicCatalogPage({
     () => programs.find((program) => program.id === selectedProgramId) ?? null,
     [programs, selectedProgramId],
   )
-
+  const visiblePrograms = useMemo(() => {
+    const normalizedSearch = normalizeSearchText(programSearch)
+    if (normalizedSearch.length === 0) return programs
+    return programs.filter((program) => normalizeSearchText([
+      program.programCode,
+      program.programName,
+      program.faculty,
+      program.campusCode,
+      program.campusName,
+    ].join(' ')).includes(normalizedSearch))
+  }, [programs, programSearch])
   function retryPrograms() {
     setProgramsState('loading')
     setProgramsError('')
@@ -165,10 +176,20 @@ export function AcademicCatalogPage({
           <div className="catalog-programs-panel">
             <div className="catalog-section-heading">
               <div><p className="catalog-eyebrow">EXPLORAR</p><h2>Programas</h2></div>
-              <span className="catalog-count">{programs.length.toString().padStart(2, '0')}</span>
+              <span className="catalog-count">{visiblePrograms.length.toString().padStart(2, '0')}</span>
             </div>
+            <label className="catalog-program-search">
+              <span>Buscar programa</span>
+              <input
+                aria-label="Buscar programa"
+                onChange={(event) => setProgramSearch(event.target.value)}
+                placeholder="Nombre, código o sede"
+                type="search"
+                value={programSearch}
+              />
+            </label>
             <div className="catalog-program-list" role="group" aria-label="Seleccionar programa">
-              {programs.map((program) => (
+              {visiblePrograms.map((program) => (
                 <button
                   aria-pressed={selectedProgramId === program.id}
                   className={`catalog-program-option${selectedProgramId === program.id ? ' is-selected' : ''}`}
@@ -181,7 +202,16 @@ export function AcademicCatalogPage({
                   <span className="catalog-program-arrow" aria-hidden="true">↗</span>
                 </button>
               ))}
+              {visiblePrograms.length === 0 && (
+                <p className="catalog-program-list-empty" role="status">Ningún programa coincide con esta búsqueda.</p>
+              )}
             </div>
+            {selectedProgram && programSearch.trim().length > 0
+              && !visiblePrograms.some(({ id }) => id === selectedProgram.id) && (
+                <p className="catalog-program-filter-context" role="status">
+                  El plan mostrado corresponde a {selectedProgram.programName}. Selecciona un resultado para cambiarlo.
+                </p>
+              )}
           </div>
 
           <div className="catalog-curricula-panel">
