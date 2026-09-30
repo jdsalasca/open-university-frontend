@@ -81,7 +81,33 @@ const details: AcademicCurriculumDetails = {
 const publicDetails: AcademicCurriculumDetails = {
   ...details,
   curriculum: publishedCurriculum,
-  entries: details.entries.map((entry) => ({ ...entry, choiceGroup: 'OPT-2026' })),
+  entries: [
+    ...details.entries.map((entry) => ({ ...entry, choiceGroup: 'OPT-2026' })),
+    {
+      ...details.entries[0],
+      subjectId: '9f7d9d63-c2bb-4424-85c1-63797065a35e',
+      subjectRevisionId: '536f34ac-cbf7-4ba3-bc35-301c814d8f51',
+      subjectCode: 'FIS-101',
+      subjectName: 'Física I',
+      semester: 2,
+      choiceGroup: null,
+      rowOrder: 2,
+    },
+  ],
+}
+
+const largePublicDetails: AcademicCurriculumDetails = {
+  ...publicDetails,
+  entries: Array.from({ length: 101 }, (_, index) => ({
+    ...publicDetails.entries[0],
+    subjectId: `00000000-0000-4000-8000-${String(index + 1).padStart(12, '0')}`,
+    subjectRevisionId: `00000001-0000-4000-8000-${String(index + 1).padStart(12, '0')}`,
+    subjectCode: `SUB-${String(index + 1).padStart(3, '0')}`,
+    subjectName: `Asignatura ${index + 1}`,
+    semester: Math.floor(index / 10) + 1,
+    choiceGroup: null,
+    rowOrder: index + 1,
+  })),
 }
 
 const authorization: CatalogAuthorization = {
@@ -178,6 +204,82 @@ describe('AcademicCatalogPage', () => {
     expect(screen.getByRole('cell', { name: 'Cálculo I' })).toBeVisible()
     expect(screen.getByRole('cell', { name: 'MAT-101' })).toBeVisible()
     expect(screen.getByRole('cell', { name: 'OPT-2026' })).toBeVisible()
+    expect(screen.getByRole('cell', { name: 'Física I' })).toBeVisible()
+  })
+
+  it('filters published subjects by accent-insensitive name and semester', async () => {
+    // Arrange
+    const client = createClient({
+      listPrograms: vi.fn().mockResolvedValue([program]),
+      listCurricula: vi.fn().mockResolvedValue([publishedCurriculum]),
+    })
+    await renderCatalogPage({ client })
+    await userEvent.click(await screen.findByRole('button', { name: /ver asignaturas de la versión 2026-A/i }))
+    await screen.findByRole('table', { name: /asignaturas de la versión 2026-A/i })
+
+    // Act: a search without the accent still finds "Cálculo I".
+    await userEvent.type(screen.getByRole('searchbox', { name: /buscar asignatura/i }), 'calculo')
+
+    // Assert: the other subject is excluded without another API read.
+    expect(screen.getByRole('cell', { name: 'Cálculo I' })).toBeVisible()
+    expect(screen.queryByRole('cell', { name: 'Física I' })).not.toBeInTheDocument()
+    expect(client.getPublishedCurriculum).toHaveBeenCalledTimes(1)
+
+    // Act: select semester 2 with the search cleared.
+    await userEvent.clear(screen.getByRole('searchbox', { name: /buscar asignatura/i }))
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: /semestre/i }), '2')
+
+    // Assert
+    expect(screen.getByRole('cell', { name: 'Física I' })).toBeVisible()
+    expect(screen.queryByRole('cell', { name: 'Cálculo I' })).not.toBeInTheDocument()
+    expect(client.getPublishedCurriculum).toHaveBeenCalledTimes(1)
+  })
+
+  it('shows an empty filter result without hiding the loaded curriculum detail', async () => {
+    // Arrange
+    const client = createClient({
+      listPrograms: vi.fn().mockResolvedValue([program]),
+      listCurricula: vi.fn().mockResolvedValue([publishedCurriculum]),
+    })
+    await renderCatalogPage({ client })
+    await userEvent.click(await screen.findByRole('button', { name: /ver asignaturas de la versión 2026-A/i }))
+    await screen.findByRole('table', { name: /asignaturas de la versión 2026-A/i })
+
+    // Act
+    await userEvent.type(screen.getByRole('searchbox', { name: /buscar asignatura/i }), 'NO-EXISTE')
+
+    // Assert
+    const detail = within(screen.getByRole('region', { name: /detalle de la versión 2026-A/i }))
+    expect(detail.getByRole('status')).toHaveTextContent(/ninguna asignatura coincide/i)
+    expect(screen.queryByRole('table', { name: /asignaturas de la versión 2026-A/i })).not.toBeInTheDocument()
+    expect(client.getPublishedCurriculum).toHaveBeenCalledTimes(1)
+  })
+
+  it('paginates large published curricula without another API request', async () => {
+    // Arrange
+    const client = createClient({
+      listPrograms: vi.fn().mockResolvedValue([program]),
+      listCurricula: vi.fn().mockResolvedValue([publishedCurriculum]),
+      getPublishedCurriculum: vi.fn().mockResolvedValue(largePublicDetails),
+    })
+    await renderCatalogPage({ client })
+    await userEvent.click(await screen.findByRole('button', { name: /ver asignaturas de la versión 2026-A/i }))
+    const table = await screen.findByRole('table', { name: /asignaturas de la versión 2026-A/i })
+
+    // Act + Assert: the first page renders at most 100 data rows and disables the previous control.
+    expect(within(table).getAllByRole('row')).toHaveLength(101)
+    expect(screen.getByRole('cell', { name: 'Asignatura 100' })).toBeVisible()
+    expect(screen.queryByRole('cell', { name: 'Asignatura 101' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /página anterior/i })).toBeDisabled()
+
+    // Act: move to the remaining row.
+    await userEvent.click(screen.getByRole('button', { name: /página siguiente/i }))
+
+    // Assert
+    expect(within(table).getAllByRole('row')).toHaveLength(2)
+    expect(screen.getByRole('cell', { name: 'Asignatura 101' })).toBeVisible()
+    expect(screen.getByText('Página 2 de 2')).toBeVisible()
+    expect(client.getPublishedCurriculum).toHaveBeenCalledTimes(1)
   })
 
   it('does not render subjects when the published detail is no longer available', async () => {

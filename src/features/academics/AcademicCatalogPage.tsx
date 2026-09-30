@@ -18,6 +18,7 @@ interface AcademicCatalogPageProps {
 }
 
 type RequestState = 'loading' | 'ready' | 'error'
+const PUBLIC_CURRICULUM_PAGE_SIZE = 100
 
 interface ApiFailure extends Error {
   status?: number
@@ -250,6 +251,26 @@ function PublishedCurriculumDetails({ client, curriculum, onClose }: PublishedCu
   const [requestState, setRequestState] = useState<RequestState>('loading')
   const [error, setError] = useState('')
   const [retryCount, setRetryCount] = useState(0)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [selectedSemester, setSelectedSemester] = useState('all')
+  const [currentPage, setCurrentPage] = useState(1)
+  const semesters = useMemo(
+    () => [...new Set(details?.entries.map((entry) => entry.semester) ?? [])].sort((left, right) => left - right),
+    [details],
+  )
+  const visibleEntries = useMemo(() => {
+    if (!details) return []
+    const normalizedSearch = normalizeSearchText(searchTerm)
+    return details.entries.filter((entry) => {
+      const matchesSemester = selectedSemester === 'all' || entry.semester === Number(selectedSemester)
+      const matchesSearch = normalizedSearch.length === 0
+        || normalizeSearchText(`${entry.subjectCode} ${entry.subjectName}`).includes(normalizedSearch)
+      return matchesSemester && matchesSearch
+    })
+  }, [details, searchTerm, selectedSemester])
+  const pageCount = Math.max(1, Math.ceil(visibleEntries.length / PUBLIC_CURRICULUM_PAGE_SIZE))
+  const firstVisibleEntry = (currentPage - 1) * PUBLIC_CURRICULUM_PAGE_SIZE
+  const pageEntries = visibleEntries.slice(firstVisibleEntry, firstVisibleEntry + PUBLIC_CURRICULUM_PAGE_SIZE)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -316,35 +337,95 @@ function PublishedCurriculumDetails({ client, curriculum, onClose }: PublishedCu
         <p className="catalog-public-detail-empty" role="status">Esta versión todavía no tiene asignaturas publicadas.</p>
       )}
       {requestState === 'ready' && details && details.entries.length > 0 && (
-        <div className="catalog-review-table-wrap">
-          <table className="catalog-review-table">
-            <caption>Asignaturas de la versión {details.curriculum.curriculumVersion}</caption>
-            <thead>
-              <tr>
-                <th scope="col">Semestre</th>
-                <th scope="col">Código</th>
-                <th scope="col">Asignatura</th>
-                <th scope="col">Créditos</th>
-                <th scope="col">Espacio de formación</th>
-                <th scope="col">Componente</th>
-                <th scope="col">Grupo de elección</th>
-              </tr>
-            </thead>
-            <tbody>
-              {details.entries.map((entry) => (
-                <tr key={entry.subjectRevisionId}>
-                  <td>{entry.semester}</td>
-                  <td>{entry.subjectCode}</td>
-                  <td>{entry.subjectName}</td>
-                  <td>{entry.credits}</td>
-                  <td>{entry.formationSpace}</td>
-                  <td>{entry.component}</td>
-                  <td>{entry.choiceGroup ?? '—'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <>
+          <div className="catalog-curriculum-filters">
+            <label>
+              <span>Buscar asignatura</span>
+              <input
+                onChange={(event) => {
+                  setSearchTerm(event.target.value)
+                  setCurrentPage(1)
+                }}
+                placeholder="Código o nombre"
+                type="search"
+                value={searchTerm}
+              />
+            </label>
+            <label>
+              <span>Semestre</span>
+              <select
+                onChange={(event) => {
+                  setSelectedSemester(event.target.value)
+                  setCurrentPage(1)
+                }}
+                value={selectedSemester}
+              >
+                <option value="all">Todos los semestres</option>
+                {semesters.map((semester) => <option key={semester} value={semester}>Semestre {semester}</option>)}
+              </select>
+            </label>
+            <p className="catalog-curriculum-filter-count">Mostrando {visibleEntries.length} de {details.entries.length} asignaturas</p>
+          </div>
+          {visibleEntries.length === 0
+            ? <p className="catalog-curriculum-filter-empty" role="status">Ninguna asignatura coincide con estos filtros.</p>
+            : (
+              <div className="catalog-review-table-wrap">
+                <table className="catalog-review-table">
+                  <caption>Asignaturas de la versión {details.curriculum.curriculumVersion}</caption>
+                  <thead>
+                    <tr>
+                      <th scope="col">Semestre</th>
+                      <th scope="col">Código</th>
+                      <th scope="col">Asignatura</th>
+                      <th scope="col">Créditos</th>
+                      <th scope="col">Espacio de formación</th>
+                      <th scope="col">Componente</th>
+                      <th scope="col">Grupo de elección</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pageEntries.map((entry) => (
+                      <tr key={entry.subjectRevisionId}>
+                        <td>{entry.semester}</td>
+                        <td>{entry.subjectCode}</td>
+                        <td>{entry.subjectName}</td>
+                        <td>{entry.credits}</td>
+                        <td>{entry.formationSpace}</td>
+                        <td>{entry.component}</td>
+                        <td>{entry.choiceGroup ?? '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          {pageCount > 1 && (
+            <nav className="catalog-curriculum-pagination" aria-label="Paginación de asignaturas">
+              <span>Mostrando {firstVisibleEntry + 1}–{Math.min(firstVisibleEntry + PUBLIC_CURRICULUM_PAGE_SIZE, visibleEntries.length)} de {visibleEntries.length}</span>
+              <div>
+                <button
+                  aria-label="Página anterior"
+                  className="catalog-button catalog-button-secondary"
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                  type="button"
+                >
+                  Anterior
+                </button>
+                <span aria-live="polite">Página {currentPage} de {pageCount}</span>
+                <button
+                  aria-label="Página siguiente"
+                  className="catalog-button catalog-button-secondary"
+                  disabled={currentPage === pageCount}
+                  onClick={() => setCurrentPage((page) => Math.min(pageCount, page + 1))}
+                  type="button"
+                >
+                  Siguiente
+                </button>
+              </div>
+            </nav>
+          )}
+        </>
       )}
     </section>
   )
@@ -608,6 +689,10 @@ function ActionError({ error }: { error: ApiFailure }) {
 
 function cohortLabel(curriculum: AcademicCurriculum): string {
   return `${curriculum.cohortFrom}${curriculum.cohortThrough ? ` — ${curriculum.cohortThrough}` : ' — sin término definido'}`
+}
+
+function normalizeSearchText(value: string): string {
+  return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('es-CO').trim()
 }
 
 function clientFailure(status: number, code: string, message: string): ApiFailure {

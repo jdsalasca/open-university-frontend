@@ -184,6 +184,18 @@
 .catalog-public-detail-heading h3 { margin: 0; color: #363832; font-family: Georgia, serif; font-size: 19px; font-weight: 500; }
 .catalog-public-detail-heading h3 span { color: #77724d; }
 .catalog-public-curriculum-detail .catalog-review-table { min-width: 860px; }
+.catalog-curriculum-filters { display: grid; grid-template-columns: minmax(210px, 1fr) minmax(170px, .55fr) auto; align-items: end; gap: 10px; margin: 0 0 11px; }
+.catalog-curriculum-filters label { display: grid; gap: 5px; color: #72736a; font-size: 9px; font-weight: 700; }
+.catalog-curriculum-filters input, .catalog-curriculum-filters select { width: 100%; min-height: 35px; padding: 0 10px; border: 1px solid #dedfd8; border-radius: 8px; background: #fff; color: #383a33; font: inherit; }
+.catalog-curriculum-filters input::placeholder { color: #9a9b93; }
+.catalog-curriculum-filters input:focus-visible, .catalog-curriculum-filters select:focus-visible { @include tokens.focus-ring; }
+.catalog-curriculum-filter-count { margin: 0 0 9px; color: #85867d; font-size: 8px; white-space: nowrap; }
+.catalog-curriculum-filter-empty { margin: 0; padding: 16px; border: 1px dashed #e3e3d9; border-radius: 9px; background: #fdfdfa; color: #77786f; font-size: 10px; text-align: center; }
+.catalog-curriculum-pagination { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 11px; color: #85867d; font-size: 8px; }
+.catalog-curriculum-pagination > div { display: flex; align-items: center; gap: 9px; }
+.catalog-curriculum-pagination .catalog-button { min-height: 29px; }
+.catalog-curriculum-pagination .catalog-button:disabled { opacity: .42; }
+.catalog-curriculum-pagination [aria-live] { min-width: 78px; color: #66675f; text-align: center; }
 .catalog-public-detail-error { margin: 0; flex-wrap: wrap; }
 .catalog-public-detail-error p { flex: 1; }
 .catalog-public-detail-empty { margin: 0; padding: 16px; border: 1px dashed #e3e3d9; border-radius: 9px; background: #fdfdfa; color: #77786f; font-size: 10px; text-align: center; }
@@ -210,6 +222,10 @@
   .catalog-admin-locked { align-items: flex-start; flex-wrap: wrap; }
   .catalog-locked-tag { margin-left: 46px; }
   .catalog-public-detail-heading { align-items: flex-start; }
+  .catalog-curriculum-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .catalog-curriculum-filter-count { grid-column: 1 / -1; margin-bottom: 0; }
+  .catalog-curriculum-pagination { align-items: flex-start; flex-direction: column; }
+  .catalog-curriculum-pagination > div { width: 100%; justify-content: space-between; }
 }
 
 @media (max-width: 520px) {
@@ -230,6 +246,8 @@
   .catalog-review-heading { align-items: flex-start; flex-direction: column; }
   .catalog-public-curriculum-detail { padding: 12px; }
   .catalog-public-detail-heading { gap: 8px; }
+  .catalog-curriculum-filters { grid-template-columns: minmax(0, 1fr); }
+  .catalog-curriculum-filter-count { grid-column: auto; }
 }
 
 @media (prefers-reduced-motion: reduce) {
