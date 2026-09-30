@@ -19,6 +19,7 @@ function emptyAcademicCatalogClient(): AcademicCatalogClient {
     listPublishedCurriculumEntries: async () => { throw new Error('Unexpected public curriculum page') },
     listDrafts: async () => [],
     getCurriculum: async () => { throw new Error('Unexpected curriculum review') },
+    previewCsv: async () => { throw new Error('Unexpected curriculum preview') },
     importCsv: async () => { throw new Error('Unexpected curriculum import') },
     publishCurriculum: async () => { throw new Error('Unexpected curriculum publication') },
   }

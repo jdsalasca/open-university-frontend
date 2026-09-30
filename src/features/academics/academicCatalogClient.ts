@@ -2,6 +2,7 @@ import type {
   AcademicCatalogClient,
   AcademicCurriculumEntriesPageQuery,
   AcademicCatalogIssue,
+  CurriculumImportPreview,
 } from './contracts'
 import {
   parseAcademicCurricula,
@@ -9,6 +10,7 @@ import {
   parseAcademicCurriculumDetails,
   parseAcademicCurriculumEntriesPage,
   parseAcademicPrograms,
+  parseCurriculumImportPreview,
   validateCurriculumCsvFile,
 } from './contracts'
 
@@ -86,15 +88,15 @@ export function createAcademicCatalogClient(fetcher: typeof fetch = fetch): Acad
     },
 
     async importCsv(file, accessToken, signal) {
-      const fileError = validateCurriculumCsvFile(file)
-      if (fileError) throw new AcademicCatalogApiError(fileError.status, fileError.code, fileError.message, [])
-      const body = new FormData()
-      body.append('file', file)
-      const response = await fetcher(
-        '/api/v1/admin/academic-catalog/imports',
-        requestOptions(accessToken, signal, { method: 'POST', body }),
-      )
-      return parseAcademicCurriculum(await responseBody(response))
+      return parseAcademicCurriculum(await uploadCsv(
+        fetcher, '/api/v1/admin/academic-catalog/imports', file, accessToken, signal,
+      ))
+    },
+
+    async previewCsv(file, accessToken, signal): Promise<CurriculumImportPreview> {
+      return parseCurriculumImportPreview(await uploadCsv(
+        fetcher, '/api/v1/admin/academic-catalog/import-previews', file, accessToken, signal,
+      ))
     },
 
     async publishCurriculum(id, accessToken, signal) {
@@ -108,6 +110,21 @@ export function createAcademicCatalogClient(fetcher: typeof fetch = fetch): Acad
 }
 
 export const academicCatalogClient = createAcademicCatalogClient()
+
+async function uploadCsv(
+  fetcher: typeof fetch,
+  path: string,
+  file: File,
+  accessToken: string,
+  signal?: AbortSignal,
+): Promise<unknown> {
+  const fileError = validateCurriculumCsvFile(file)
+  if (fileError) throw new AcademicCatalogApiError(fileError.status, fileError.code, fileError.message, [])
+  const body = new FormData()
+  body.append('file', file)
+  const response = await fetcher(path, requestOptions(accessToken, signal, { method: 'POST', body }))
+  return responseBody(response)
+}
 
 function requestOptions(accessToken?: string, signal?: AbortSignal, overrides: RequestInit = {}): RequestInit {
   const headers: Record<string, string> = { Accept: 'application/json' }

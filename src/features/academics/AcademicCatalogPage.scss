@@ -145,6 +145,19 @@
 .catalog-template-download { width: fit-content; margin: 11px 0 0 46px; text-decoration: none; }
 .catalog-admin-grid { display: grid; grid-template-columns: minmax(230px, .75fr) minmax(0, 1.25fr); gap: 12px; }
 .catalog-upload-card, .catalog-drafts-card, .catalog-review-card { min-width: 0; padding: 16px; border: 1px solid #e6e7df; border-radius: 11px; background: #fff; }
+.catalog-import-preview { display: grid; gap: 12px; margin-top: 12px; padding: 16px; border: 1px solid #d9e4cf; border-radius: 11px; background: linear-gradient(135deg, #fbfcf8, #fff); }
+.catalog-import-preview-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.catalog-import-preview-heading .catalog-eyebrow { margin-bottom: 4px; }
+.catalog-import-preview-heading h3 { margin: 0; color: #3a3c34; font-family: Georgia, serif; font-size: 16px; font-weight: 500; }
+.catalog-preview-valid { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 6px; padding: 6px 9px; border: 1px solid #d8e7d2; border-radius: 999px; background: #f3faf1; color: #427049; font-size: 9px; font-weight: 750; }
+.catalog-preview-valid span { display: grid; width: 15px; height: 15px; place-items: center; border-radius: 50%; background: #e1f0dd; }
+.catalog-import-preview-meta { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 0; }
+.catalog-import-preview-meta > div { min-width: 0; padding: 9px 10px; border: 1px solid #eceee7; border-radius: 8px; background: #fff; }
+.catalog-import-preview-meta dt { margin-bottom: 4px; color: #85867d; font-size: 8px; font-weight: 700; text-transform: uppercase; }
+.catalog-import-preview-meta dd { overflow-wrap: anywhere; margin: 0; color: #4c4e46; font-size: 9px; line-height: 1.45; }
+.catalog-import-preview-count { margin: 0; color: #55574f; font-size: 10px; font-weight: 750; }
+.catalog-import-preview .catalog-review-table { min-width: 720px; }
+.catalog-import-preview-note { margin: 0; color: #777970; font-size: 9px; line-height: 1.5; }
 .catalog-upload-card .catalog-eyebrow, .catalog-drafts-heading .catalog-eyebrow { margin-bottom: 4px; }
 .catalog-upload-card h3, .catalog-drafts-heading h3, .catalog-review-heading h3 { margin: 0; color: #3a3c34; font-family: Georgia, serif; font-size: 16px; font-weight: 500; }
 .catalog-upload-card > p:not(.catalog-eyebrow) { margin: 7px 0 12px; color: #85867d; font-size: 9px; line-height: 1.6; }
@@ -223,6 +236,8 @@
   .catalog-hero-copy { max-width: 100%; }
   .catalog-intro { max-width: 520px; }
   .catalog-browser, .catalog-admin-grid { grid-template-columns: minmax(0, 1fr); }
+  .catalog-import-preview-meta { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .catalog-import-preview-heading { align-items: flex-start; }
   .catalog-program-list { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
   .catalog-admin-locked { align-items: flex-start; flex-wrap: wrap; }
   .catalog-locked-tag { margin-left: 46px; }

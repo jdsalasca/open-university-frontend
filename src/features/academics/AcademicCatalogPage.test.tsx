@@ -9,6 +9,7 @@ import type {
   AcademicCurriculumEntriesPage,
   AcademicCurriculumEntriesPageQuery,
   AcademicCurriculumEntry,
+  CurriculumImportPreview,
   AcademicProgram,
   CatalogAuthorization,
 } from './contracts'
@@ -105,6 +106,34 @@ const details: AcademicCurriculumDetails = {
   }],
 }
 
+const importPreview: CurriculumImportPreview = {
+  programCode: program.programCode,
+  academicLevel: 'PREGRADO',
+  studyModality: 'PRESENCIAL',
+  sniesCode: '12345',
+  programName: program.programName,
+  faculty: program.faculty,
+  campusCode: program.campusCode,
+  campusName: program.campusName,
+  curriculumVersion: '2026-A',
+  cohortFrom: '2026-1',
+  cohortThrough: null,
+  approvalReference: 'Acuerdo de prueba',
+  entryCount: 1,
+  semesters: [1],
+  sampleEntries: [{
+    sourceRowNumber: 2,
+    rowOrder: 1,
+    semester: 1,
+    subjectCode: 'MAT-101',
+    subjectName: 'Cálculo I',
+    credits: 4,
+    formationSpace: 'Disciplinar',
+    component: 'Fundamentación',
+    choiceGroup: null,
+  }],
+}
+
 const publicDetails: AcademicCurriculumDetails = {
   ...details,
   curriculum: publishedCurriculum,
@@ -163,6 +192,7 @@ function createClient(overrides: Partial<AcademicCatalogClient> = {}): AcademicC
     getCurriculum: vi.fn().mockResolvedValue(details),
     getPublishedCurriculum: vi.fn().mockResolvedValue(publishedCurriculum),
     listPublishedCurriculumEntries: vi.fn().mockImplementation((_id, query) => Promise.resolve(createEntriesPage(query))),
+    previewCsv: vi.fn().mockResolvedValue(importPreview),
     importCsv: vi.fn().mockResolvedValue(draft),
     publishCurriculum: vi.fn().mockResolvedValue({ ...details, curriculum: publishedCurriculum }),
     ...overrides,
@@ -542,7 +572,7 @@ describe('AcademicCatalogPage', () => {
     expect(client.importCsv).not.toHaveBeenCalled()
   })
 
-  it('imports a valid CSV and adds the created draft to the review queue', async () => {
+  it('previews a valid CSV before creating its draft and adds the draft to the review queue', async () => {
     // Arrange
     const client = createClient()
     await renderCatalogPage({ client, authorization })
@@ -551,7 +581,16 @@ describe('AcademicCatalogPage', () => {
     fireEvent.change(input, { target: { files: [file] } })
 
     // Act
-    await userEvent.click(screen.getByRole('button', { name: /importar borrador/i }))
+    await userEvent.click(screen.getByRole('button', { name: /validar csv/i }))
+
+    // Assert the first request is a no-write preview.
+    expect(client.previewCsv).toHaveBeenCalledWith(file, authorization.accessToken)
+    expect(client.importCsv).not.toHaveBeenCalled()
+    expect(await screen.findByText('Cálculo I')).toBeVisible()
+    expect(screen.getByText(/3 semestres|1 semestre/i)).toBeVisible()
+
+    // Act: the explicit confirmation makes the import request.
+    await userEvent.click(screen.getByRole('button', { name: /crear borrador/i }))
 
     // Assert
     expect(client.importCsv).toHaveBeenCalledWith(file, authorization.accessToken)
@@ -559,7 +598,44 @@ describe('AcademicCatalogPage', () => {
     expect(screen.getByRole('button', { name: /revisar 2026-A/i })).toBeVisible()
   })
 
-  it('shows safe row and field details when the backend rejects an import', async () => {
+  it('does not import when the preview is rejected', async () => {
+    // Arrange
+    const client = createClient({ previewCsv: vi.fn().mockRejectedValue(new Error('No fue posible validar el archivo.')) })
+    await renderCatalogPage({ client, authorization })
+    const input = await screen.findByLabelText(/archivo CSV/i)
+    const firstFile = new File(['first'], 'first.csv', { type: 'text/csv' })
+    fireEvent.change(input, { target: { files: [firstFile] } })
+
+    // Act
+    await userEvent.click(screen.getByRole('button', { name: /validar csv/i }))
+
+    // Assert
+    expect(await screen.findByRole('alert')).toHaveTextContent('No fue posible validar el archivo.')
+    expect(client.importCsv).not.toHaveBeenCalled()
+
+  })
+
+  it('clears a successful preview when another file is selected', async () => {
+    // Arrange
+    const client = createClient()
+    await renderCatalogPage({ client, authorization })
+    const input = await screen.findByLabelText(/archivo CSV/i)
+    const firstFile = new File(['first'], 'first.csv', { type: 'text/csv' })
+    fireEvent.change(input, { target: { files: [firstFile] } })
+
+    // Act
+    await userEvent.click(screen.getByRole('button', { name: /validar csv/i }))
+    expect(await screen.findByText('Cálculo I')).toBeVisible()
+    const replacement = new File(['replacement'], 'replacement.csv', { type: 'text/csv' })
+    fireEvent.change(input, { target: { files: [replacement] } })
+
+    // Assert
+    expect(screen.queryByText('Cálculo I')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /validar csv/i })).toBeEnabled()
+    expect(client.importCsv).not.toHaveBeenCalled()
+  })
+
+  it('shows safe row and field details when the backend rejects a confirmed import', async () => {
     // Arrange
     const invalidCsv = Object.assign(new Error('El CSV tiene errores.'), {
       status: 400,
@@ -572,7 +648,9 @@ describe('AcademicCatalogPage', () => {
     fireEvent.change(input, { target: { files: [new File(['bad'], 'plan.csv', { type: 'text/csv' })] } })
 
     // Act
-    await userEvent.click(screen.getByRole('button', { name: /importar borrador/i }))
+    await userEvent.click(screen.getByRole('button', { name: /validar csv/i }))
+    await screen.findByText('Cálculo I')
+    await userEvent.click(screen.getByRole('button', { name: /crear borrador/i }))
 
     // Assert
     const errors = await screen.findByRole('alert')

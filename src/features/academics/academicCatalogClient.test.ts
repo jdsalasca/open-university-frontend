@@ -12,6 +12,7 @@ const program = {
   programCode: 'PRE-001',
   academicLevel: 'PREGRADO',
   studyModality: 'PRESENCIAL',
+  sniesCode: '12345',
   campusCode: 'TUNJA',
   programName: 'Ingeniería de Prueba',
   faculty: 'Facultad de Prueba',
@@ -58,6 +59,34 @@ const entryPage = {
   totalItems: 1,
   totalPages: 1,
   entries: [entry],
+}
+
+const importPreview = {
+  programCode: 'PRE-001',
+  academicLevel: 'PREGRADO',
+  studyModality: 'PRESENCIAL',
+  sniesCode: '12345',
+  programName: 'Ingeniería de Prueba',
+  faculty: 'Facultad de Prueba',
+  campusCode: 'TUNJA',
+  campusName: 'Tunja',
+  curriculumVersion: '2026-A',
+  cohortFrom: '2026-1',
+  cohortThrough: null,
+  approvalReference: 'Acuerdo de prueba',
+  entryCount: 1,
+  semesters: [1],
+  sampleEntries: [{
+    sourceRowNumber: 2,
+    rowOrder: 1,
+    semester: 1,
+    subjectCode: 'MAT-101',
+    subjectName: 'Cálculo I',
+    credits: 4,
+    formationSpace: 'Disciplinar',
+    component: 'Fundamentación',
+    choiceGroup: null,
+  }],
 }
 
 function jsonResponse(body: unknown, status = 200) {
@@ -225,6 +254,46 @@ describe('academic catalog client', () => {
     // Assert
     await expect(request).rejects.toMatchObject({ code: 'file_too_large' })
     expect(fetcher).not.toHaveBeenCalled()
+  })
+
+  it('prevalidates a curriculum CSV through the protected no-write preview route', async () => {
+    // Arrange
+    const { createAcademicCatalogClient } = await loadClient()
+    const fetcher = vi.fn().mockResolvedValue(jsonResponse(importPreview))
+    const client = createAcademicCatalogClient(fetcher)
+    const file = new File(['curriculum'], 'curriculum.csv', { type: 'text/csv' })
+
+    // Act
+    const result = await client.previewCsv(file, 'institutional-token')
+
+    // Assert
+    expect(result).toMatchObject({
+      programCode: 'PRE-001',
+      entryCount: 1,
+      semesters: [1],
+      sampleEntries: [{ sourceRowNumber: 2, subjectName: 'Cálculo I' }],
+    })
+    expect(fetcher).toHaveBeenCalledWith('/api/v1/admin/academic-catalog/import-previews', expect.objectContaining({
+      method: 'POST',
+      credentials: 'omit',
+      headers: { Accept: 'application/json', Authorization: 'Bearer institutional-token' },
+      body: expect.any(FormData),
+    }))
+  })
+
+  it('rejects malformed preview metadata rather than rendering unvalidated response values', async () => {
+    // Arrange
+    const { createAcademicCatalogClient } = await loadClient()
+    const client = createAcademicCatalogClient(vi.fn().mockResolvedValue(jsonResponse({
+      ...importPreview,
+      entryCount: -1,
+      semesters: ['all'],
+    })))
+    const file = new File(['curriculum'], 'curriculum.csv', { type: 'text/csv' })
+
+    // Act + Assert
+    await expect(client.previewCsv(file, 'institutional-token'))
+      .rejects.toThrow('The academic catalog response is malformed.')
   })
 
   it('returns safe row and column issues from a rejected CSV without retaining cell values', async () => {

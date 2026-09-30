@@ -68,6 +68,36 @@ export interface AcademicCurriculumEntriesPageQuery {
   semester?: number
 }
 
+export interface CurriculumImportPreviewEntry {
+  sourceRowNumber: number
+  rowOrder: number
+  semester: number
+  subjectCode: string
+  subjectName: string
+  credits: number
+  formationSpace: string
+  component: string
+  choiceGroup: string | null
+}
+
+export interface CurriculumImportPreview {
+  programCode: string
+  academicLevel: AcademicLevel
+  studyModality: StudyModality
+  sniesCode: string | null
+  programName: string
+  faculty: string
+  campusCode: string
+  campusName: string
+  curriculumVersion: string
+  cohortFrom: string
+  cohortThrough: string | null
+  approvalReference: string
+  entryCount: number
+  semesters: number[]
+  sampleEntries: CurriculumImportPreviewEntry[]
+}
+
 export const MAX_PUBLIC_CURRICULUM_PAGE_SIZE = 100
 export const MAX_PUBLIC_CURRICULUM_SEARCH_CODE_POINTS = 120
 
@@ -93,6 +123,7 @@ export interface AcademicCatalogClient {
   ): Promise<AcademicCurriculumEntriesPage>
   listDrafts(accessToken: string, signal?: AbortSignal): Promise<AcademicCurriculum[]>
   getCurriculum(id: string, accessToken: string, signal?: AbortSignal): Promise<AcademicCurriculumDetails>
+  previewCsv(file: File, accessToken: string, signal?: AbortSignal): Promise<CurriculumImportPreview>
   importCsv(file: File, accessToken: string, signal?: AbortSignal): Promise<AcademicCurriculum>
   publishCurriculum(id: string, accessToken: string, signal?: AbortSignal): Promise<AcademicCurriculumDetails>
 }
@@ -198,6 +229,56 @@ export function parseAcademicCurriculumEntriesPage(
   }
 }
 
+export function parseCurriculumImportPreview(input: unknown): CurriculumImportPreview {
+  if (!isRecord(input)
+    || !isProgramCode(input.programCode)
+    || input.academicLevel !== 'PREGRADO'
+    || input.studyModality !== 'PRESENCIAL'
+    || !(input.sniesCode === null || isBoundedText(input.sniesCode, 32))
+    || !isBoundedText(input.programName, 240)
+    || !isBoundedText(input.faculty, 160)
+    || !isProgramCode(input.campusCode)
+    || !isBoundedText(input.campusName, 160)
+    || !isBoundedText(input.curriculumVersion, 80)
+    || !isCohort(input.cohortFrom)
+    || !(input.cohortThrough === null || isCohort(input.cohortThrough))
+    || !isBoundedText(input.approvalReference, 240)
+    || !isPositiveInteger(input.entryCount)
+    || !Array.isArray(input.semesters)
+    || !Array.isArray(input.sampleEntries)
+    || input.sampleEntries.length === 0
+    || input.sampleEntries.length > Math.min(10, input.entryCount)) throw malformedResponse()
+
+  const semesters = input.semesters
+  if (semesters.length === 0
+    || semesters.length > input.entryCount
+    || !semesters.every((semester, index) => Number.isInteger(semester)
+      && Number(semester) >= 1
+      && Number(semester) <= 32767
+      && (index === 0 || Number(semester) > Number(semesters[index - 1])))) throw malformedResponse()
+
+  const sampleEntries = input.sampleEntries.map(parseCurriculumImportPreviewEntry)
+  if (sampleEntries.some((entry) => !semesters.includes(entry.semester))) throw malformedResponse()
+
+  return {
+    programCode: input.programCode,
+    academicLevel: 'PREGRADO',
+    studyModality: 'PRESENCIAL',
+    sniesCode: input.sniesCode,
+    programName: input.programName,
+    faculty: input.faculty,
+    campusCode: input.campusCode,
+    campusName: input.campusName,
+    curriculumVersion: input.curriculumVersion,
+    cohortFrom: input.cohortFrom,
+    cohortThrough: input.cohortThrough,
+    approvalReference: input.approvalReference,
+    entryCount: input.entryCount,
+    semesters: [...semesters],
+    sampleEntries,
+  }
+}
+
 export function parseAcademicCurriculum(input: unknown): AcademicCurriculum {
   if (!isRecord(input)
     || !isUuid(input.id)
@@ -272,6 +353,38 @@ function parseAcademicCurriculumEntry(input: unknown): AcademicCurriculumEntry {
   }
 }
 
+function parseCurriculumImportPreviewEntry(input: unknown): CurriculumImportPreviewEntry {
+  if (!isRecord(input)
+    || !Number.isSafeInteger(input.sourceRowNumber)
+    || Number(input.sourceRowNumber) < 2
+    || !Number.isSafeInteger(input.rowOrder)
+    || Number(input.rowOrder) < 1
+    || !Number.isInteger(input.semester)
+    || Number(input.semester) < 1
+    || Number(input.semester) > 32767
+    || !isProgramCode(input.subjectCode)
+    || !isBoundedText(input.subjectName, 240)
+    || typeof input.credits !== 'number'
+    || !Number.isFinite(input.credits)
+    || input.credits <= 0
+    || input.credits > 999.99
+    || !isBoundedText(input.formationSpace, 120)
+    || !isBoundedText(input.component, 120)
+    || !(input.choiceGroup === null || isBoundedText(input.choiceGroup, 100))) throw malformedResponse()
+
+  return {
+    sourceRowNumber: Number(input.sourceRowNumber),
+    rowOrder: Number(input.rowOrder),
+    semester: Number(input.semester),
+    subjectCode: input.subjectCode,
+    subjectName: input.subjectName,
+    credits: input.credits,
+    formationSpace: input.formationSpace,
+    component: input.component,
+    choiceGroup: input.choiceGroup,
+  }
+}
+
 function malformedResponse() {
   return new Error('The academic catalog response is malformed.')
 }
@@ -298,6 +411,10 @@ function isCohort(input: unknown): input is string {
 
 function isNonNegativeInteger(input: unknown): input is number {
   return Number.isSafeInteger(input) && Number(input) >= 0
+}
+
+function isPositiveInteger(input: unknown): input is number {
+  return Number.isSafeInteger(input) && Number(input) > 0
 }
 
 function isIsoInstant(input: unknown): input is string {

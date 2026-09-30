@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ChangeEvent } from 'react'
 import { academicCatalogClient } from './academicCatalogClient'
 import type {
@@ -9,6 +9,7 @@ import type {
   AcademicCurriculumEntriesPage,
   AcademicProgram,
   CatalogAuthorization,
+  CurriculumImportPreview,
 } from './contracts'
 import {
   MAX_PUBLIC_CURRICULUM_PAGE_SIZE,
@@ -574,6 +575,9 @@ function CatalogAdministration({ accessToken, authorization, client, onPublished
   const [selectedDraft, setSelectedDraft] = useState<AcademicCurriculumDetails | null>(null)
   const [reviewingDraftId, setReviewingDraftId] = useState('')
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const selectedFileRef = useRef<File | null>(null)
+  const [filePreview, setFilePreview] = useState<{ file: File; preview: CurriculumImportPreview } | null>(null)
+  const [previewPending, setPreviewPending] = useState(false)
   const [actionPending, setActionPending] = useState(false)
   const [actionMessage, setActionMessage] = useState('')
   const [actionError, setActionError] = useState<ApiFailure | null>(null)
@@ -595,7 +599,9 @@ function CatalogAdministration({ accessToken, authorization, client, onPublished
 
   function chooseFile(event: ChangeEvent<HTMLInputElement>) {
     const file = event.currentTarget.files?.[0] ?? null
+    selectedFileRef.current = file
     setSelectedFile(file)
+    setFilePreview(null)
     setActionMessage('')
     setActionError(null)
     if (!file) return
@@ -604,15 +610,33 @@ function CatalogAdministration({ accessToken, authorization, client, onPublished
     if (fileError) setActionError(clientFailure(fileError.status, fileError.code, fileError.message))
   }
 
+  async function previewCurriculum() {
+    const file = selectedFile
+    if (!canWriteCatalog || !file || actionError) return
+    setPreviewPending(true)
+    setActionMessage('')
+    setActionError(null)
+    try {
+      const preview = await client.previewCsv(file, accessToken)
+      if (selectedFileRef.current === file) setFilePreview({ file, preview })
+    } catch (error) {
+      if (selectedFileRef.current === file) setActionError(asApiFailure(error))
+    } finally {
+      setPreviewPending(false)
+    }
+  }
+
   async function importCurriculum() {
-    if (!canWriteCatalog || !selectedFile || actionError) return
+    if (!canWriteCatalog || !selectedFile || filePreview?.file !== selectedFile || actionError) return
     setActionPending(true)
     setActionMessage('')
     setActionError(null)
     try {
       const created = await client.importCsv(selectedFile, accessToken)
       setDrafts((current) => [created, ...current.filter((draft) => draft.id !== created.id)])
+      selectedFileRef.current = null
       setSelectedFile(null)
+      setFilePreview(null)
       setActionMessage(`Borrador creado: versión ${created.curriculumVersion}.`)
       setSelectedDraft(null)
     } catch (error) {
@@ -680,17 +704,18 @@ function CatalogAdministration({ accessToken, authorization, client, onPublished
             <input
               accept=".csv,text/csv,application/vnd.ms-excel"
               className="catalog-file-input"
+              disabled={actionPending || previewPending}
               id="catalog-csv-file"
               onChange={chooseFile}
               type="file"
             />
             <button
               className="catalog-button catalog-button-primary"
-              disabled={!selectedFile || Boolean(actionError) || actionPending}
-              onClick={importCurriculum}
+              disabled={!selectedFile || Boolean(actionError) || actionPending || previewPending}
+              onClick={filePreview?.file === selectedFile ? importCurriculum : previewCurriculum}
               type="button"
             >
-              {actionPending ? 'Procesando…' : 'Importar borrador'} <span aria-hidden="true">→</span>
+              {previewPending ? 'Validando…' : actionPending ? 'Procesando…' : filePreview?.file === selectedFile ? 'Crear borrador' : 'Validar CSV'} <span aria-hidden="true">→</span>
             </button>
           </section>
         )}
@@ -716,6 +741,8 @@ function CatalogAdministration({ accessToken, authorization, client, onPublished
         </section>
       </div>
 
+      {filePreview?.file === selectedFile && <CurriculumImportPreviewPanel preview={filePreview.preview} />}
+
       {selectedDraft && (
         <section className="catalog-review-card" aria-labelledby="catalog-review-title">
           <div className="catalog-review-heading"><div><p className="catalog-eyebrow">REVISIÓN DEL BORRADOR</p><h3 id="catalog-review-title">{selectedDraft.curriculum.programName} · {selectedDraft.curriculum.curriculumVersion}</h3><p>Cohorte {cohortLabel(selectedDraft.curriculum)}</p></div>
@@ -732,6 +759,40 @@ function CatalogAdministration({ accessToken, authorization, client, onPublished
 
       {actionMessage && <p className="catalog-action-success" role="status">{actionMessage}</p>}
       {actionError && <ActionError error={actionError} />}
+    </section>
+  )
+}
+
+function CurriculumImportPreviewPanel({ preview }: { preview: CurriculumImportPreview }) {
+  const numberFormat = new Intl.NumberFormat('es-CO')
+  return (
+    <section className="catalog-import-preview" aria-labelledby="catalog-import-preview-title">
+      <div className="catalog-import-preview-heading">
+        <div><p className="catalog-eyebrow">VALIDACIÓN SIN GUARDAR</p><h3 id="catalog-import-preview-title">{preview.programName} · versión {preview.curriculumVersion}</h3></div>
+        <span className="catalog-preview-valid"><span aria-hidden="true">✓</span> CSV válido</span>
+      </div>
+      <dl className="catalog-import-preview-meta">
+        <div><dt>Programa</dt><dd>{preview.programCode}</dd></div>
+        <div><dt>Código SNIES</dt><dd>{preview.sniesCode ?? 'Sin código'}</dd></div>
+        <div><dt>Facultad</dt><dd>{preview.faculty}</dd></div>
+        <div><dt>Sede</dt><dd>{preview.campusName} · {preview.campusCode}</dd></div>
+        <div><dt>Cohortes</dt><dd>{preview.cohortFrom} a {preview.cohortThrough ?? 'sin fecha final'}</dd></div>
+        <div><dt>Referencia</dt><dd>{preview.approvalReference}</dd></div>
+        <div><dt>Semestres</dt><dd>{preview.semesters.join(', ')}</dd></div>
+      </dl>
+      <p className="catalog-import-preview-count">{numberFormat.format(preview.entryCount)} asignaturas · {numberFormat.format(preview.semesters.length)} {preview.semesters.length === 1 ? 'semestre' : 'semestres'}</p>
+      <div className="catalog-review-table-wrap">
+        <table className="catalog-review-table">
+          <caption>Muestra de hasta 10 asignaturas de la carga</caption>
+          <thead><tr><th scope="col">Fila</th><th scope="col">Semestre</th><th scope="col">Código</th><th scope="col">Asignatura</th><th scope="col">Créditos</th><th scope="col">Espacio</th><th scope="col">Componente</th></tr></thead>
+          <tbody>{preview.sampleEntries.map((entry) => (
+            <tr key={`${entry.sourceRowNumber}-${entry.rowOrder}`}>
+              <td>{entry.sourceRowNumber}</td><td>{entry.semester}</td><td>{entry.subjectCode}</td><td>{entry.subjectName}</td><td>{entry.credits}</td><td>{entry.formationSpace}</td><td>{entry.component}</td>
+            </tr>
+          ))}</tbody>
+        </table>
+      </div>
+      <p className="catalog-import-preview-note">Al crear el borrador, el servidor volverá a validar el archivo completo antes de guardarlo.</p>
     </section>
   )
 }
