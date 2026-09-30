@@ -159,6 +159,20 @@ describe('AcademicOperationsPage', () => {
       displayName: 'Escuela primero por relación',
       displayOrder: 2,
     }
+    const schoolTieZulu = {
+      ...structure.units[1]!,
+      id: 'c72e5da1-7d8e-463e-8916-d13126c55fb9',
+      code: 'ESC-TIE-Z',
+      displayName: 'Escuela empate Z',
+      displayOrder: 3,
+    }
+    const schoolTieAlpha = {
+      ...structure.units[1]!,
+      id: 'b9f98965-b868-4eb6-8e20-02bd74dfef97',
+      code: 'ESC-TIE-A',
+      displayName: 'Escuela empate A',
+      displayOrder: 3,
+    }
     const siteRootFirst = {
       ...structure.sites[0]!,
       id: 'f1df48de-5279-4a62-a067-4c0ed5724ebc',
@@ -182,9 +196,25 @@ describe('AcademicOperationsPage', () => {
       displayName: 'Sede primero por relación',
       displayOrder: 2,
     }
+    const siteTieZulu = {
+      ...structure.sites[0]!,
+      id: '372aab0b-520a-4bf1-9ad9-ed2021483cee',
+      code: 'SITE-TIE-Z',
+      type: 'REGIONAL' as const,
+      displayName: 'Sede empate Z',
+      displayOrder: 3,
+    }
+    const siteTieAlpha = {
+      ...structure.sites[0]!,
+      id: '8349a8c1-3dcb-4bec-8a1d-4105dbdc8450',
+      code: 'SITE-TIE-A',
+      type: 'REGIONAL' as const,
+      displayName: 'Sede empate A',
+      displayOrder: 3,
+    }
     const orderedStructure: AcademicStructureSnapshot = {
       ...structure,
-      units: [...structure.units, facultyRootFirst, schoolNodeFirst, schoolRelationFirst],
+      units: [...structure.units, facultyRootFirst, schoolNodeFirst, schoolRelationFirst, schoolTieZulu, schoolTieAlpha],
       organizationRelations: [
         { ...structure.organizationRelations[0]!, displayOrder: 12 },
         {
@@ -201,8 +231,22 @@ describe('AcademicOperationsPage', () => {
           validFrom: '2026-01-01',
           validThrough: null,
         },
+        {
+          parentUnitId: structure.units[0]!.id,
+          childUnitId: schoolTieZulu.id,
+          displayOrder: 5,
+          validFrom: '2026-01-01',
+          validThrough: null,
+        },
+        {
+          parentUnitId: structure.units[0]!.id,
+          childUnitId: schoolTieAlpha.id,
+          displayOrder: 5,
+          validFrom: '2026-01-01',
+          validThrough: null,
+        },
       ],
-      sites: [...structure.sites, siteRootFirst, siteNodeFirst, siteRelationFirst],
+      sites: [...structure.sites, siteRootFirst, siteNodeFirst, siteRelationFirst, siteTieZulu, siteTieAlpha],
       siteRelations: [
         {
           parentSiteId: structure.sites[0]!.id,
@@ -218,6 +262,20 @@ describe('AcademicOperationsPage', () => {
           validFrom: '2026-01-01',
           validThrough: null,
         },
+        {
+          parentSiteId: structure.sites[0]!.id,
+          childSiteId: siteTieZulu.id,
+          displayOrder: 5,
+          validFrom: '2026-01-01',
+          validThrough: null,
+        },
+        {
+          parentSiteId: structure.sites[0]!.id,
+          childSiteId: siteTieAlpha.id,
+          displayOrder: 5,
+          validFrom: '2026-01-01',
+          validThrough: null,
+        },
       ],
     }
     const client = createClient({ getStructure: vi.fn().mockResolvedValue(orderedStructure) })
@@ -229,17 +287,31 @@ describe('AcademicOperationsPage', () => {
     // Assert
     const organizationRoots = screen.getByRole('list', { name: 'Jerarquía académica' })
     expect(organizationRoots.children[0]).toHaveTextContent('Facultad raíz primero')
+    expect(organizationRoots.children[0]?.querySelector('.academic-sort-order')).toHaveTextContent('01')
     const faculty = screen.getByText('Facultad de Ciencias').closest('li')!
     const unitChildren = faculty.querySelector(':scope > ul')!
     expect(unitChildren.children[0]).toHaveTextContent('Escuela primero por relación')
-    expect(unitChildren.children[1]).toHaveTextContent('Escuela primero por nodo')
+    expect(unitChildren.children[1]).toHaveTextContent('Escuela empate A')
+    expect(unitChildren.children[2]).toHaveTextContent('Escuela empate Z')
+    expect(unitChildren.children[3]).toHaveTextContent('Escuela primero por nodo')
+    expect(unitChildren.children[0]?.querySelector('.academic-sort-order')).toHaveTextContent('02')
+    expect(unitChildren.children[1]?.querySelector('.academic-sort-order')).toHaveTextContent('05')
+    expect(unitChildren.children[2]?.querySelector('.academic-sort-order')).toHaveTextContent('05')
+    expect(unitChildren.children[3]?.querySelector('.academic-sort-order')).toHaveTextContent('08')
 
     const siteRoots = screen.getByRole('list', { name: 'Jerarquía de sedes' })
     expect(siteRoots.children[0]).toHaveTextContent('Sede raíz primero')
+    expect(siteRoots.children[0]?.querySelector('.academic-sort-order')).toHaveTextContent('00')
     const centralSite = screen.getByText('Sede Central Tunja').closest('li')!
     const siteChildren = centralSite.querySelector(':scope > ul')!
     expect(siteChildren.children[0]).toHaveTextContent('Sede primero por relación')
-    expect(siteChildren.children[1]).toHaveTextContent('Sede primero por nodo')
+    expect(siteChildren.children[1]).toHaveTextContent('Sede empate A')
+    expect(siteChildren.children[2]).toHaveTextContent('Sede empate Z')
+    expect(siteChildren.children[3]).toHaveTextContent('Sede primero por nodo')
+    expect(siteChildren.children[0]?.querySelector('.academic-sort-order')).toHaveTextContent('02')
+    expect(siteChildren.children[1]?.querySelector('.academic-sort-order')).toHaveTextContent('05')
+    expect(siteChildren.children[2]?.querySelector('.academic-sort-order')).toHaveTextContent('05')
+    expect(siteChildren.children[3]?.querySelector('.academic-sort-order')).toHaveTextContent('08')
   })
 
   it('orders the hierarchy and uses normalized affiliations while distinguishing regular and intersemester periods', async () => {

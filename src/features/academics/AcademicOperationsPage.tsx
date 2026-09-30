@@ -202,7 +202,11 @@ function OrganizationTree({
     || first.programName.localeCompare(second.programName))
   const unattachedPrograms = visiblePrograms.filter((program) => !attachedProgramIds.has(program.id))
 
-  function renderUnit(unit: AcademicOrganizationUnit, ancestors: ReadonlySet<string>): ReactNode {
+  function renderUnit(
+    unit: AcademicOrganizationUnit,
+    ancestors: ReadonlySet<string>,
+    displayOrder: number,
+  ): ReactNode {
     if (ancestors.has(unit.id)) return null
     const nextAncestors = new Set(ancestors).add(unit.id)
     const children = childrenByParent.get(unit.id) ?? []
@@ -218,14 +222,14 @@ function OrganizationTree({
         <div className="academic-unit-row">
           <span className={'academic-unit-type academic-unit-type-' + unit.type.toLocaleLowerCase('en-US')}>{labelUnitType(unit.type)}</span>
           <div className="academic-unit-copy"><strong>{unit.displayName}</strong><small>{unit.code}</small></div>
-          <span className="academic-sort-order">{String(unit.displayOrder).padStart(2, '0')}</span>
+          <span className="academic-sort-order">{String(displayOrder).padStart(2, '0')}</span>
         </div>
         {(children.length > 0 || unitPrograms.length > 0) && (
           <ul className="academic-tree-children">
             {unitPrograms.map(({ affiliation, program }) => (
               <ProgramNode key={affiliation.id} program={program} site={siteById.get(affiliation.siteId)} />
             ))}
-            {children.map(({ unit: child }) => renderUnit(child, nextAncestors))}
+            {children.map(({ relation, unit: child }) => renderUnit(child, nextAncestors, relation.displayOrder))}
           </ul>
         )}
       </li>
@@ -235,7 +239,7 @@ function OrganizationTree({
   return (
     <div className="academic-tree-wrap">
       <ul className="academic-tree" aria-label="Jerarquía académica">
-        {roots.map((root) => renderUnit(root, new Set()))}
+        {roots.map((root) => renderUnit(root, new Set(), root.displayOrder))}
       </ul>
       {unattachedPrograms.length > 0 && (
         <div className="academic-unattached-programs">
@@ -280,7 +284,11 @@ function SiteTree({
   let roots = sites.filter((site) => !childIds.has(site.id))
   if (roots.length === 0) roots = sites
 
-  function renderSite(site: AcademicSite, ancestors: ReadonlySet<string>): ReactNode {
+  function renderSite(
+    site: AcademicSite,
+    ancestors: ReadonlySet<string>,
+    displayOrder: number,
+  ): ReactNode {
     if (ancestors.has(site.id)) return null
     const nextAncestors = new Set(ancestors).add(site.id)
     const children = childrenByParent.get(site.id) ?? []
@@ -289,14 +297,14 @@ function SiteTree({
         <div className="academic-site-row">
           <span className="academic-site-pin" aria-hidden="true">⌖</span>
           <div><strong>{site.displayName}</strong><small>{site.code} · {labelSiteType(site.type)}</small></div>
-          <span className="academic-sort-order">{String(site.displayOrder).padStart(2, '0')}</span>
+          <span className="academic-sort-order">{String(displayOrder).padStart(2, '0')}</span>
         </div>
-        {children.length > 0 && <ul>{children.map(({ site: child }) => renderSite(child, nextAncestors))}</ul>}
+        {children.length > 0 && <ul>{children.map(({ relation, site: child }) => renderSite(child, nextAncestors, relation.displayOrder))}</ul>}
       </li>
     )
   }
 
-  return <ul className="academic-site-tree" aria-label="Jerarquía de sedes">{roots.map((root) => renderSite(root, new Set()))}</ul>
+  return <ul className="academic-site-tree" aria-label="Jerarquía de sedes">{roots.map((root) => renderSite(root, new Set(), root.displayOrder))}</ul>
 }
 
 function PeriodCard({ period }: { period: AcademicPeriod }) {
