@@ -52,6 +52,25 @@ export interface AcademicCurriculumDetails {
   entries: AcademicCurriculumEntry[]
 }
 
+export interface AcademicCurriculumEntriesPage {
+  curriculumId: string
+  page: number
+  pageSize: number
+  totalItems: number
+  totalPages: number
+  entries: AcademicCurriculumEntry[]
+}
+
+export interface AcademicCurriculumEntriesPageQuery {
+  page: number
+  pageSize: number
+  search: string
+  semester?: number
+}
+
+export const MAX_PUBLIC_CURRICULUM_PAGE_SIZE = 100
+export const MAX_PUBLIC_CURRICULUM_SEARCH_CODE_POINTS = 120
+
 export interface AcademicCatalogIssue {
   rowNumber: number | null
   column: string | null
@@ -66,7 +85,12 @@ export interface CatalogAuthorization {
 export interface AcademicCatalogClient {
   listPrograms(signal?: AbortSignal): Promise<AcademicProgram[]>
   listCurricula(programId: string, signal?: AbortSignal): Promise<AcademicCurriculum[]>
-  getPublishedCurriculum(id: string, signal?: AbortSignal): Promise<AcademicCurriculumDetails>
+  getPublishedCurriculum(id: string, signal?: AbortSignal): Promise<AcademicCurriculum>
+  listPublishedCurriculumEntries(
+    id: string,
+    query: AcademicCurriculumEntriesPageQuery,
+    signal?: AbortSignal
+  ): Promise<AcademicCurriculumEntriesPage>
   listDrafts(accessToken: string, signal?: AbortSignal): Promise<AcademicCurriculum[]>
   getCurriculum(id: string, accessToken: string, signal?: AbortSignal): Promise<AcademicCurriculumDetails>
   importCsv(file: File, accessToken: string, signal?: AbortSignal): Promise<AcademicCurriculum>
@@ -134,6 +158,42 @@ export function parseAcademicCurriculumDetails(input: unknown): AcademicCurricul
   if (!isRecord(input) || !Array.isArray(input.entries)) throw malformedResponse()
   return {
     curriculum: parseAcademicCurriculum(input.curriculum),
+    entries: input.entries.map(parseAcademicCurriculumEntry),
+  }
+}
+
+export function parseAcademicCurriculumEntriesPage(
+  input: unknown,
+  expectedCurriculumId: string,
+  query: AcademicCurriculumEntriesPageQuery
+): AcademicCurriculumEntriesPage {
+  if (!isUuid(expectedCurriculumId)
+    || !isRecord(input)
+    || !isUuid(input.curriculumId)
+    || input.curriculumId.toLocaleLowerCase('en-US') !== expectedCurriculumId.toLocaleLowerCase('en-US')
+    || !Number.isSafeInteger(query.page)
+    || query.page < 1
+    || query.page > 2_147_483_647
+    || !Number.isSafeInteger(query.pageSize)
+    || query.pageSize < 1
+    || query.pageSize > MAX_PUBLIC_CURRICULUM_PAGE_SIZE
+    || !Number.isSafeInteger(input.page)
+    || input.page !== query.page
+    || !Number.isSafeInteger(input.pageSize)
+    || input.pageSize !== query.pageSize
+    || !isNonNegativeInteger(input.totalItems)
+    || !isNonNegativeInteger(input.totalPages)
+    || input.totalPages !== (input.totalItems === 0 ? 0 : Math.ceil(input.totalItems / input.pageSize))
+    || !Array.isArray(input.entries)
+    || input.entries.length > input.pageSize
+    || input.entries.length > input.totalItems) throw malformedResponse()
+
+  return {
+    curriculumId: input.curriculumId,
+    page: input.page,
+    pageSize: input.pageSize,
+    totalItems: input.totalItems,
+    totalPages: input.totalPages,
     entries: input.entries.map(parseAcademicCurriculumEntry),
   }
 }

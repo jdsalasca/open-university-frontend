@@ -6,10 +6,15 @@ import type {
   AcademicCatalogIssue,
   AcademicCurriculum,
   AcademicCurriculumDetails,
+  AcademicCurriculumEntriesPage,
   AcademicProgram,
   CatalogAuthorization,
 } from './contracts'
-import { validateCurriculumCsvFile } from './contracts'
+import {
+  MAX_PUBLIC_CURRICULUM_PAGE_SIZE,
+  MAX_PUBLIC_CURRICULUM_SEARCH_CODE_POINTS,
+  validateCurriculumCsvFile,
+} from './contracts'
 import './AcademicCatalogPage.scss'
 
 interface AcademicCatalogPageProps {
@@ -18,7 +23,6 @@ interface AcademicCatalogPageProps {
 }
 
 type RequestState = 'loading' | 'ready' | 'error'
-const PUBLIC_CURRICULUM_PAGE_SIZE = 100
 
 interface ApiFailure extends Error {
   status?: number
@@ -277,30 +281,22 @@ interface PublishedCurriculumDetailsProps {
 }
 
 function PublishedCurriculumDetails({ client, curriculum, onClose }: PublishedCurriculumDetailsProps) {
-  const [details, setDetails] = useState<AcademicCurriculumDetails | null>(null)
-  const [requestState, setRequestState] = useState<RequestState>('loading')
-  const [error, setError] = useState('')
+  const [metadata, setMetadata] = useState<AcademicCurriculum | null>(null)
+  const [entriesPage, setEntriesPage] = useState<AcademicCurriculumEntriesPage | null>(null)
+  const [metadataState, setMetadataState] = useState<RequestState>('loading')
+  const [entriesState, setEntriesState] = useState<RequestState>('loading')
+  const [metadataError, setMetadataError] = useState('')
+  const [entriesError, setEntriesError] = useState('')
   const [retryCount, setRetryCount] = useState(0)
   const [searchTerm, setSearchTerm] = useState('')
-  const [selectedSemester, setSelectedSemester] = useState('all')
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('')
+  const [selectedSemester, setSelectedSemester] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
-  const semesters = useMemo(
-    () => [...new Set(details?.entries.map((entry) => entry.semester) ?? [])].sort((left, right) => left - right),
-    [details],
-  )
-  const visibleEntries = useMemo(() => {
-    if (!details) return []
-    const normalizedSearch = normalizeSearchText(searchTerm)
-    return details.entries.filter((entry) => {
-      const matchesSemester = selectedSemester === 'all' || entry.semester === Number(selectedSemester)
-      const matchesSearch = normalizedSearch.length === 0
-        || normalizeSearchText(`${entry.subjectCode} ${entry.subjectName}`).includes(normalizedSearch)
-      return matchesSemester && matchesSearch
-    })
-  }, [details, searchTerm, selectedSemester])
-  const pageCount = Math.max(1, Math.ceil(visibleEntries.length / PUBLIC_CURRICULUM_PAGE_SIZE))
-  const firstVisibleEntry = (currentPage - 1) * PUBLIC_CURRICULUM_PAGE_SIZE
-  const pageEntries = visibleEntries.slice(firstVisibleEntry, firstVisibleEntry + PUBLIC_CURRICULUM_PAGE_SIZE)
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => setDebouncedSearchTerm(searchTerm.trim()), 250)
+    return () => window.clearTimeout(timeout)
+  }, [searchTerm])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -308,34 +304,106 @@ function PublishedCurriculumDetails({ client, curriculum, onClose }: PublishedCu
     client.getPublishedCurriculum(curriculum.id, controller.signal)
       .then((result) => {
         if (controller.signal.aborted) return
-        if (result.curriculum.status !== 'PUBLISHED'
-          || result.curriculum.id !== curriculum.id
-          || result.curriculum.programId !== curriculum.programId) {
-          setError('La versión no está disponible para consulta pública.')
-          setRequestState('error')
+        if (result.status !== 'PUBLISHED'
+          || result.id.toLocaleLowerCase('en-US') !== curriculum.id.toLocaleLowerCase('en-US')
+          || result.programId.toLocaleLowerCase('en-US') !== curriculum.programId.toLocaleLowerCase('en-US')) {
+          setMetadata(null)
+          setMetadataError('La versión no está disponible para consulta pública.')
+          setMetadataState('error')
           return
         }
-        setDetails(result)
-        setRequestState('ready')
+        setMetadata(result)
+        setMetadataState('ready')
       })
       .catch((requestError: unknown) => {
         if (controller.signal.aborted) return
         const failure = asApiFailure(requestError)
-        setError(failure.status === 404 || failure.code === 'curriculum_not_found'
+        setMetadataError(failure.status === 404 || failure.code === 'curriculum_not_found'
           ? 'Esta versión ya no está publicada o no existe.'
-          : 'No se pudieron cargar las asignaturas de esta versión.')
-        setRequestState('error')
+          : 'No se pudo cargar la información de esta versión.')
+        setMetadataState('error')
       })
 
     return () => controller.abort()
   }, [client, curriculum.id, curriculum.programId, retryCount])
 
+  const searchPending = searchTerm.trim() !== debouncedSearchTerm
+  const parsedSemester = selectedSemester === '' ? undefined : Number(selectedSemester)
+  const invalidSemester = parsedSemester !== undefined
+    && (!Number.isInteger(parsedSemester) || parsedSemester < 1 || parsedSemester > 32767)
+
+  useEffect(() => {
+    if (curriculum.entryCount === 0 || searchPending) return
+
+    if (invalidSemester) {
+      return
+    }
+
+    const controller = new AbortController()
+    const query = {
+      page: currentPage,
+      pageSize: MAX_PUBLIC_CURRICULUM_PAGE_SIZE,
+      search: debouncedSearchTerm,
+      semester: parsedSemester,
+    }
+    client.listPublishedCurriculumEntries(curriculum.id, query, controller.signal)
+      .then((result) => {
+        if (controller.signal.aborted) return
+        if (result.curriculumId.toLocaleLowerCase('en-US') !== curriculum.id.toLocaleLowerCase('en-US')
+          || result.page !== query.page
+          || result.pageSize !== query.pageSize
+          || result.entries.length > MAX_PUBLIC_CURRICULUM_PAGE_SIZE
+          || result.totalPages !== (result.totalItems === 0 ? 0 : Math.ceil(result.totalItems / query.pageSize))) {
+          throw new Error('The published curriculum page response is inconsistent.')
+        }
+        if (result.totalPages > 0 && query.page > result.totalPages) {
+          setCurrentPage(result.totalPages)
+          return
+        }
+        if (result.totalPages === 0 && query.page > 1) {
+          setCurrentPage(1)
+          return
+        }
+        setEntriesPage(result)
+        setEntriesState('ready')
+      })
+      .catch((requestError: unknown) => {
+        if (controller.signal.aborted) return
+        const failure = asApiFailure(requestError)
+        setEntriesError(failure.status === 404 || failure.code === 'curriculum_not_found'
+          ? 'Esta versión ya no está publicada o no existe.'
+          : 'No se pudieron cargar las asignaturas de esta versión.')
+        setEntriesState('error')
+      })
+
+    return () => controller.abort()
+  }, [client, curriculum.entryCount, curriculum.id, currentPage, debouncedSearchTerm, invalidSemester, parsedSemester, searchPending])
+
   function retryDetails() {
-    setDetails(null)
-    setRequestState('loading')
-    setError('')
+    setMetadata(null)
+    setEntriesPage(null)
+    setMetadataState('loading')
+    setEntriesState('loading')
+    setMetadataError('')
+    setEntriesError('')
+    setCurrentPage(1)
     setRetryCount((count) => count + 1)
   }
+
+  function markEntriesLoading() {
+    setEntriesPage(null)
+    setEntriesError('')
+    setEntriesState('loading')
+  }
+
+  const requestError = metadataState === 'error' ? metadataError : ''
+  const totalPages = entriesPage?.totalPages ?? 0
+  const totalItems = entriesPage?.totalItems ?? 0
+  const firstVisibleEntry = totalItems === 0 ? 0 : (currentPage - 1) * MAX_PUBLIC_CURRICULUM_PAGE_SIZE + 1
+  const lastVisibleEntry = entriesPage
+    ? Math.min((currentPage - 1) * MAX_PUBLIC_CURRICULUM_PAGE_SIZE + entriesPage.entries.length, totalItems)
+    : 0
+  const hasActiveFilters = debouncedSearchTerm.length > 0 || selectedSemester !== ''
 
   return (
     <section className="catalog-public-curriculum-detail" aria-label={`Detalle de la versión ${curriculum.curriculumVersion}`}>
@@ -354,19 +422,19 @@ function PublishedCurriculumDetails({ client, curriculum, onClose }: PublishedCu
         </button>
       </div>
 
-      {requestState === 'loading' && <p className="catalog-loading" role="status">Cargando asignaturas publicadas…</p>}
-      {requestState === 'error' && (
+      {metadataState === 'loading' && <p className="catalog-loading" role="status">Cargando el plan publicado…</p>}
+      {requestError && (
         <div className="catalog-error catalog-public-detail-error" role="alert">
-          <p>{error}</p>
+          <p>{requestError}</p>
           <button className="catalog-button catalog-button-secondary" onClick={retryDetails} type="button">
             Reintentar
           </button>
         </div>
       )}
-      {requestState === 'ready' && details && details.entries.length === 0 && (
+      {metadataState === 'ready' && metadata && metadata.entryCount === 0 && (
         <p className="catalog-public-detail-empty" role="status">Esta versión todavía no tiene asignaturas publicadas.</p>
       )}
-      {requestState === 'ready' && details && details.entries.length > 0 && (
+      {metadataState === 'ready' && metadata && metadata.entryCount > 0 && !requestError && (
         <>
           <div className="catalog-curriculum-filters">
             <label>
@@ -375,7 +443,9 @@ function PublishedCurriculumDetails({ client, curriculum, onClose }: PublishedCu
                 onChange={(event) => {
                   setSearchTerm(event.target.value)
                   setCurrentPage(1)
+                  markEntriesLoading()
                 }}
+                maxLength={MAX_PUBLIC_CURRICULUM_SEARCH_CODE_POINTS}
                 placeholder="Código o nombre"
                 type="search"
                 value={searchTerm}
@@ -383,25 +453,45 @@ function PublishedCurriculumDetails({ client, curriculum, onClose }: PublishedCu
             </label>
             <label>
               <span>Semestre</span>
-              <select
+              <input
+                max={32767}
+                min={1}
                 onChange={(event) => {
                   setSelectedSemester(event.target.value)
                   setCurrentPage(1)
+                  markEntriesLoading()
                 }}
+                placeholder="Todos"
+                step={1}
+                type="number"
                 value={selectedSemester}
-              >
-                <option value="all">Todos los semestres</option>
-                {semesters.map((semester) => <option key={semester} value={semester}>Semestre {semester}</option>)}
-              </select>
+              />
             </label>
-            <p className="catalog-curriculum-filter-count">Mostrando {visibleEntries.length} de {details.entries.length} asignaturas</p>
+            <p className="catalog-curriculum-filter-count">
+              {entriesPage ? `${entriesPage.entries.length} de ${entriesPage.totalItems} asignaturas` : 'Consulta del catálogo publicado'}
+            </p>
           </div>
-          {visibleEntries.length === 0
-            ? <p className="catalog-curriculum-filter-empty" role="status">Ninguna asignatura coincide con estos filtros.</p>
-            : (
+          {invalidSemester && <p className="catalog-curriculum-filter-empty" role="alert">El semestre debe ser un número entero entre 1 y 32767.</p>}
+          {!invalidSemester && entriesState === 'error' && (
+            <div className="catalog-error catalog-public-detail-error" role="alert">
+              <p>{entriesError}</p>
+              <button className="catalog-button catalog-button-secondary" onClick={retryDetails} type="button">
+                Reintentar
+              </button>
+            </div>
+          )}
+          {searchPending && <p className="catalog-loading" role="status">Actualizando filtros…</p>}
+          {!invalidSemester && !searchPending && entriesState === 'loading' && <p className="catalog-loading" role="status">Cargando asignaturas…</p>}
+          {!invalidSemester && !searchPending && entriesState === 'ready' && entriesPage && entriesPage.totalItems === 0 && (
+            <p className="catalog-curriculum-filter-empty" role="status">
+              {hasActiveFilters ? 'Ninguna asignatura coincide con estos filtros.' : 'Esta versión todavía no tiene asignaturas publicadas.'}
+            </p>
+          )}
+          {!invalidSemester && !searchPending && entriesState === 'ready' && entriesPage && entriesPage.entries.length > 0 && (
+            <>
               <div className="catalog-review-table-wrap">
                 <table className="catalog-review-table">
-                  <caption>Asignaturas de la versión {details.curriculum.curriculumVersion}</caption>
+                  <caption>Asignaturas de la versión {metadata.curriculumVersion}</caption>
                   <thead>
                     <tr>
                       <th scope="col">Semestre</th>
@@ -414,7 +504,7 @@ function PublishedCurriculumDetails({ client, curriculum, onClose }: PublishedCu
                     </tr>
                   </thead>
                   <tbody>
-                    {pageEntries.map((entry) => (
+                    {entriesPage.entries.map((entry) => (
                       <tr key={entry.subjectRevisionId}>
                         <td>{entry.semester}</td>
                         <td>{entry.subjectCode}</td>
@@ -428,26 +518,33 @@ function PublishedCurriculumDetails({ client, curriculum, onClose }: PublishedCu
                   </tbody>
                 </table>
               </div>
-            )}
-          {pageCount > 1 && (
+            </>
+          )}
+          {!invalidSemester && !searchPending && entriesState === 'ready' && totalPages > 1 && (
             <nav className="catalog-curriculum-pagination" aria-label="Paginación de asignaturas">
-              <span>Mostrando {firstVisibleEntry + 1}–{Math.min(firstVisibleEntry + PUBLIC_CURRICULUM_PAGE_SIZE, visibleEntries.length)} de {visibleEntries.length}</span>
+              <span>Mostrando {firstVisibleEntry}–{lastVisibleEntry} de {totalItems}</span>
               <div>
                 <button
                   aria-label="Página anterior"
                   className="catalog-button catalog-button-secondary"
                   disabled={currentPage === 1}
-                  onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                  onClick={() => {
+                    markEntriesLoading()
+                    setCurrentPage((page) => Math.max(1, page - 1))
+                  }}
                   type="button"
                 >
                   Anterior
                 </button>
-                <span aria-live="polite">Página {currentPage} de {pageCount}</span>
+                <span aria-live="polite">Página {currentPage} de {totalPages}</span>
                 <button
                   aria-label="Página siguiente"
                   className="catalog-button catalog-button-secondary"
-                  disabled={currentPage === pageCount}
-                  onClick={() => setCurrentPage((page) => Math.min(pageCount, page + 1))}
+                  disabled={currentPage === totalPages}
+                  onClick={() => {
+                    markEntriesLoading()
+                    setCurrentPage((page) => Math.min(totalPages, page + 1))
+                  }}
                   type="button"
                 >
                   Siguiente

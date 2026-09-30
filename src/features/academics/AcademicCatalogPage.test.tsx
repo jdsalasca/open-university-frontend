@@ -6,6 +6,9 @@ import type {
   AcademicCatalogClient,
   AcademicCurriculum,
   AcademicCurriculumDetails,
+  AcademicCurriculumEntriesPage,
+  AcademicCurriculumEntriesPageQuery,
+  AcademicCurriculumEntry,
   AcademicProgram,
   CatalogAuthorization,
 } from './contracts'
@@ -120,9 +123,7 @@ const publicDetails: AcademicCurriculumDetails = {
   ],
 }
 
-const largePublicDetails: AcademicCurriculumDetails = {
-  ...publicDetails,
-  entries: Array.from({ length: 101 }, (_, index) => ({
+const largeCurriculumEntries: AcademicCurriculumEntry[] = Array.from({ length: 101 }, (_, index) => ({
     ...publicDetails.entries[0],
     subjectId: `00000000-0000-4000-8000-${String(index + 1).padStart(12, '0')}`,
     subjectRevisionId: `00000001-0000-4000-8000-${String(index + 1).padStart(12, '0')}`,
@@ -131,29 +132,41 @@ const largePublicDetails: AcademicCurriculumDetails = {
     semester: Math.floor(index / 10) + 1,
     choiceGroup: null,
     rowOrder: index + 1,
-  })),
-}
+  }))
 
 const authorization: CatalogAuthorization = {
   accessToken: 'institutional-token',
   permissions: ['academic:catalog:read', 'academic:catalog:write'],
 }
 
-type TestCatalogClient = AcademicCatalogClient & {
-  getPublishedCurriculum: (id: string, signal?: AbortSignal) => Promise<AcademicCurriculumDetails>
+function createEntriesPage(
+  query: AcademicCurriculumEntriesPageQuery,
+  entries: AcademicCurriculumEntry[] = publicDetails.entries,
+  totalItems = entries.length,
+  curriculumId = publishedCurriculum.id,
+): AcademicCurriculumEntriesPage {
+  return {
+    curriculumId,
+    page: query.page,
+    pageSize: query.pageSize,
+    totalItems,
+    totalPages: totalItems === 0 ? 0 : Math.ceil(totalItems / query.pageSize),
+    entries,
+  }
 }
 
-function createClient(overrides: Partial<TestCatalogClient> = {}): TestCatalogClient {
+function createClient(overrides: Partial<AcademicCatalogClient> = {}): AcademicCatalogClient {
   return {
     listPrograms: vi.fn().mockResolvedValue([]),
     listCurricula: vi.fn().mockResolvedValue([]),
     listDrafts: vi.fn().mockResolvedValue([]),
     getCurriculum: vi.fn().mockResolvedValue(details),
-    getPublishedCurriculum: vi.fn().mockResolvedValue(publicDetails),
+    getPublishedCurriculum: vi.fn().mockResolvedValue(publishedCurriculum),
+    listPublishedCurriculumEntries: vi.fn().mockImplementation((_id, query) => Promise.resolve(createEntriesPage(query))),
     importCsv: vi.fn().mockResolvedValue(draft),
     publishCurriculum: vi.fn().mockResolvedValue({ ...details, curriculum: publishedCurriculum }),
     ...overrides,
-  } as TestCatalogClient
+  } as AcademicCatalogClient
 }
 
 describe('AcademicCatalogPage', () => {
@@ -260,7 +273,7 @@ describe('AcademicCatalogPage', () => {
     expect(client.listCurricula).toHaveBeenCalledTimes(1)
   })
 
-  it('opens the published curriculum and displays its subjects in a readable table', async () => {
+  it('requests_only_the_first_bounded_page', async () => {
     // Arrange
     const client = createClient({
       listPrograms: vi.fn().mockResolvedValue([program]),
@@ -273,6 +286,11 @@ describe('AcademicCatalogPage', () => {
 
     // Assert
     expect(client.getPublishedCurriculum).toHaveBeenCalledWith(publishedCurriculum.id, expect.any(AbortSignal))
+    expect(client.listPublishedCurriculumEntries).toHaveBeenCalledWith(
+      publishedCurriculum.id,
+      { page: 1, pageSize: 100, search: '', semester: undefined },
+      expect.any(AbortSignal),
+    )
     expect(await screen.findByRole('table', { name: /asignaturas de la versión 2026-A/i })).toBeVisible()
     expect(screen.getByRole('columnheader', { name: /asignatura/i })).toBeVisible()
     expect(screen.getByRole('cell', { name: 'Cálculo I' })).toBeVisible()
@@ -281,66 +299,78 @@ describe('AcademicCatalogPage', () => {
     expect(screen.getByRole('cell', { name: 'Física I' })).toBeVisible()
   })
 
-  it('filters published subjects by accent-insensitive name and semester', async () => {
+  it('filters_by_numeric_semester', async () => {
     // Arrange
+    const listEntries = vi.fn().mockImplementation((_id, query: AcademicCurriculumEntriesPageQuery) => Promise.resolve(
+      createEntriesPage(query, query.semester === 2 ? [publicDetails.entries[1]] : publicDetails.entries),
+    ))
     const client = createClient({
       listPrograms: vi.fn().mockResolvedValue([program]),
       listCurricula: vi.fn().mockResolvedValue([publishedCurriculum]),
-    })
-    await renderCatalogPage({ client })
-    await userEvent.click(await screen.findByRole('button', { name: /ver asignaturas de la versión 2026-A/i }))
-    await screen.findByRole('table', { name: /asignaturas de la versión 2026-A/i })
-
-    // Act: a search without the accent still finds "Cálculo I".
-    await userEvent.type(screen.getByRole('searchbox', { name: /buscar asignatura/i }), 'calculo')
-
-    // Assert: the other subject is excluded without another API read.
-    expect(screen.getByRole('cell', { name: 'Cálculo I' })).toBeVisible()
-    expect(screen.queryByRole('cell', { name: 'Física I' })).not.toBeInTheDocument()
-    expect(client.getPublishedCurriculum).toHaveBeenCalledTimes(1)
-
-    // Act: select semester 2 with the search cleared.
-    await userEvent.clear(screen.getByRole('searchbox', { name: /buscar asignatura/i }))
-    await userEvent.selectOptions(screen.getByRole('combobox', { name: /semestre/i }), '2')
-
-    // Assert
-    expect(screen.getByRole('cell', { name: 'Física I' })).toBeVisible()
-    expect(screen.queryByRole('cell', { name: 'Cálculo I' })).not.toBeInTheDocument()
-    expect(client.getPublishedCurriculum).toHaveBeenCalledTimes(1)
-  })
-
-  it('shows an empty filter result without hiding the loaded curriculum detail', async () => {
-    // Arrange
-    const client = createClient({
-      listPrograms: vi.fn().mockResolvedValue([program]),
-      listCurricula: vi.fn().mockResolvedValue([publishedCurriculum]),
+      listPublishedCurriculumEntries: listEntries,
     })
     await renderCatalogPage({ client })
     await userEvent.click(await screen.findByRole('button', { name: /ver asignaturas de la versión 2026-A/i }))
     await screen.findByRole('table', { name: /asignaturas de la versión 2026-A/i })
 
     // Act
-    await userEvent.type(screen.getByRole('searchbox', { name: /buscar asignatura/i }), 'NO-EXISTE')
+    fireEvent.change(screen.getByRole('spinbutton', { name: /semestre/i }), { target: { value: '2' } })
 
     // Assert
-    const detail = within(screen.getByRole('region', { name: /detalle de la versión 2026-A/i }))
-    expect(detail.getByRole('status')).toHaveTextContent(/ninguna asignatura coincide/i)
-    expect(screen.queryByRole('table', { name: /asignaturas de la versión 2026-A/i })).not.toBeInTheDocument()
-    expect(client.getPublishedCurriculum).toHaveBeenCalledTimes(1)
+    await waitFor(() => expect(listEntries).toHaveBeenLastCalledWith(
+      publishedCurriculum.id,
+      { page: 1, pageSize: 100, search: '', semester: 2 },
+      expect.any(AbortSignal),
+    ))
+    expect(await screen.findByRole('cell', { name: 'Física I' })).toBeVisible()
+    expect(screen.queryByRole('cell', { name: 'Cálculo I' })).not.toBeInTheDocument()
   })
 
-  it('paginates large published curricula without another API request', async () => {
+  it('shows_no_server_matches', async () => {
     // Arrange
+    const listEntries = vi.fn().mockImplementation((_id, query: AcademicCurriculumEntriesPageQuery) => Promise.resolve(
+      query.search
+        ? createEntriesPage(query, [], 0)
+        : createEntriesPage(query),
+    ))
     const client = createClient({
       listPrograms: vi.fn().mockResolvedValue([program]),
       listCurricula: vi.fn().mockResolvedValue([publishedCurriculum]),
-      getPublishedCurriculum: vi.fn().mockResolvedValue(largePublicDetails),
+      listPublishedCurriculumEntries: listEntries,
+    })
+    await renderCatalogPage({ client })
+    await userEvent.click(await screen.findByRole('button', { name: /ver asignaturas de la versión 2026-A/i }))
+    await screen.findByRole('table', { name: /asignaturas de la versión 2026-A/i })
+
+    // Act
+    fireEvent.change(screen.getByRole('searchbox', { name: /buscar asignatura/i }), { target: { value: 'NO-EXISTE' } })
+
+    // Assert
+    const detail = within(screen.getByRole('region', { name: /detalle de la versión 2026-A/i }))
+    await waitFor(() => expect(detail.getByRole('status')).toHaveTextContent(/ninguna asignatura coincide/i))
+    expect(screen.queryByRole('table', { name: /asignaturas de la versión 2026-A/i })).not.toBeInTheDocument()
+    await waitFor(() => expect(listEntries).toHaveBeenLastCalledWith(
+      publishedCurriculum.id,
+      { page: 1, pageSize: 100, search: 'NO-EXISTE', semester: undefined },
+      expect.any(AbortSignal),
+    ))
+  })
+
+  it('loads_the_next_server_page', async () => {
+    // Arrange
+    const listEntries = vi.fn().mockImplementation((_id, query: AcademicCurriculumEntriesPageQuery) => Promise.resolve(
+      createEntriesPage(query, query.page === 1 ? largeCurriculumEntries.slice(0, 100) : largeCurriculumEntries.slice(100), 101),
+    ))
+    const client = createClient({
+      listPrograms: vi.fn().mockResolvedValue([program]),
+      listCurricula: vi.fn().mockResolvedValue([publishedCurriculum]),
+      listPublishedCurriculumEntries: listEntries,
     })
     await renderCatalogPage({ client })
     await userEvent.click(await screen.findByRole('button', { name: /ver asignaturas de la versión 2026-A/i }))
     const table = await screen.findByRole('table', { name: /asignaturas de la versión 2026-A/i })
 
-    // Act + Assert: the first page renders at most 100 data rows and disables the previous control.
+    // Act + Assert: the first server page renders no more than 100 data rows.
     expect(within(table).getAllByRole('row')).toHaveLength(101)
     expect(screen.getByRole('cell', { name: 'Asignatura 100' })).toBeVisible()
     expect(screen.queryByRole('cell', { name: 'Asignatura 101' })).not.toBeInTheDocument()
@@ -348,12 +378,71 @@ describe('AcademicCatalogPage', () => {
 
     // Act: move to the remaining row.
     await userEvent.click(screen.getByRole('button', { name: /página siguiente/i }))
+    await screen.findByRole('cell', { name: 'Asignatura 101' })
 
     // Assert
-    expect(within(table).getAllByRole('row')).toHaveLength(2)
+    const secondPageTable = screen.getByRole('table', { name: /asignaturas de la versión 2026-A/i })
+    expect(within(secondPageTable).getAllByRole('row')).toHaveLength(2)
     expect(screen.getByRole('cell', { name: 'Asignatura 101' })).toBeVisible()
     expect(screen.getByText('Página 2 de 2')).toBeVisible()
-    expect(client.getPublishedCurriculum).toHaveBeenCalledTimes(1)
+    expect(listEntries).toHaveBeenLastCalledWith(
+      publishedCurriculum.id,
+      { page: 2, pageSize: 100, search: '', semester: undefined },
+      expect.any(AbortSignal),
+    )
+  })
+
+  it('debounces_search_and_resets_pagination', async () => {
+    // Arrange
+    const listEntries = vi.fn().mockImplementation((_id, query: AcademicCurriculumEntriesPageQuery) => Promise.resolve(
+      query.search
+        ? createEntriesPage(query, [publicDetails.entries[1]], 1)
+        : createEntriesPage(query, query.page === 1 ? largeCurriculumEntries.slice(0, 100) : largeCurriculumEntries.slice(100), 101),
+    ))
+    const client = createClient({
+      listPrograms: vi.fn().mockResolvedValue([program]),
+      listCurricula: vi.fn().mockResolvedValue([publishedCurriculum]),
+      listPublishedCurriculumEntries: listEntries,
+    })
+    await renderCatalogPage({ client })
+
+    // Act: navigate to page two, then start a search.
+    await userEvent.click(await screen.findByRole('button', { name: /ver asignaturas de la versión 2026-A/i }))
+    await userEvent.click(await screen.findByRole('button', { name: /página siguiente/i }))
+    await screen.findByRole('cell', { name: 'Asignatura 101' })
+    const callsBeforeSearch = listEntries.mock.calls.length
+    fireEvent.change(screen.getByRole('searchbox', { name: /buscar asignatura/i }), { target: { value: 'Física' } })
+
+    // Assert: the request waits for the debounce and returns to server page one.
+    expect(listEntries).toHaveBeenCalledTimes(callsBeforeSearch)
+    await waitFor(() => expect(listEntries).toHaveBeenLastCalledWith(
+      publishedCurriculum.id,
+      { page: 1, pageSize: 100, search: 'Física', semester: undefined },
+      expect.any(AbortSignal),
+    ))
+    expect(await screen.findByRole('cell', { name: 'Física I' })).toBeVisible()
+    expect(screen.queryByRole('navigation', { name: /paginación de asignaturas/i })).not.toBeInTheDocument()
+  })
+
+  it('rejects_entries_for_another_curriculum', async () => {
+    // Arrange
+    const listEntries = vi.fn().mockImplementation((_id, query: AcademicCurriculumEntriesPageQuery) => Promise.resolve(
+      createEntriesPage(query, publicDetails.entries, publicDetails.entries.length, secondPublishedCurriculum.id),
+    ))
+    const client = createClient({
+      listPrograms: vi.fn().mockResolvedValue([program]),
+      listCurricula: vi.fn().mockResolvedValue([publishedCurriculum]),
+      listPublishedCurriculumEntries: listEntries,
+    })
+    await renderCatalogPage({ client })
+
+    // Act
+    await userEvent.click(await screen.findByRole('button', { name: /ver asignaturas de la versión 2026-A/i }))
+
+    // Assert
+    expect(await screen.findByRole('alert')).toHaveTextContent(/no se pudieron cargar las asignaturas/i)
+    expect(screen.queryByRole('table', { name: /asignaturas de la versión 2026-A/i })).not.toBeInTheDocument()
+    expect(screen.queryByText('Cálculo I')).not.toBeInTheDocument()
   })
 
   it('does not render subjects when the published detail is no longer available', async () => {
@@ -380,7 +469,7 @@ describe('AcademicCatalogPage', () => {
     const client = createClient({
       listPrograms: vi.fn().mockResolvedValue([program]),
       listCurricula: vi.fn().mockResolvedValue([publishedCurriculum]),
-      getPublishedCurriculum: vi.fn().mockResolvedValue({ ...details, curriculum: draft }),
+      getPublishedCurriculum: vi.fn().mockResolvedValue({ ...draft, id: publishedCurriculum.id }),
     })
     await renderCatalogPage({ client })
 

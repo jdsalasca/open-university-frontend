@@ -38,6 +38,28 @@ const curriculum = {
   publishedAt: '2026-01-11T10:00:00Z',
 }
 
+const entry = {
+  subjectId: '9f7d9d63-c2bb-4424-85c1-63797065a35d',
+  subjectRevisionId: '536f34ac-cbf7-4ba3-bc35-301c814d8f50',
+  subjectCode: 'MAT-101',
+  subjectName: 'Cálculo I',
+  credits: 4,
+  semester: 1,
+  formationSpace: 'Disciplinar',
+  component: 'Fundamentación',
+  choiceGroup: null,
+  rowOrder: 1,
+}
+
+const entryPage = {
+  curriculumId: curriculum.id,
+  page: 1,
+  pageSize: 100,
+  totalItems: 1,
+  totalPages: 1,
+  entries: [entry],
+}
+
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -63,14 +85,13 @@ describe('academic catalog client', () => {
     })
   })
 
-  it('loads a published curriculum detail without credentials or cookies', async () => {
+  it('parses_public_curriculum_metadata_without_entries', async () => {
     // Arrange
     const { createAcademicCatalogClient } = await loadClient()
-    const expectedDetails = { curriculum, entries: [] }
-    const fetcher = vi.fn().mockResolvedValue(jsonResponse(expectedDetails))
+    const fetcher = vi.fn().mockResolvedValue(jsonResponse(curriculum))
     const client = createAcademicCatalogClient(fetcher)
     const getPublishedCurriculum = Reflect.get(client, 'getPublishedCurriculum') as
-      | ((id: string, signal?: AbortSignal) => Promise<typeof expectedDetails>)
+      | ((id: string, signal?: AbortSignal) => Promise<typeof curriculum>)
       | undefined
 
     // Act
@@ -78,11 +99,79 @@ describe('academic catalog client', () => {
     const result = await getPublishedCurriculum!(curriculum.id)
 
     // Assert
-    expect(result).toEqual(expectedDetails)
+    expect(result).toEqual(curriculum)
     expect(fetcher).toHaveBeenCalledWith(`/api/v1/academic-catalog/curricula/${curriculum.id}`, {
       credentials: 'omit',
       headers: { Accept: 'application/json' },
     })
+  })
+
+  it('requests_public_curriculum_entries_with_encoded_filters', async () => {
+    // Arrange
+    const { createAcademicCatalogClient } = await loadClient()
+    const response = { ...entryPage, page: 2, pageSize: 25, totalItems: 26, totalPages: 2 }
+    const fetcher = vi.fn().mockResolvedValue(jsonResponse(response))
+    const client = createAcademicCatalogClient(fetcher)
+    const listEntries = Reflect.get(client, 'listPublishedCurriculumEntries') as
+      | ((id: string, query: { page: number; pageSize: number; search: string; semester: number }, signal?: AbortSignal) => Promise<unknown>)
+      | undefined
+    const controller = new AbortController()
+
+    // Act + Assert
+    expect(listEntries, 'bounded public entries page query is available').toBeTypeOf('function')
+    if (!listEntries) return
+    const result = await listEntries(curriculum.id, {
+      page: 2,
+      pageSize: 25,
+      search: 'Cálculo A%_!',
+      semester: 7,
+    }, controller.signal)
+
+    expect(result).toEqual(response)
+    expect(fetcher).toHaveBeenCalledWith(
+      `/api/v1/academic-catalog/curricula/${curriculum.id}/entries?page=2&pageSize=25&search=C%C3%A1lculo+A%25_%21&semester=7`,
+      {
+        credentials: 'omit',
+        headers: { Accept: 'application/json' },
+        signal: controller.signal,
+      },
+    )
+  })
+
+  it('parses_bounded_entry_pages', async () => {
+    // Arrange
+    const { createAcademicCatalogClient } = await loadClient()
+    const fetcher = vi.fn().mockResolvedValue(jsonResponse(entryPage))
+    const client = createAcademicCatalogClient(fetcher)
+    const listEntries = Reflect.get(client, 'listPublishedCurriculumEntries') as
+      | ((id: string, query: { page: number; pageSize: number; search: string; semester?: number }) => Promise<unknown>)
+      | undefined
+
+    // Act + Assert
+    expect(listEntries, 'bounded public entries page query is available').toBeTypeOf('function')
+    if (!listEntries) return
+    await expect(listEntries(curriculum.id, { page: 1, pageSize: 100, search: '' })).resolves.toEqual(entryPage)
+  })
+
+  it.each([
+    ['malformed curriculum id', { ...entryPage, curriculumId: '../draft' }],
+    ['negative item count', { ...entryPage, totalItems: -1 }],
+    ['inconsistent page count', { ...entryPage, totalPages: 2 }],
+    ['invalid page number', { ...entryPage, page: 0 }],
+    ['oversized page size', { ...entryPage, pageSize: 101 }],
+    ['too many page entries', { ...entryPage, entries: Array.from({ length: 101 }, (_, index) => ({ ...entry, rowOrder: index + 1 })) }],
+  ])('rejects_malformed_or_oversized_page_responses (%s)', async (_case, response) => {
+    // Arrange
+    const { createAcademicCatalogClient } = await loadClient()
+    const client = createAcademicCatalogClient(vi.fn().mockResolvedValue(jsonResponse(response)))
+    const listEntries = Reflect.get(client, 'listPublishedCurriculumEntries') as
+      | ((id: string, query: { page: number; pageSize: number; search: string; semester?: number }) => Promise<unknown>)
+      | undefined
+
+    // Act + Assert
+    expect(listEntries, 'bounded public entries page query is available').toBeTypeOf('function')
+    if (!listEntries) return
+    await expect(listEntries(curriculum.id, { page: 1, pageSize: 100, search: '' })).rejects.toThrow('malformed')
   })
 
   it('sends the institutional bearer token for protected draft reads and reviews', async () => {

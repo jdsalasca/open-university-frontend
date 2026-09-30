@@ -1,11 +1,13 @@
 import type {
   AcademicCatalogClient,
+  AcademicCurriculumEntriesPageQuery,
   AcademicCatalogIssue,
 } from './contracts'
 import {
   parseAcademicCurricula,
   parseAcademicCurriculum,
   parseAcademicCurriculumDetails,
+  parseAcademicCurriculumEntriesPage,
   parseAcademicPrograms,
   validateCurriculumCsvFile,
 } from './contracts'
@@ -49,7 +51,22 @@ export function createAcademicCatalogClient(fetcher: typeof fetch = fetch): Acad
         `/api/v1/academic-catalog/curricula/${encodeURIComponent(id)}`,
         requestOptions(undefined, signal),
       )
-      return parseAcademicCurriculumDetails(await responseBody(response))
+      return parseAcademicCurriculum(await responseBody(response))
+    },
+
+    async listPublishedCurriculumEntries(id, query: AcademicCurriculumEntriesPageQuery, signal) {
+      const parameters = new URLSearchParams({
+        page: String(query.page),
+        pageSize: String(query.pageSize),
+      })
+      if (query.search) parameters.set('search', query.search)
+      if (query.semester !== undefined) parameters.set('semester', String(query.semester))
+
+      const response = await fetcher(
+        `/api/v1/academic-catalog/curricula/${encodeURIComponent(id)}/entries?${parameters.toString()}`,
+        requestOptions(undefined, signal),
+      )
+      return parseAcademicCurriculumEntriesPage(await responseBody(response), id, query)
     },
 
     async listDrafts(accessToken, signal) {
