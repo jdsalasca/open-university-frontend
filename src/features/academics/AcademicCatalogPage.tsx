@@ -42,6 +42,7 @@ export function AcademicCatalogPage({
   const [curriculaState, setCurriculaState] = useState<RequestState>('ready')
   const [curriculaError, setCurriculaError] = useState('')
   const [publicRefresh, setPublicRefresh] = useState(0)
+  const [selectedCurriculum, setSelectedCurriculum] = useState<AcademicCurriculum | null>(null)
   useEffect(() => {
     const controller = new AbortController()
     client.listPrograms(controller.signal)
@@ -50,6 +51,7 @@ export function AcademicCatalogPage({
         setProgramsState('ready')
         setSelectedProgramId(result[0]?.id ?? '')
         setCurricula([])
+        setSelectedCurriculum(null)
         setCurriculaState(result.length > 0 ? 'loading' : 'ready')
         setCurriculaError('')
       })
@@ -91,17 +93,20 @@ export function AcademicCatalogPage({
 
   function chooseProgram(programId: string) {
     setSelectedProgramId(programId)
+    setSelectedCurriculum(null)
     setCurriculaState('loading')
     setCurriculaError('')
   }
 
   function retryCurricula() {
+    setSelectedCurriculum(null)
     setCurriculaState('loading')
     setCurriculaError('')
     setPublicRefresh((count) => count + 1)
   }
 
   function refreshPublicCurricula() {
+    setSelectedCurriculum(null)
     setCurriculaState('loading')
     setCurriculaError('')
     setPublicRefresh((count) => count + 1)
@@ -200,8 +205,22 @@ export function AcademicCatalogPage({
             )}
             {curriculaState === 'ready' && curricula.length > 0 && (
               <div className="catalog-curriculum-grid">
-                {curricula.map((curriculum) => <CurriculumCard curriculum={curriculum} key={curriculum.id} />)}
+                {curricula.map((curriculum) => (
+                  <CurriculumCard
+                    curriculum={curriculum}
+                    key={curriculum.id}
+                    onView={() => setSelectedCurriculum(curriculum)}
+                  />
+                ))}
               </div>
+            )}
+            {selectedCurriculum && curricula.some(({ id }) => id === selectedCurriculum.id) && (
+              <PublishedCurriculumDetails
+                key={selectedCurriculum.id}
+                client={client}
+                curriculum={selectedCurriculum}
+                onClose={() => setSelectedCurriculum(null)}
+              />
             )}
           </div>
         </section>
@@ -217,6 +236,117 @@ export function AcademicCatalogPage({
         />
         : <LockedCatalogAdministration />}
     </div>
+  )
+}
+
+interface PublishedCurriculumDetailsProps {
+  client: AcademicCatalogClient
+  curriculum: AcademicCurriculum
+  onClose: () => void
+}
+
+function PublishedCurriculumDetails({ client, curriculum, onClose }: PublishedCurriculumDetailsProps) {
+  const [details, setDetails] = useState<AcademicCurriculumDetails | null>(null)
+  const [requestState, setRequestState] = useState<RequestState>('loading')
+  const [error, setError] = useState('')
+  const [retryCount, setRetryCount] = useState(0)
+
+  useEffect(() => {
+    const controller = new AbortController()
+
+    client.getPublishedCurriculum(curriculum.id, controller.signal)
+      .then((result) => {
+        if (controller.signal.aborted) return
+        if (result.curriculum.status !== 'PUBLISHED'
+          || result.curriculum.id !== curriculum.id
+          || result.curriculum.programId !== curriculum.programId) {
+          setError('La versión no está disponible para consulta pública.')
+          setRequestState('error')
+          return
+        }
+        setDetails(result)
+        setRequestState('ready')
+      })
+      .catch((requestError: unknown) => {
+        if (controller.signal.aborted) return
+        const failure = asApiFailure(requestError)
+        setError(failure.status === 404 || failure.code === 'curriculum_not_found'
+          ? 'Esta versión ya no está publicada o no existe.'
+          : 'No se pudieron cargar las asignaturas de esta versión.')
+        setRequestState('error')
+      })
+
+    return () => controller.abort()
+  }, [client, curriculum.id, curriculum.programId, retryCount])
+
+  function retryDetails() {
+    setDetails(null)
+    setRequestState('loading')
+    setError('')
+    setRetryCount((count) => count + 1)
+  }
+
+  return (
+    <section className="catalog-public-curriculum-detail" aria-label={`Detalle de la versión ${curriculum.curriculumVersion}`}>
+      <div className="catalog-public-detail-heading">
+        <div>
+          <p className="catalog-eyebrow">PLAN PUBLICADO · {cohortLabel(curriculum)}</p>
+          <h3>Asignaturas <span>{curriculum.curriculumVersion}</span></h3>
+        </div>
+        <button
+          aria-label={`Cerrar detalle de la versión ${curriculum.curriculumVersion}`}
+          className="catalog-button catalog-button-secondary"
+          onClick={onClose}
+          type="button"
+        >
+          Cerrar
+        </button>
+      </div>
+
+      {requestState === 'loading' && <p className="catalog-loading" role="status">Cargando asignaturas publicadas…</p>}
+      {requestState === 'error' && (
+        <div className="catalog-error catalog-public-detail-error" role="alert">
+          <p>{error}</p>
+          <button className="catalog-button catalog-button-secondary" onClick={retryDetails} type="button">
+            Reintentar
+          </button>
+        </div>
+      )}
+      {requestState === 'ready' && details && details.entries.length === 0 && (
+        <p className="catalog-public-detail-empty" role="status">Esta versión todavía no tiene asignaturas publicadas.</p>
+      )}
+      {requestState === 'ready' && details && details.entries.length > 0 && (
+        <div className="catalog-review-table-wrap">
+          <table className="catalog-review-table">
+            <caption>Asignaturas de la versión {details.curriculum.curriculumVersion}</caption>
+            <thead>
+              <tr>
+                <th scope="col">Semestre</th>
+                <th scope="col">Código</th>
+                <th scope="col">Asignatura</th>
+                <th scope="col">Créditos</th>
+                <th scope="col">Espacio de formación</th>
+                <th scope="col">Componente</th>
+                <th scope="col">Grupo de elección</th>
+              </tr>
+            </thead>
+            <tbody>
+              {details.entries.map((entry) => (
+                <tr key={entry.subjectRevisionId}>
+                  <td>{entry.semester}</td>
+                  <td>{entry.subjectCode}</td>
+                  <td>{entry.subjectName}</td>
+                  <td>{entry.credits}</td>
+                  <td>{entry.formationSpace}</td>
+                  <td>{entry.component}</td>
+                  <td>{entry.choiceGroup ?? '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
   )
 }
 
@@ -434,13 +564,21 @@ function CatalogAdminHeading() {
   )
 }
 
-function CurriculumCard({ curriculum }: { curriculum: AcademicCurriculum }) {
+function CurriculumCard({ curriculum, onView }: { curriculum: AcademicCurriculum; onView: () => void }) {
   return (
     <article className="catalog-curriculum-card" aria-label={`Versión ${curriculum.curriculumVersion}`}>
       <div className="catalog-curriculum-card-top"><span className="catalog-version-label">VERSIÓN</span><span className="catalog-published-indicator"><i aria-hidden="true" /> Publicado</span></div>
       <h3>{curriculum.curriculumVersion}</h3>
       <div className="catalog-cohort-band"><span aria-hidden="true">◷</span><span><small>COHORTE</small><strong>{cohortLabel(curriculum)}</strong></span><span className="catalog-card-arrow" aria-hidden="true">↗</span></div>
       <div className="catalog-curriculum-card-bottom"><span>{curriculum.entryCount} actividades</span><span>{curriculum.campusName}</span></div>
+      <button
+        aria-label={`Ver asignaturas de la versión ${curriculum.curriculumVersion}`}
+        className="catalog-button catalog-button-secondary catalog-curriculum-view"
+        onClick={onView}
+        type="button"
+      >
+        Ver asignaturas <span aria-hidden="true">↗</span>
+      </button>
     </article>
   )
 }

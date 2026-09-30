@@ -78,21 +78,32 @@ const details: AcademicCurriculumDetails = {
   }],
 }
 
+const publicDetails: AcademicCurriculumDetails = {
+  ...details,
+  curriculum: publishedCurriculum,
+  entries: details.entries.map((entry) => ({ ...entry, choiceGroup: 'OPT-2026' })),
+}
+
 const authorization: CatalogAuthorization = {
   accessToken: 'institutional-token',
   permissions: ['academic:catalog:read', 'academic:catalog:write'],
 }
 
-function createClient(overrides: Partial<AcademicCatalogClient> = {}): AcademicCatalogClient {
+type TestCatalogClient = AcademicCatalogClient & {
+  getPublishedCurriculum: (id: string, signal?: AbortSignal) => Promise<AcademicCurriculumDetails>
+}
+
+function createClient(overrides: Partial<TestCatalogClient> = {}): TestCatalogClient {
   return {
     listPrograms: vi.fn().mockResolvedValue([]),
     listCurricula: vi.fn().mockResolvedValue([]),
     listDrafts: vi.fn().mockResolvedValue([]),
     getCurriculum: vi.fn().mockResolvedValue(details),
+    getPublishedCurriculum: vi.fn().mockResolvedValue(publicDetails),
     importCsv: vi.fn().mockResolvedValue(draft),
     publishCurriculum: vi.fn().mockResolvedValue({ ...details, curriculum: publishedCurriculum }),
     ...overrides,
-  }
+  } as TestCatalogClient
 }
 
 describe('AcademicCatalogPage', () => {
@@ -147,6 +158,62 @@ describe('AcademicCatalogPage', () => {
     expect(within(curriculumCard).getByText(/2026-1/)).toBeVisible()
     expect(within(curriculumCard).getByText(/42 actividades/i)).toBeVisible()
     expect(within(curriculumCard).getByText(/Publicado/i)).toBeVisible()
+  })
+
+  it('opens the published curriculum and displays its subjects in a readable table', async () => {
+    // Arrange
+    const client = createClient({
+      listPrograms: vi.fn().mockResolvedValue([program]),
+      listCurricula: vi.fn().mockResolvedValue([publishedCurriculum]),
+    })
+    await renderCatalogPage({ client })
+
+    // Act
+    await userEvent.click(await screen.findByRole('button', { name: /ver asignaturas de la versión 2026-A/i }))
+
+    // Assert
+    expect(client.getPublishedCurriculum).toHaveBeenCalledWith(publishedCurriculum.id, expect.any(AbortSignal))
+    expect(await screen.findByRole('table', { name: /asignaturas de la versión 2026-A/i })).toBeVisible()
+    expect(screen.getByRole('columnheader', { name: /asignatura/i })).toBeVisible()
+    expect(screen.getByRole('cell', { name: 'Cálculo I' })).toBeVisible()
+    expect(screen.getByRole('cell', { name: 'MAT-101' })).toBeVisible()
+    expect(screen.getByRole('cell', { name: 'OPT-2026' })).toBeVisible()
+  })
+
+  it('does not render subjects when the published detail is no longer available', async () => {
+    // Arrange
+    const unavailable = Object.assign(new Error('Not found.'), { status: 404, code: 'curriculum_not_found' })
+    const client = createClient({
+      listPrograms: vi.fn().mockResolvedValue([program]),
+      listCurricula: vi.fn().mockResolvedValue([publishedCurriculum]),
+      getPublishedCurriculum: vi.fn().mockRejectedValue(unavailable),
+    })
+    await renderCatalogPage({ client })
+
+    // Act
+    await userEvent.click(await screen.findByRole('button', { name: /ver asignaturas de la versión 2026-A/i }))
+
+    // Assert
+    expect(await screen.findByRole('alert')).toHaveTextContent(/ya no está publicada o no existe/i)
+    expect(screen.queryByRole('table', { name: /asignaturas de la versión 2026-A/i })).not.toBeInTheDocument()
+    expect(screen.queryByText('Cálculo I')).not.toBeInTheDocument()
+  })
+
+  it('fails closed if a public detail response unexpectedly contains a draft', async () => {
+    // Arrange
+    const client = createClient({
+      listPrograms: vi.fn().mockResolvedValue([program]),
+      listCurricula: vi.fn().mockResolvedValue([publishedCurriculum]),
+      getPublishedCurriculum: vi.fn().mockResolvedValue({ ...details, curriculum: draft }),
+    })
+    await renderCatalogPage({ client })
+
+    // Act
+    await userEvent.click(await screen.findByRole('button', { name: /ver asignaturas de la versión 2026-A/i }))
+
+    // Assert
+    expect(await screen.findByRole('alert')).toHaveTextContent(/no está disponible para consulta pública/i)
+    expect(screen.queryByText('Cálculo I')).not.toBeInTheDocument()
   })
 
   it('renders institution supplied program text as text rather than executable markup', async () => {

@@ -63,6 +63,28 @@ describe('academic catalog client', () => {
     })
   })
 
+  it('loads a published curriculum detail without credentials or cookies', async () => {
+    // Arrange
+    const { createAcademicCatalogClient } = await loadClient()
+    const expectedDetails = { curriculum, entries: [] }
+    const fetcher = vi.fn().mockResolvedValue(jsonResponse(expectedDetails))
+    const client = createAcademicCatalogClient(fetcher)
+    const getPublishedCurriculum = Reflect.get(client, 'getPublishedCurriculum') as
+      | ((id: string, signal?: AbortSignal) => Promise<typeof expectedDetails>)
+      | undefined
+
+    // Act
+    expect(getPublishedCurriculum, 'public curriculum detail query is available').toBeTypeOf('function')
+    const result = await getPublishedCurriculum!(curriculum.id)
+
+    // Assert
+    expect(result).toEqual(expectedDetails)
+    expect(fetcher).toHaveBeenCalledWith(`/api/v1/academic-catalog/curricula/${curriculum.id}`, {
+      credentials: 'omit',
+      headers: { Accept: 'application/json' },
+    })
+  })
+
   it('sends the institutional bearer token for protected draft reads and reviews', async () => {
     // Arrange
     const { createAcademicCatalogClient } = await loadClient()

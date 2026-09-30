@@ -109,6 +109,8 @@
 .catalog-cohort-band strong { color: #454536; font-size: 10px; font-weight: 700; }
 .catalog-card-arrow { margin-left: auto; font-size: 13px; }
 .catalog-curriculum-card-bottom { display: flex; justify-content: space-between; gap: 10px; margin-top: 11px; color: #888980; font-size: 8px; }
+.catalog-curriculum-view { width: 100%; justify-content: space-between; margin-top: 12px; }
+.catalog-curriculum-view span { color: #8b7a31; }
 .catalog-no-curricula { display: flex; align-items: center; gap: 13px; min-height: 119px; padding: 18px; border: 1px dashed #e3e3d9; border-radius: 11px; background: #fdfdfa; }
 .catalog-no-curricula-icon { display: grid; flex: 0 0 40px; width: 40px; height: 40px; place-items: center; border-radius: 13px; background: #f2f2eb; color: #78796f; font-size: 21px; }
 .catalog-no-curricula h3 { margin: 0 0 5px; color: #45463f; font-size: 11px; }
@@ -176,6 +178,15 @@
 .catalog-review-table th { padding: 8px 10px; background: #f6f6f1; color: #777970; font-size: 8px; font-weight: 750; white-space: nowrap; }
 .catalog-review-table td { padding: 9px 10px; border-top: 1px solid #edeee8; color: #55574f; font-size: 8px; }
 .catalog-review-table td:first-child { color: #807335; font-weight: 750; }
+.catalog-public-curriculum-detail { margin-top: 17px; padding: 17px; border: 1px solid #e7e8e0; border-radius: 11px; background: #fff; }
+.catalog-public-detail-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 12px; }
+.catalog-public-detail-heading .catalog-eyebrow { margin-bottom: 4px; }
+.catalog-public-detail-heading h3 { margin: 0; color: #363832; font-family: Georgia, serif; font-size: 19px; font-weight: 500; }
+.catalog-public-detail-heading h3 span { color: #77724d; }
+.catalog-public-curriculum-detail .catalog-review-table { min-width: 860px; }
+.catalog-public-detail-error { margin: 0; flex-wrap: wrap; }
+.catalog-public-detail-error p { flex: 1; }
+.catalog-public-detail-empty { margin: 0; padding: 16px; border: 1px dashed #e3e3d9; border-radius: 9px; background: #fdfdfa; color: #77786f; font-size: 10px; text-align: center; }
 .catalog-action-success { margin: 12px 0 0; padding: 10px 12px; border: 1px solid #cfe2d2; border-radius: 9px; background: #f3faf2; color: #3e7049; font-size: 9px; }
 .catalog-action-error { margin-top: 12px; padding: 11px 12px; border: 1px solid #edc9c0; border-radius: 9px; background: #fff8f6; color: #7c4940; font-size: 9px; line-height: 1.6; }
 .catalog-action-error strong { color: #70483f; }
@@ -198,6 +209,7 @@
   .catalog-program-list { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
   .catalog-admin-locked { align-items: flex-start; flex-wrap: wrap; }
   .catalog-locked-tag { margin-left: 46px; }
+  .catalog-public-detail-heading { align-items: flex-start; }
 }
 
 @media (max-width: 520px) {
@@ -216,6 +228,8 @@
   .catalog-draft-row { align-items: flex-start; flex-wrap: wrap; }
   .catalog-draft-row .catalog-button { margin-left: 18px; }
   .catalog-review-heading { align-items: flex-start; flex-direction: column; }
+  .catalog-public-curriculum-detail { padding: 12px; }
+  .catalog-public-detail-heading { gap: 8px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

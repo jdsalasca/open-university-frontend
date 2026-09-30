@@ -44,6 +44,14 @@ export function createAcademicCatalogClient(fetcher: typeof fetch = fetch): Acad
       return parseAcademicCurricula(await responseBody(response))
     },
 
+    async getPublishedCurriculum(id, signal) {
+      const response = await fetcher(
+        `/api/v1/academic-catalog/curricula/${encodeURIComponent(id)}`,
+        requestOptions(undefined, signal),
+      )
+      return parseAcademicCurriculumDetails(await responseBody(response))
+    },
+
     async listDrafts(accessToken, signal) {
       const response = await fetcher(
         '/api/v1/admin/academic-catalog/drafts',

@@ -66,6 +66,7 @@ export interface CatalogAuthorization {
 export interface AcademicCatalogClient {
   listPrograms(signal?: AbortSignal): Promise<AcademicProgram[]>
   listCurricula(programId: string, signal?: AbortSignal): Promise<AcademicCurriculum[]>
+  getPublishedCurriculum(id: string, signal?: AbortSignal): Promise<AcademicCurriculumDetails>
   listDrafts(accessToken: string, signal?: AbortSignal): Promise<AcademicCurriculum[]>
   getCurriculum(id: string, accessToken: string, signal?: AbortSignal): Promise<AcademicCurriculumDetails>
   importCsv(file: File, accessToken: string, signal?: AbortSignal): Promise<AcademicCurriculum>
