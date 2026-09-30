@@ -116,6 +116,21 @@ describe('AcademicCatalogPage', () => {
     expect(client.publishCurriculum).not.toHaveBeenCalled()
   })
 
+  it('offers a public download of the blank curriculum CSV template while administrative actions stay locked', async () => {
+    // Arrange
+    const client = createClient()
+    await renderCatalogPage({ client })
+
+    // Act
+    const templateLink = screen.getByRole('link', { name: /descargar plantilla csv/i })
+
+    // Assert
+    expect(templateLink).toHaveAttribute('href', '/api/v1/academic-catalog/curriculum-template')
+    expect(templateLink).toHaveAttribute('download', 'academic-curriculum-template.csv')
+    expect(screen.queryByLabelText(/archivo CSV/i)).not.toBeInTheDocument()
+    expect(client.importCsv).not.toHaveBeenCalled()
+  })
+
   it('renders published curriculum versions grouped with their admission cohorts', async () => {
     // Arrange
     const client = createClient({
@@ -283,6 +298,7 @@ describe('AcademicCatalogPage', () => {
 
     // Assert
     expect(screen.getByRole('button', { name: /revisar 2026-A/i })).toBeVisible()
+    expect(screen.getByRole('link', { name: /descargar plantilla csv/i })).toHaveAttribute('download', 'academic-curriculum-template.csv')
     expect(screen.queryByLabelText(/archivo CSV/i)).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /publicar/i })).not.toBeInTheDocument()
   })

@@ -327,6 +327,7 @@ function CatalogAdministration({ accessToken, authorization, client, onPublished
   return (
     <section className="catalog-admin" aria-labelledby="catalog-admin-title">
       <CatalogAdminHeading />
+      <CurriculumTemplateDownload />
       <div className="catalog-admin-grid">
         {canWriteCatalog && (
           <section className="catalog-upload-card" aria-labelledby="catalog-upload-title">
@@ -406,7 +407,20 @@ function LockedCatalogAdministration() {
         <div><strong>Funciones administrativas cerradas</strong><p>La revisión de borradores y las acciones de publicación requieren acceso y permisos institucionales.</p></div>
         <span className="catalog-locked-tag">Sin sesión institucional</span>
       </div>
+      <CurriculumTemplateDownload />
     </section>
+  )
+}
+
+function CurriculumTemplateDownload() {
+  return (
+    <a
+      className="catalog-button catalog-button-secondary catalog-template-download"
+      href="/api/v1/academic-catalog/curriculum-template"
+      download="academic-curriculum-template.csv"
+    >
+      Descargar plantilla CSV
+    </a>
   )
 }
 
