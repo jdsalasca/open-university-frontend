@@ -7,5 +7,5 @@
 - Ejecuta `npm test`, `npm run build` y `npm run lint` antes de integrar.
 - `VITE_API_TARGET` configura el destino del proxy Vite. Localmente es `http://localhost:8080`; Compose lo establece a `http://backend:8080`.
 - No incluir tokens, datos estudiantiles reales ni secretos en el cliente. El modo de demostración no debe presentarse como publicación institucional activa.
-- La ruta `/#academia` es de lectura en este incremento: ordena unidades, afiliaciones de programa y lugares por campos recibidos de la API, y muestra periodos públicos OPEN. No inferir afiliaciones desde texto histórico ni incluir controles de apertura administrativa sin SSO y permisos reales.
+- La ruta `/#academia` es de lectura en este incremento: ordena raíces por `displayOrder` del nodo, hijos por orden de relación (luego orden/código del hijo), afiliaciones por su `displayOrder` y lugares con las mismas reglas; muestra periodos públicos OPEN. No inferir afiliaciones desde texto histórico ni incluir controles de apertura administrativa sin SSO y permisos reales.
 - Mantener separados el semestre curricular de una asignatura y el periodo académico regular/intersemestral; no crear calendarios, periodos o datos oficiales ficticios para llenar estados vacíos.

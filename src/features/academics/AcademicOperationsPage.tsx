@@ -182,16 +182,17 @@ function OrganizationTree({
 }) {
   const unitById = new Map(units.map((unit) => [unit.id, unit]))
   const siteById = new Map(sites.map((site) => [site.id, site]))
-  const childrenByParent = new Map<string, AcademicOrganizationUnit[]>()
+  const childrenByParent = new Map<string, { relation: AcademicStructureSnapshot['organizationRelations'][number]; unit: AcademicOrganizationUnit }[]>()
   const childIds = new Set<string>()
   for (const relation of relations) {
     const parent = unitById.get(relation.parentUnitId)
     const child = unitById.get(relation.childUnitId)
     if (!parent || !child) continue
-    childrenByParent.set(parent.id, [...(childrenByParent.get(parent.id) ?? []), child])
+    childrenByParent.set(parent.id, [...(childrenByParent.get(parent.id) ?? []), { relation, unit: child }])
     childIds.add(child.id)
   }
-  childrenByParent.forEach((children) => children.sort(compareUnits))
+  childrenByParent.forEach((children) => children.sort((first, second) =>
+    first.relation.displayOrder - second.relation.displayOrder || compareUnits(first.unit, second.unit)))
   let roots = units.filter((unit) => !childIds.has(unit.id))
   if (roots.length === 0) roots = units
   const attachedProgramIds = new Set(affiliations
@@ -224,7 +225,7 @@ function OrganizationTree({
             {unitPrograms.map(({ affiliation, program }) => (
               <ProgramNode key={affiliation.id} program={program} site={siteById.get(affiliation.siteId)} />
             ))}
-            {children.map((child) => renderUnit(child, nextAncestors))}
+            {children.map(({ unit: child }) => renderUnit(child, nextAncestors))}
           </ul>
         )}
       </li>
@@ -265,16 +266,17 @@ function SiteTree({
   relations: AcademicStructureSnapshot['siteRelations']
 }) {
   const byId = new Map(sites.map((site) => [site.id, site]))
-  const childrenByParent = new Map<string, AcademicSite[]>()
+  const childrenByParent = new Map<string, { relation: AcademicStructureSnapshot['siteRelations'][number]; site: AcademicSite }[]>()
   const childIds = new Set<string>()
   for (const relation of relations) {
     const parent = byId.get(relation.parentSiteId)
     const child = byId.get(relation.childSiteId)
     if (!parent || !child) continue
-    childrenByParent.set(parent.id, [...(childrenByParent.get(parent.id) ?? []), child])
+    childrenByParent.set(parent.id, [...(childrenByParent.get(parent.id) ?? []), { relation, site: child }])
     childIds.add(child.id)
   }
-  childrenByParent.forEach((children) => children.sort(compareSites))
+  childrenByParent.forEach((children) => children.sort((first, second) =>
+    first.relation.displayOrder - second.relation.displayOrder || compareSites(first.site, second.site)))
   let roots = sites.filter((site) => !childIds.has(site.id))
   if (roots.length === 0) roots = sites
 
@@ -289,7 +291,7 @@ function SiteTree({
           <div><strong>{site.displayName}</strong><small>{site.code} · {labelSiteType(site.type)}</small></div>
           <span className="academic-sort-order">{String(site.displayOrder).padStart(2, '0')}</span>
         </div>
-        {children.length > 0 && <ul>{children.map((child) => renderSite(child, nextAncestors))}</ul>}
+        {children.length > 0 && <ul>{children.map(({ site: child }) => renderSite(child, nextAncestors))}</ul>}
       </li>
     )
   }

@@ -18,6 +18,7 @@ export interface AcademicOrganizationUnit {
 export interface AcademicOrganizationRelation {
   parentUnitId: string
   childUnitId: string
+  displayOrder: number
   validFrom: string
   validThrough: string | null
 }
@@ -36,6 +37,7 @@ export interface AcademicSite {
 export interface AcademicSiteRelation {
   parentSiteId: string
   childSiteId: string
+  displayOrder: number
   validFrom: string
   validThrough: string | null
 }

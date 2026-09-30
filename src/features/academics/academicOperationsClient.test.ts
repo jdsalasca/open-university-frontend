@@ -25,8 +25,23 @@ const structure = {
     status: 'ACTIVE',
     validFrom: '2026-01-01',
     validThrough: null,
+  }, {
+    id: '127d89c9-a72a-436a-9a90-26da60bc9570',
+    code: 'ESC-SISTEMAS',
+    type: 'SCHOOL',
+    displayName: 'Escuela de Sistemas',
+    displayOrder: 1,
+    status: 'ACTIVE',
+    validFrom: '2026-01-01',
+    validThrough: null,
   }],
-  organizationRelations: [],
+  organizationRelations: [{
+    parentUnitId: 'fae06170-9acf-4718-854e-92e945a7db17',
+    childUnitId: '127d89c9-a72a-436a-9a90-26da60bc9570',
+    displayOrder: 3,
+    validFrom: '2026-01-01',
+    validThrough: null,
+  }],
   sites: [{
     id: 'b16116a1-10ba-4d79-839b-4195e4851d73',
     code: 'TUNJA',
@@ -81,6 +96,7 @@ describe('academic operations client', () => {
 
     // Assert
     expect(result[0].programAffiliations[0]?.programId).toBe(structure.programAffiliations[0]?.programId)
+    expect(result[0].organizationRelations[0]?.displayOrder).toBe(3)
     expect(result[1][0]).toMatchObject({ kind: 'REGULAR', status: 'OPEN', calendarRevisionNumber: 1 })
     expect(fetcher).toHaveBeenNthCalledWith(1, '/api/v1/academic-structure', {
       credentials: 'omit',
@@ -102,6 +118,7 @@ describe('academic operations client', () => {
       organizationRelations: [{
         parentUnitId: structure.units[0]?.id,
         childUnitId: 'not-a-uuid',
+        displayOrder: 0,
         validFrom: '2026-01-01',
         validThrough: null,
       }],
@@ -114,6 +131,46 @@ describe('academic operations client', () => {
     // Act + Assert
     await expect(client.getStructure()).rejects.toThrow(/malformed/i)
     await expect(client.getOpenPeriods()).rejects.toThrow(/malformed/i)
+  })
+
+  it('requires a nonnegative integer on every academic structure relationship', async () => {
+    // Arrange
+    const { createAcademicOperationsClient } = await loadClient()
+    const { displayOrder: _omitted, ...relationWithoutOrder } = structure.organizationRelations[0]!
+    const invalidResponses = [
+      {
+        ...structure,
+        organizationRelations: [relationWithoutOrder],
+      },
+      {
+        ...structure,
+        sites: [...structure.sites, {
+          id: 'bb783bf7-0fbb-48d5-9c49-17240492ef6e',
+          code: 'REGIONAL',
+          type: 'REGIONAL',
+          displayName: 'Sede regional',
+          displayOrder: 1,
+          status: 'ACTIVE',
+          validFrom: '2026-01-01',
+          validThrough: null,
+        }],
+        siteRelations: [{
+          parentSiteId: structure.sites[0]!.id,
+          childSiteId: 'bb783bf7-0fbb-48d5-9c49-17240492ef6e',
+          displayOrder: -1,
+          validFrom: '2026-01-01',
+          validThrough: null,
+        }],
+      },
+    ]
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(jsonResponse(invalidResponses[0]))
+      .mockResolvedValueOnce(jsonResponse(invalidResponses[1]))
+    const client = createAcademicOperationsClient(fetcher)
+
+    // Act + Assert
+    await expect(client.getStructure()).rejects.toThrow(/malformed/i)
+    await expect(client.getStructure()).rejects.toThrow(/malformed/i)
   })
 
   it('reports a public API error as a retryable rejected request', async () => {

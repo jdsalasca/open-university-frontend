@@ -116,6 +116,7 @@ function parseOrganizationRelation(input: unknown): AcademicOrganizationRelation
     || !isUuid(input.parentUnitId)
     || !isUuid(input.childUnitId)
     || input.parentUnitId === input.childUnitId
+    || !isNonNegativeInteger(input.displayOrder)
     || !isDate(input.validFrom)
     || !(input.validThrough === null || isDate(input.validThrough))
     || compareDates(input.validThrough, input.validFrom) < 0) throw malformedResponse()
@@ -127,6 +128,7 @@ function parseSiteRelation(input: unknown): AcademicSiteRelation {
     || !isUuid(input.parentSiteId)
     || !isUuid(input.childSiteId)
     || input.parentSiteId === input.childSiteId
+    || !isNonNegativeInteger(input.displayOrder)
     || !isDate(input.validFrom)
     || !(input.validThrough === null || isDate(input.validThrough))
     || compareDates(input.validThrough, input.validFrom) < 0) throw malformedResponse()
