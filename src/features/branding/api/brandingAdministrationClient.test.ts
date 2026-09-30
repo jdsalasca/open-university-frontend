@@ -3,6 +3,17 @@ import { HttpBrandingAdministrationClient } from './brandingAdministrationClient
 
 afterEach(() => vi.unstubAllGlobals())
 
+function validBrandingChange() {
+  return {
+    expectedRevision: 7,
+    institutionName: 'Universidad UPTC',
+    colors: { primary: '#FFCC29', ink: '#1A1A1A', surface: '#FFFFFF', text: '#1A1A1A', accent: '#FFCC29', focus: '#1A1A1A' },
+    assets: { logoLight: null, logoDark: null, favicon: null },
+    modules: [],
+    banners: [],
+  }
+}
+
 describe('HttpBrandingAdministrationClient', () => {
   it('uploads a file with a bearer token without persisting the browser filename in metadata', async () => {
     // Arrange
@@ -32,14 +43,7 @@ describe('HttpBrandingAdministrationClient', () => {
 
   it('publishes the explicit current revision and uses the API audit contract', async () => {
     // Arrange
-    const change = {
-      expectedRevision: 7,
-      institutionName: 'Universidad UPTC',
-      colors: { primary: '#FFCC29', ink: '#1A1A1A', surface: '#FFFFFF', text: '#1A1A1A', accent: '#FFCC29', focus: '#1A1A1A' },
-      assets: { logoLight: null, logoDark: null, favicon: null },
-      modules: [],
-      banners: [],
-    }
+    const change = validBrandingChange()
     const published = { ...change, revision: 8 }
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(published), { status: 200 }))
     vi.stubGlobal('fetch', fetchMock)
@@ -59,6 +63,27 @@ describe('HttpBrandingAdministrationClient', () => {
       body: JSON.stringify(change),
     }))
     expect(result.revision).toBe(8)
+  })
+
+  it('omits ambient browser credentials from every bearer-authenticated administration request', async () => {
+    // Arrange
+    const fetchMock = vi.fn().mockResolvedValue(new Response('{"error":"unauthorized"}', { status: 401 }))
+    vi.stubGlobal('fetch', fetchMock)
+    const client = new HttpBrandingAdministrationClient()
+    const change = validBrandingChange()
+
+    // Act
+    await expect(client.getCurrentConfiguration('institution-admin-token')).rejects.toMatchObject({ status: 401 })
+    await expect(client.uploadAsset(new File(['png'], 'logo.png', { type: 'image/png' }), 'institution-admin-token'))
+      .rejects.toMatchObject({ status: 401 })
+    await expect(client.publishConfiguration(change, 'institution-admin-token')).rejects.toMatchObject({ status: 401 })
+    await expect(client.restoreRevision(6, 7, 'institution-admin-token')).rejects.toMatchObject({ status: 401 })
+
+    // Assert
+    expect(fetchMock).toHaveBeenCalledTimes(4)
+    for (const [, request] of fetchMock.mock.calls) {
+      expect(request?.credentials).toBe('omit')
+    }
   })
 
   it('preserves a structured revision conflict for the editor to handle', async () => {

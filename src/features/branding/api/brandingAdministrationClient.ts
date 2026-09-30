@@ -83,7 +83,7 @@ export class HttpBrandingAdministrationClient implements BrandingAdministrationC
   }
 
   private async requestJson(path: string, init: RequestInit): Promise<unknown> {
-    const response = await fetch(path, init)
+    const response = await fetch(path, { ...init, credentials: 'omit' })
     if (!response.ok) {
       let code = 'request_failed'
       try {
