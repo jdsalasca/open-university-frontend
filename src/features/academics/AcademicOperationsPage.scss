@@ -104,10 +104,23 @@
 .academic-period-title-row { display: flex; align-items: center; gap: 7px; }
 .academic-period-title-row h3 { overflow: hidden; margin: 0; color: #34352e; font-size: 10px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
 .academic-period-state { padding: 3px 6px; border-radius: 4px; background: #edf5ec; color: #528058; font-size: 7px; font-weight: 750; }
+.academic-period-state.state-draft { background: #f1f1ed; color: #73746d; }
+.academic-period-state.state-approved { background: #edf2fa; color: #506f9d; }
+.academic-period-state.state-closed, .academic-period-state.state-cancelled { background: #f4eae7; color: #956254; }
 .academic-period-copy p { display: flex; flex-wrap: wrap; gap: 5px; margin: 5px 0 0; color: #77786f; font-size: 8px; }
 .academic-period-copy p strong { color: #55564e; }
-.academic-period-copy > small { display: block; overflow: hidden; margin-top: 4px; color: #999a92; font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
-.academic-period-chevron { align-self: flex-start; color: #9c9c91; font-size: 13px; }
+.academic-period-copy > small { display: block; overflow: hidden; margin-top: 4px; color: #999a92; font-size: 8px; line-height: 1.5; text-overflow: ellipsis; }
+.academic-period-action { min-height: 28px; margin-top: 9px; padding: 0 10px; border: 1px solid #465947; border-radius: 6px; background: #465947; color: #fff; font: inherit; font-size: 8px; font-weight: 700; cursor: pointer; }
+.academic-period-action.action-close { border-color: #d9d9d1; background: #fff; color: #55564e; }
+.academic-period-action:focus-visible, .academic-period-confirmation button:focus-visible { outline: 3px solid var(--brand-focus, #1a1a1a); outline-offset: 2px; }
+.academic-period-action:disabled, .academic-period-confirmation button:disabled { opacity: .55; cursor: wait; }
+.academic-period-confirmation { display: grid; gap: 8px; margin-top: 9px; padding: 10px; border: 1px solid #e8dfc6; border-radius: 7px; background: #faf7ed; }
+.academic-period-confirmation > p { margin: 0; color: #625c49; font-size: 8px; line-height: 1.55; }
+.academic-period-confirmation > div { display: flex; flex-wrap: wrap; gap: 6px; }
+.academic-period-confirmation button { min-height: 27px; padding: 0 9px; border: 1px solid #465947; border-radius: 5px; background: #465947; color: #fff; font: inherit; font-size: 8px; font-weight: 700; cursor: pointer; }
+.academic-period-confirmation button.secondary { border-color: #d3d1c7; background: #fff; color: #55564e; }
+.academic-period-action-message { margin: 12px 0; padding: 10px 12px; border: 1px solid #dbe8dd; border-radius: 7px; background: #f3f8f2; color: #47714c; font-size: 9px; line-height: 1.5; }
+.academic-period-action-message.is-error { border-color: #efd8d0; background: #fbf3f0; color: #965347; }
 
 .academic-loading { display: flex; align-items: center; gap: 10px; min-height: 115px; padding: 20px; border: 1px solid #e6e7df; border-radius: 11px; background: #fff; color: #77786f; font-size: 11px; }
 .academic-loading-mark { width: 15px; height: 15px; border: 2px solid #e7e4d8; border-top-color: #a58c31; border-radius: 50%; animation: academic-spin .7s linear infinite; }

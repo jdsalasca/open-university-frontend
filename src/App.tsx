@@ -1,17 +1,25 @@
 import { useEffect, useState } from 'react'
 import { AcademicCatalogPage } from './features/academics/AcademicCatalogPage'
 import { academicCatalogClient } from './features/academics/academicCatalogClient'
-import type { AcademicCatalogClient } from './features/academics/contracts'
+import type { AcademicCatalogClient, AcademicCatalogPermission } from './features/academics/contracts'
 import { AcademicOperationsPage } from './features/academics/AcademicOperationsPage'
 import { academicOperationsClient } from './features/academics/academicOperationsClient'
-import type { AcademicOperationsClient } from './features/academics/academicOperationsContracts'
+import type { AcademicOperationsClient, AcademicPeriodAuthorization } from './features/academics/academicOperationsContracts'
 import { useBranding } from './features/branding/useBranding'
 import { VisualIdentityCenter } from './features/branding/VisualIdentityCenter'
+import { IdentityProvider } from './features/identity/IdentityProvider'
+import type { IdentitySessionManager } from './features/identity/IdentityProvider'
+import { useIdentity } from './features/identity/identityContext'
+import type { IdentityClient } from './features/identity/identityContracts'
+import type { OidcConfigurationResult } from './features/identity/oidcConfiguration'
 import './App.scss'
 
 interface AppProps {
   catalogClient?: AcademicCatalogClient
   academicOperationsClient?: AcademicOperationsClient
+  oidcConfiguration?: OidcConfigurationResult
+  identityManager?: IdentitySessionManager
+  currentIdentityClient?: IdentityClient
 }
 
 type ApplicationView = 'identity' | 'programs' | 'academia'
@@ -29,8 +37,30 @@ const MODULE_SYMBOLS: Record<string, string> = {
 export function App({
   catalogClient = academicCatalogClient,
   academicOperationsClient: operationsClient = academicOperationsClient,
+  oidcConfiguration,
+  identityManager,
+  currentIdentityClient,
 }: AppProps = {}) {
+  return (
+    <IdentityProvider
+      configuration={oidcConfiguration}
+      manager={identityManager}
+      identityClient={currentIdentityClient}
+    >
+      <ApplicationShell catalogClient={catalogClient} operationsClient={operationsClient} />
+    </IdentityProvider>
+  )
+}
+
+function ApplicationShell({
+  catalogClient,
+  operationsClient,
+}: {
+  catalogClient: AcademicCatalogClient
+  operationsClient: AcademicOperationsClient
+}) {
   const { branding, status } = useBranding()
+  const { state: identity, login, logout, retry, loginAvailable } = useIdentity()
   const [view, setView] = useState<ApplicationView>(() => readApplicationView())
   useEffect(() => {
     const onHashChange = () => setView(readApplicationView())
@@ -49,6 +79,28 @@ export function App({
   const isProgramsView = view === 'programs'
   const isAcademicOperationsView = view === 'academia'
   const isIdentityView = view === 'identity'
+  const authenticatedIdentity = identity.status === 'authenticated' ? identity : null
+  const hasInstitutionalSession = authenticatedIdentity !== null
+  const catalogAuthorization = authenticatedIdentity
+    ? {
+      accessToken: authenticatedIdentity.accessToken,
+      permissions: authenticatedIdentity.permissions.filter(isAcademicCatalogPermission),
+    }
+    : null
+  const periodAuthorization: AcademicPeriodAuthorization | null = authenticatedIdentity
+    ? {
+      accessToken: authenticatedIdentity.accessToken,
+      canRead: authenticatedIdentity.permissions.includes('academic:period:read'),
+      canWrite: authenticatedIdentity.permissions.includes('academic:period:write'),
+    }
+    : null
+  const sessionLabel = identity.status === 'authenticated' ? 'Sesión institucional activa'
+    : identity.status === 'loading' ? 'Verificando sesión…'
+      : identity.status === 'unconfigured' ? 'Acceso institucional pendiente de configuración'
+        : identity.status === 'error' ? identity.message
+          : identity.reason === 'expired' ? 'Sesión vencida · Sin acceso'
+            : 'Sin sesión institucional'
+  const identityCenterKey = `${branding.revision}:${authenticatedIdentity?.subject ?? 'anonymous'}`
   const currentPageLabel = isProgramsView ? programsLabel
     : isAcademicOperationsView ? 'Estructura y periodos'
       : identityLabel
@@ -121,6 +173,27 @@ export function App({
               : isAcademicOperationsView
                 ? <span className="revision-chip">ESTRUCTURA · PERIODOS</span>
                 : <span className="revision-chip">REV. {branding.revision.toString().padStart(2, '0')}</span>}
+            <div className="identity-session-controls" aria-label="Sesión institucional">
+              <span className={`identity-session-status is-${identity.status}`}
+                role={identity.status === 'error' ? 'status' : undefined}
+                aria-live="polite">
+                {sessionLabel}
+              </span>
+              {identity.status === 'error' && (
+                <button className="identity-session-button secondary" type="button" onClick={() => void retry()}>
+                  Reintentar
+                </button>
+              )}
+              <button
+                className="identity-session-button"
+                type="button"
+                disabled={!loginAvailable || identity.status === 'loading'}
+                onClick={() => void (hasInstitutionalSession ? logout() : login())}
+                title={!loginAvailable ? 'El inicio de sesión requiere configuración institucional aprobada' : undefined}
+              >
+                {hasInstitutionalSession ? 'Cerrar sesión' : 'Iniciar sesión'}
+              </button>
+            </div>
           </div>
         </header>
 
@@ -135,15 +208,26 @@ export function App({
           {isIdentityView && status === 'loading' && <p className="sr-only" role="status">Cargando identidad institucional…</p>}
 
           {isProgramsView
-            ? <AcademicCatalogPage client={catalogClient} authorization={null} />
+            ? <AcademicCatalogPage client={catalogClient} authorization={catalogAuthorization} />
             : isAcademicOperationsView
-              ? <AcademicOperationsPage client={operationsClient} />
-              : <VisualIdentityCenter key={branding.revision} accessToken={null} initialConfiguration={branding} />}
+              ? <AcademicOperationsPage
+                client={operationsClient}
+                loadPrograms={catalogClient.listPrograms}
+                authorization={periodAuthorization}
+              />
+              : <VisualIdentityCenter
+                key={identityCenterKey}
+                accessToken={authenticatedIdentity?.accessToken ?? null}
+                permissions={authenticatedIdentity?.permissions ?? []}
+                initialConfiguration={branding}
+              />}
 
           <footer className="page-footer"><span>{branding.institutionName}</span><span>{isProgramsView
             ? 'Vista previa de programas · Sin publicación institucional'
-            : isAcademicOperationsView
-              ? 'Vista de desarrollo · Sin autorización administrativa institucional'
+          : isAcademicOperationsView
+              ? periodAuthorization?.canWrite
+                ? 'Control del estado del periodo · Oferta y matrícula independientes'
+                : 'Vista de consulta · Apertura y cierre requieren permiso institucional'
               : `Configuración pública · Rev. ${branding.revision}`}</span></footer>
         </main>
       </div>
@@ -158,4 +242,8 @@ function readApplicationView(): ApplicationView {
   if (window.location.hash === '#programas') return 'programs'
   if (window.location.hash === '#academia') return 'academia'
   return 'identity'
+}
+
+function isAcademicCatalogPermission(permission: string): permission is AcademicCatalogPermission {
+  return permission === 'academic:catalog:read' || permission === 'academic:catalog:write'
 }

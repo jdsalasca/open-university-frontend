@@ -70,14 +70,23 @@ export interface AcademicPeriod {
   startsOn: string
   endsOn: string
   status: AcademicPeriodStatus
-  calendarRevisionId: string
-  calendarRevisionNumber: number
-  approvalReference: string
-  officialReference: string
+  calendarRevisionId: string | null
+  calendarRevisionNumber: number | null
+  approvalReference: string | null
+  officialReference: string | null
   createdAt: string
 }
 
 export interface AcademicOperationsClient {
   getStructure(signal?: AbortSignal): Promise<AcademicStructureSnapshot>
   getOpenPeriods(signal?: AbortSignal): Promise<AcademicPeriod[]>
+  getAdminPeriods(accessToken: string, signal?: AbortSignal): Promise<AcademicPeriod[]>
+  openPeriod(periodId: string, accessToken: string, signal?: AbortSignal): Promise<AcademicPeriod>
+  closePeriod(periodId: string, accessToken: string, signal?: AbortSignal): Promise<AcademicPeriod>
+}
+
+export interface AcademicPeriodAuthorization {
+  accessToken: string
+  canRead: boolean
+  canWrite: boolean
 }

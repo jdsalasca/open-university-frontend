@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { BrandingProvider } from './BrandingProvider'
 import { DEFAULT_BRANDING } from './contracts'
 import type { PublicBranding } from './contracts'
+import type { ApplicationPermission } from '../identity/identityContracts'
 import { VisualIdentityCenter } from './VisualIdentityCenter'
 import type { BrandingAdministrationClient } from './api/brandingAdministrationClient'
 import { BrandingAdministrationError } from './api/brandingAdministrationClient'
@@ -34,16 +35,19 @@ function createClient(overrides: Partial<BrandingAdministrationClient> = {}): Br
 function renderCenter({
   client = createClient(),
   accessToken = 'test-access-token',
+  permissions = ['branding:read', 'branding:write'],
   initialConfiguration = configuration(),
 }: {
   client?: BrandingAdministrationClient
   accessToken?: string | null
+  permissions?: ApplicationPermission[]
   initialConfiguration?: PublicBranding | null
 } = {}) {
   const view = render(
     <BrandingProvider loader={async () => configuration()}>
       <VisualIdentityCenter
         accessToken={accessToken}
+        permissions={permissions}
         client={client}
         initialConfiguration={initialConfiguration ?? undefined}
       />
@@ -59,6 +63,23 @@ afterEach(() => {
 })
 
 describe('VisualIdentityCenter', () => {
+  it('keeps publishing and rollback unavailable when the session lacks branding write permission', () => {
+    // Arrange
+    const client = createClient()
+    renderCenter({ client, permissions: ['branding:read'] })
+
+    // Act
+    const publish = screen.getByRole('button', { name: 'Publicar cambios' })
+    const restore = screen.getByRole('button', { name: 'Restaurar revisión anterior' })
+
+    // Assert
+    expect(publish).toBeDisabled()
+    expect(restore).toBeDisabled()
+    expect(screen.getByRole('status')).toHaveTextContent(/permiso de escritura/i)
+    expect(client.publishConfiguration).not.toHaveBeenCalled()
+    expect(client.restoreRevision).not.toHaveBeenCalled()
+  })
+
   it('edits a local preview without publishing until the administrator saves', async () => {
     // Arrange
     const user = userEvent.setup()

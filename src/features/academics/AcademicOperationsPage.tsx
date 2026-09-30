@@ -7,6 +7,8 @@ import type {
   AcademicOperationsClient,
   AcademicOrganizationUnit,
   AcademicPeriod,
+  AcademicPeriodAuthorization,
+  AcademicPeriodStatus,
   AcademicProgramAffiliation,
   AcademicSite,
   AcademicStructureSnapshot,
@@ -17,12 +19,14 @@ type RequestState = 'loading' | 'ready' | 'error'
 type RequestData = {
   structure: AcademicStructureSnapshot
   periods: AcademicPeriod[]
+  periodSource: 'public' | 'admin'
   programs: AcademicProgram[]
 }
 
 interface AcademicOperationsPageProps {
   client?: AcademicOperationsClient
   loadPrograms?: (signal?: AbortSignal) => Promise<AcademicProgram[]>
+  authorization?: AcademicPeriodAuthorization | null
 }
 
 const defaultLoadPrograms = (signal?: AbortSignal) => academicCatalogClient.listPrograms(signal)
@@ -30,20 +34,27 @@ const defaultLoadPrograms = (signal?: AbortSignal) => academicCatalogClient.list
 export function AcademicOperationsPage({
   client = academicOperationsClient,
   loadPrograms = defaultLoadPrograms,
+  authorization = null,
 }: AcademicOperationsPageProps) {
   const [requestState, setRequestState] = useState<RequestState>('loading')
   const [requestData, setRequestData] = useState<RequestData | null>(null)
   const [retryNumber, setRetryNumber] = useState(0)
+  const [periodConfirmation, setPeriodConfirmation] = useState<{ id: string; action: 'open' | 'close' } | null>(null)
+  const [pendingPeriodId, setPendingPeriodId] = useState<string | null>(null)
+  const [periodActionMessage, setPeriodActionMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
   useEffect(() => {
     const controller = new AbortController()
+    const periodRequest = authorization?.canRead
+      ? client.getAdminPeriods(authorization.accessToken, controller.signal)
+      : client.getOpenPeriods(controller.signal)
     Promise.all([
       client.getStructure(controller.signal),
-      client.getOpenPeriods(controller.signal),
+      periodRequest,
       loadPrograms(controller.signal),
     ])
       .then(([structure, periods, programs]) => {
-        setRequestData({ structure, periods, programs })
+        setRequestData({ structure, periods, programs, periodSource: authorization?.canRead ? 'admin' : 'public' })
         setRequestState('ready')
       })
       .catch(() => {
@@ -51,7 +62,7 @@ export function AcademicOperationsPage({
         setRequestState('error')
       })
     return () => controller.abort()
-  }, [client, loadPrograms, retryNumber])
+  }, [authorization?.accessToken, authorization?.canRead, client, loadPrograms, retryNumber])
 
   const sortedUnits = useMemo(() => requestData
     ? [...requestData.structure.units].filter((unit) => unit.status === 'ACTIVE').sort(compareUnits)
@@ -72,13 +83,40 @@ export function AcademicOperationsPage({
     setRetryNumber((current) => current + 1)
   }
 
+  async function transitionPeriod(period: AcademicPeriod, action: 'open' | 'close') {
+    if (!authorization?.canWrite || pendingPeriodId) return
+    setPendingPeriodId(period.id)
+    setPeriodActionMessage(null)
+    try {
+      const updatedPeriod = action === 'open'
+        ? await client.openPeriod(period.id, authorization.accessToken)
+        : await client.closePeriod(period.id, authorization.accessToken)
+      setRequestData((current) => {
+        if (!current) return current
+        const updatedPeriods = current.periods
+          .map((item) => item.id === updatedPeriod.id ? updatedPeriod : item)
+          .filter((item) => current.periodSource === 'admin' || item.status === 'OPEN')
+        return { ...current, periods: updatedPeriods }
+      })
+      setPeriodConfirmation(null)
+      setPeriodActionMessage({
+        type: 'success',
+        text: `El periodo ${updatedPeriod.code} quedó ${action === 'open' ? 'abierto' : 'cerrado'}. La oferta de asignaturas y la matrícula no cambiaron.`,
+      })
+    } catch {
+      setPeriodActionMessage({ type: 'error', text: 'No fue posible cambiar el estado del periodo. Actualiza la vista y vuelve a intentarlo.' })
+    } finally {
+      setPendingPeriodId(null)
+    }
+  }
+
   return (
     <div className="academic-operations">
       <section className="academic-operations-hero" aria-labelledby="academic-operations-title">
         <div className="academic-operations-hero-copy">
           <p className="academic-operations-eyebrow"><span aria-hidden="true" /> GESTIÓN ACADÉMICA <span aria-hidden="true">/</span> ORGANIZACIÓN Y PERIODOS</p>
           <h1 id="academic-operations-title">Estructura y periodos académicos</h1>
-          <p>Una vista ordenada de las unidades académicas, sus sedes y los calendarios que están abiertos.</p>
+          <p>Una vista ordenada de las unidades académicas, sus sedes y el estado de los periodos regulares e intersemestrales.</p>
           <span className="academic-preview-chip"><span aria-hidden="true">◌</span> Consulta de desarrollo · Sin datos personales</span>
         </div>
         <div className="academic-hero-mark" aria-hidden="true">
@@ -91,14 +129,16 @@ export function AcademicOperationsPage({
             <div><strong>{sortedUnits.length}</strong><span>unidades</span></div>
             <div><strong>{sortedSites.length}</strong><span>sedes activas</span></div>
             <div><strong>{requestData.programs.length}</strong><span>programas publicados</span></div>
-            <div><strong>{sortedPeriods.length}</strong><span>periodos abiertos</span></div>
+            <div><strong>{sortedPeriods.filter((period) => period.status === 'OPEN').length}</strong><span>periodos abiertos</span></div>
           </div>
         )}
       </section>
 
       <div className="academic-operations-note" role="note">
         <span aria-hidden="true">i</span>
-        <p><strong>Vista de consulta.</strong> Crear unidades, adscribir programas y abrir periodos requiere una sesión institucional con permisos. El semestre indicado en una malla curricular es distinto del periodo académico real.</p>
+        <p><strong>{authorization?.canWrite ? 'Control explícito del periodo.' : 'Vista de consulta.'}</strong> {authorization?.canWrite
+          ? 'Abrir o cerrar solo cambia el estado del periodo; no publica oferta de asignaturas ni abre matrícula. El semestre de una malla curricular es distinto del periodo académico real.'
+          : 'Los cambios de estado requieren permiso institucional de escritura. El semestre de una malla curricular es distinto del periodo académico real.'}</p>
       </div>
 
       {requestState === 'loading' && (
@@ -152,13 +192,26 @@ export function AcademicOperationsPage({
           <section className="academic-panel academic-periods-panel" aria-labelledby="academic-periods-title">
             <header className="academic-panel-heading">
               <span className="academic-panel-icon academic-icon-periods" aria-hidden="true">◷</span>
-              <div><p className="academic-panel-kicker">CALENDARIO VIGENTE</p><h2 id="academic-periods-title">Periodos académicos abiertos</h2></div>
-              <span className="academic-open-badge"><span aria-hidden="true" /> Solo periodos abiertos</span>
+              <div><p className="academic-panel-kicker">CALENDARIO VIGENTE</p><h2 id="academic-periods-title">{requestData.periodSource === 'admin' ? 'Gestión de periodos académicos' : 'Periodos académicos abiertos'}</h2></div>
+              <span className="academic-open-badge"><span aria-hidden="true" />{requestData.periodSource === 'admin' ? 'Vista por estado' : 'Solo periodos abiertos'}</span>
             </header>
+            {periodActionMessage && <p className={`academic-period-action-message is-${periodActionMessage.type}`} role={periodActionMessage.type === 'error' ? 'alert' : 'status'}>{periodActionMessage.text}</p>}
             {sortedPeriods.length === 0
-              ? <p className="academic-empty-state">No hay periodos académicos abiertos para consulta.</p>
+              ? <p className="academic-empty-state">{requestData.periodSource === 'admin' ? 'No hay periodos académicos registrados.' : 'No hay periodos académicos abiertos para consulta.'}</p>
               : <ul className="academic-period-list">
-                  {sortedPeriods.map((period) => <PeriodCard key={period.id} period={period} />)}
+                  {sortedPeriods.map((period) => <PeriodCard
+                    key={period.id}
+                    period={period}
+                    canWrite={authorization?.canWrite === true}
+                    confirmation={periodConfirmation?.id === period.id ? periodConfirmation.action : null}
+                    pending={pendingPeriodId === period.id}
+                    onRequestTransition={(action) => {
+                      setPeriodActionMessage(null)
+                      setPeriodConfirmation({ id: period.id, action })
+                    }}
+                    onCancelTransition={() => setPeriodConfirmation(null)}
+                    onConfirmTransition={() => void transitionPeriod(period, periodConfirmation?.action ?? 'open')}
+                  />)}
                 </ul>}
           </section>
         </>
@@ -307,21 +360,74 @@ function SiteTree({
   return <ul className="academic-site-tree" aria-label="Jerarquía de sedes">{roots.map((root) => renderSite(root, new Set(), root.displayOrder))}</ul>
 }
 
-function PeriodCard({ period }: { period: AcademicPeriod }) {
+function PeriodCard({
+  period,
+  canWrite,
+  confirmation,
+  pending,
+  onRequestTransition,
+  onCancelTransition,
+  onConfirmTransition,
+}: {
+  period: AcademicPeriod
+  canWrite: boolean
+  confirmation: 'open' | 'close' | null
+  pending: boolean
+  onRequestTransition(action: 'open' | 'close'): void
+  onCancelTransition(): void
+  onConfirmTransition(): void
+}) {
+  const availableAction = canWrite && period.status === 'APPROVED' ? 'open'
+    : canWrite && period.status === 'OPEN' ? 'close'
+      : null
+  const actionLabel = availableAction === 'open' ? 'Abrir' : 'Cerrar'
+
   return (
     <li className="academic-period-card">
       <div className="academic-period-date"><span>{period.startsOn.slice(0, 4)}</span><strong>{period.startsOn.slice(5)}</strong></div>
       <div className="academic-period-copy">
         <div className="academic-period-title-row">
           <h3>{period.kind === 'REGULAR' ? 'Período regular' : 'Intersemestral'}</h3>
-          <span className="academic-period-state">Abierto</span>
+          <span className={`academic-period-state state-${period.status.toLocaleLowerCase('en-US')}`}>{periodStatusLabel(period.status)}</span>
         </div>
         <p><strong>{period.code}</strong><span aria-hidden="true">·</span> {formatDate(period.startsOn)} – {formatDate(period.endsOn)}</p>
-        <small>{period.officialReference} · Calendario rev. {period.calendarRevisionNumber}</small>
+        <small>{periodReferencesLabel(period)}</small>
+        {availableAction && <button
+          className={`academic-period-action action-${availableAction}`}
+          type="button"
+          aria-label={`${actionLabel} periodo ${period.code}`}
+          disabled={pending}
+          onClick={() => onRequestTransition(availableAction)}
+        >{pending ? 'Procesando…' : `${actionLabel} periodo`}</button>}
+        {confirmation && (
+          <div className="academic-period-confirmation" role="group" aria-label={`Confirmar ${confirmation === 'open' ? 'apertura' : 'cierre'} de ${period.code}`}>
+            <p>Esta acción solo cambiará el estado del periodo; no publicará oferta ni abrirá matrículas.</p>
+            <div>
+              <button type="button" disabled={pending} onClick={onConfirmTransition}>Confirmar {confirmation === 'open' ? 'apertura' : 'cierre'}</button>
+              <button type="button" className="secondary" disabled={pending} onClick={onCancelTransition}>Cancelar</button>
+            </div>
+          </div>
+        )}
       </div>
-      <span className="academic-period-chevron" aria-hidden="true">↗</span>
     </li>
   )
+}
+
+function periodStatusLabel(status: AcademicPeriodStatus): string {
+  if (status === 'DRAFT') return 'Borrador'
+  if (status === 'APPROVED') return 'Aprobado'
+  if (status === 'OPEN') return 'Abierto'
+  if (status === 'CLOSED') return 'Cerrado'
+  return 'Cancelado'
+}
+
+function periodReferencesLabel(period: AcademicPeriod): string {
+  const references = [
+    period.officialReference,
+    period.calendarRevisionNumber === null ? null : `Calendario rev. ${period.calendarRevisionNumber}`,
+    period.approvalReference === null ? null : `Aprobación: ${period.approvalReference}`,
+  ].filter((reference): reference is string => reference !== null)
+  return references.length > 0 ? references.join(' · ') : 'Calendario pendiente de aprobación'
 }
 
 function compareUnits(first: AcademicOrganizationUnit, second: AcademicOrganizationUnit) {

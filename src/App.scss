@@ -130,6 +130,15 @@
 .autosave-indicator > span { width: 6px; height: 6px; border-radius: 50%; background: #79b98f; }
 .topbar-divider { width: 1px; height: 18px; background: #deded7; }
 .revision-chip { color: #3d3e37; font-size: 9px; font-weight: 750; letter-spacing: .1em; }
+.identity-session-controls { display: flex; align-items: center; gap: 8px; }
+.identity-session-status { max-width: 240px; overflow: hidden; color: #686a61; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.identity-session-status.is-authenticated { color: #397a52; }
+.identity-session-status.is-error { color: #a34336; }
+.identity-session-button { min-height: 31px; padding: 0 11px; border: 1px solid #34362e; border-radius: 7px; background: #24251f; color: #fff; font: inherit; font-size: 9px; font-weight: 650; cursor: pointer; }
+.identity-session-button:hover:not(:disabled) { background: #414238; }
+.identity-session-button:focus-visible { outline: 3px solid var(--brand-focus, #1a1a1a); outline-offset: 2px; }
+.identity-session-button:disabled { border-color: #d4d5ce; background: #e7e8e1; color: #85867e; cursor: not-allowed; }
+.identity-session-button.secondary { border-color: #d6d7cf; background: transparent; color: #4b4d44; }
 
 .page-content { max-width: 1440px; margin: 0 auto; padding: 34px 42px 20px; }
 .page-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin: 0 0 24px; }
@@ -289,6 +298,8 @@
   .topbar { min-height: 56px; padding: 0 16px; }
   .breadcrumbs, .topbar-meta { gap: 7px; font-size: 9px; }
   .autosave-indicator { display: none; }
+  .identity-session-status { display: none; }
+  .identity-session-button { min-height: 29px; padding: 0 8px; font-size: 8px; }
   .page-content { padding: 25px 15px 17px; }
   .page-heading { display: block; margin-bottom: 18px; }
   .page-heading h1 { max-width: 520px; font-size: 30px; }

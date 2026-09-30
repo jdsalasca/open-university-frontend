@@ -12,12 +12,14 @@ import type {
   AcademicSiteType,
   AcademicStructureSnapshot,
 } from './academicOperationsContracts'
+import { containsAsciiControlCharacters } from '../../shared/inputValidation'
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 const UNIT_TYPES = new Set<AcademicOrganizationUnitType>(['FACULTY', 'SCHOOL', 'ACADEMIC_UNIT'])
 const SITE_TYPES = new Set<AcademicSiteType>(['CENTRAL', 'SECCIONAL', 'REGIONAL', 'CREAD', 'CAMPUS', 'OTHER'])
 const ENTITY_STATUSES = new Set<AcademicEntityStatus>(['ACTIVE', 'INACTIVE'])
 const PERIOD_KINDS = new Set<AcademicPeriodKind>(['REGULAR', 'INTERSEMESTRAL'])
+const PERIOD_STATUSES = new Set<AcademicPeriod['status']>(['DRAFT', 'APPROVED', 'OPEN', 'CLOSED', 'CANCELLED'])
 
 export class AcademicOperationsApiError extends Error {
   readonly status: number
@@ -39,6 +41,21 @@ export function createAcademicOperationsClient(fetcher: typeof fetch = fetch): A
     async getOpenPeriods(signal) {
       const response = await fetcher('/api/v1/academic-periods', requestOptions(signal))
       return parseOpenAcademicPeriods(await responseBody(response))
+    },
+
+    async getAdminPeriods(accessToken, signal) {
+      const response = await fetcher('/api/v1/admin/academic-periods', authorizedRequestOptions(accessToken, signal))
+      return parseAdminAcademicPeriods(await responseBody(response))
+    },
+
+    async openPeriod(periodId, accessToken, signal) {
+      const response = await fetcher(periodActionPath(periodId, 'open'), postRequestOptions(accessToken, signal))
+      return parseTransitionResponse(await responseBody(response), 'OPEN')
+    },
+
+    async closePeriod(periodId, accessToken, signal) {
+      const response = await fetcher(periodActionPath(periodId, 'close'), postRequestOptions(accessToken, signal))
+      return parseTransitionResponse(await responseBody(response), 'CLOSED')
     },
   }
 }
@@ -77,7 +94,15 @@ export function parseAcademicStructure(input: unknown): AcademicStructureSnapsho
 
 export function parseOpenAcademicPeriods(input: unknown): AcademicPeriod[] {
   if (!Array.isArray(input)) throw malformedResponse()
-  const periods = input.map(parseOpenAcademicPeriod)
+  const periods = input.map((period) => parseAcademicPeriod(period, 'OPEN'))
+  assertUnique(periods.map((period) => period.id))
+  assertUnique(periods.map((period) => period.code))
+  return periods
+}
+
+export function parseAdminAcademicPeriods(input: unknown): AcademicPeriod[] {
+  if (!Array.isArray(input)) throw malformedResponse()
+  const periods = input.map((period) => parseAcademicPeriod(period))
   assertUnique(periods.map((period) => period.id))
   assertUnique(periods.map((period) => period.code))
   return periods
@@ -149,7 +174,7 @@ function parseProgramAffiliation(input: unknown): AcademicProgramAffiliation {
   return input as unknown as AcademicProgramAffiliation
 }
 
-function parseOpenAcademicPeriod(input: unknown): AcademicPeriod {
+function parseAcademicPeriod(input: unknown, expectedStatus?: AcademicPeriod['status']): AcademicPeriod {
   if (!isRecord(input)
     || !isUuid(input.id)
     || !isIdentifier(input.code)
@@ -163,13 +188,31 @@ function parseOpenAcademicPeriod(input: unknown): AcademicPeriod {
     || !isDate(input.startsOn)
     || !isDate(input.endsOn)
     || input.endsOn < input.startsOn
-    || input.status !== 'OPEN'
-    || !isUuid(input.calendarRevisionId)
-    || !isPositiveInteger(input.calendarRevisionNumber)
-    || !isBoundedText(input.approvalReference, 240)
-    || !isBoundedText(input.officialReference, 240)
+    || !isOneOf(PERIOD_STATUSES, input.status)
+    || (expectedStatus !== undefined && input.status !== expectedStatus)
+    || !hasValidPeriodReferences(input)
+    || (input.status === 'DRAFT' && !hasNoPeriodReferences(input))
+    || (['APPROVED', 'OPEN', 'CLOSED'].includes(String(input.status)) && !hasCompletePeriodReferences(input))
     || !isIsoInstant(input.createdAt)) throw malformedResponse()
   return input as unknown as AcademicPeriod
+}
+
+function hasNoPeriodReferences(input: Record<string, unknown>): boolean {
+  return input.calendarRevisionId === null
+    && input.calendarRevisionNumber === null
+    && input.approvalReference === null
+    && input.officialReference === null
+}
+
+function hasCompletePeriodReferences(input: Record<string, unknown>): boolean {
+  return isUuid(input.calendarRevisionId)
+    && isPositiveInteger(input.calendarRevisionNumber)
+    && isBoundedText(input.approvalReference, 240)
+    && isBoundedText(input.officialReference, 240)
+}
+
+function hasValidPeriodReferences(input: Record<string, unknown>): boolean {
+  return hasNoPeriodReferences(input) || hasCompletePeriodReferences(input)
 }
 
 async function responseBody(response: Response): Promise<unknown> {
@@ -195,6 +238,33 @@ function requestOptions(signal?: AbortSignal): RequestInit {
     headers: { Accept: 'application/json' },
     ...(signal ? { signal } : {}),
   }
+}
+
+function authorizedRequestOptions(accessToken: string, signal?: AbortSignal): RequestInit {
+  return {
+    ...requestOptions(signal),
+    headers: { Accept: 'application/json', Authorization: `Bearer ${requireAccessToken(accessToken)}` },
+  }
+}
+
+function postRequestOptions(accessToken: string, signal?: AbortSignal): RequestInit {
+  return { ...authorizedRequestOptions(accessToken, signal), method: 'POST' }
+}
+
+function periodActionPath(periodId: string, action: 'open' | 'close'): string {
+  if (!isUuid(periodId)) throw malformedResponse()
+  return `/api/v1/admin/academic-periods/${periodId}/${action}`
+}
+
+function requireAccessToken(accessToken: string): string {
+  if (accessToken.trim() !== accessToken || accessToken.length === 0 || containsAsciiControlCharacters(accessToken)) {
+    throw new Error('A valid institutional access token is required.')
+  }
+  return accessToken
+}
+
+function parseTransitionResponse(input: unknown, expectedStatus: 'OPEN' | 'CLOSED'): AcademicPeriod {
+  return parseAcademicPeriod(input, expectedStatus)
 }
 
 function assertUnique(values: readonly string[]) {

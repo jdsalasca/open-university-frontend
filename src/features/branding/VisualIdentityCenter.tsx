@@ -11,10 +11,12 @@ import type {
   BrandingAdministrationClient,
   BrandingChangePayload,
 } from './api/brandingAdministrationClient'
+import type { ApplicationPermission } from '../identity/identityContracts'
 import './VisualIdentityCenter.scss'
 
 interface VisualIdentityCenterProps {
   accessToken: string | null
+  permissions?: ApplicationPermission[]
   client?: BrandingAdministrationClient
   initialConfiguration?: PublicBranding
   onPublished?: (configuration: PublicBranding) => void
@@ -65,6 +67,7 @@ const HEX_COLOR = /^#[0-9a-f]{6}$/i
 
 export function VisualIdentityCenter({
   accessToken,
+  permissions = [],
   client = brandingAdministrationClient,
   initialConfiguration,
   onPublished,
@@ -89,6 +92,7 @@ export function VisualIdentityCenter({
   const isLoaded = hasInitialConfiguration || !accessToken || loadedAccessToken === accessToken
   const loadError = Boolean(accessToken && !hasInitialConfiguration && failedAccessToken === accessToken)
   const isLoading = Boolean(accessToken && !hasInitialConfiguration && !isLoaded && !loadError)
+  const canWrite = accessToken !== null && permissions.includes('branding:write')
 
   useEffect(() => {
     if (hasInitialConfiguration || !accessToken) return
@@ -120,7 +124,7 @@ export function VisualIdentityCenter({
   )
   const isDirty = JSON.stringify(draft) !== JSON.stringify(editableFrom(baseline))
     || Object.keys(pendingFiles).length > 0
-  const publishDisabled = !accessToken || !isLoaded || isLoading || isSaving
+  const publishDisabled = !canWrite || !isLoaded || isLoading || isSaving
     || !isDirty || validationErrors.length > 0
   const logoPreview = pendingFiles['asset:logoLight']?.previewUrl
     || (draft.assets.logoLight ? `/assets/${draft.assets.logoLight}` : null)
@@ -353,6 +357,11 @@ export function VisualIdentityCenter({
       {!accessToken && (
         <p className="identity-status" role="status">
           Vista previa local. La publicación requiere acceso institucional.
+        </p>
+      )}
+      {accessToken && !canWrite && (
+        <p className="identity-status" role="status">
+          Sesión institucional de consulta. Se requiere permiso de escritura para publicar o restaurar cambios.
         </p>
       )}
       {mediaError && <p className="identity-alert" role="alert">{mediaError}</p>}
@@ -603,7 +612,7 @@ export function VisualIdentityCenter({
               <button
                 type="button"
                 className="text-button"
-                disabled={!accessToken || baseline.revision <= 1 || isDirty || isSaving || isLoading}
+                disabled={!canWrite || baseline.revision <= 1 || isDirty || isSaving || isLoading}
                 onClick={() => setRestoreDialogOpen(true)}
               >
                 Restaurar revisión anterior

@@ -130,6 +130,15 @@ function createClient(overrides: Partial<AcademicOperationsClient> = {}): Academ
   return {
     getStructure: vi.fn().mockResolvedValue(structure),
     getOpenPeriods: vi.fn().mockResolvedValue([regularPeriod, intersemester]),
+    getAdminPeriods: vi.fn().mockResolvedValue([regularPeriod, intersemester]),
+    openPeriod: vi.fn().mockImplementation(async (_periodId: string, _accessToken: string) => ({
+      ...regularPeriod,
+      status: 'OPEN',
+    })),
+    closePeriod: vi.fn().mockImplementation(async (_periodId: string, _accessToken: string) => ({
+      ...regularPeriod,
+      status: 'CLOSED',
+    })),
     ...overrides,
   }
 }
@@ -336,10 +345,86 @@ describe('AcademicOperationsPage', () => {
     expect(screen.getByText('ING-SIS').closest('li')?.nextElementSibling).toHaveTextContent('AAA-PROG')
     expect(screen.getByText('Período regular')).toBeVisible()
     expect(screen.getByText('Intersemestral')).toBeVisible()
-    expect(screen.getByText(/el semestre indicado en una malla curricular es distinto del periodo académico/i)).toBeVisible()
-    expect(screen.getByText(/requiere una sesión institucional/i)).toBeVisible()
+    expect(screen.getByText(/el semestre de una malla curricular es distinto del periodo académico/i)).toBeVisible()
+    expect(screen.getByText(/requieren permiso institucional de escritura/i)).toBeVisible()
     expect(client.getStructure).toHaveBeenCalledOnce()
     expect(client.getOpenPeriods).toHaveBeenCalledOnce()
+    expect(client.getAdminPeriods).not.toHaveBeenCalled()
+    expect(screen.queryByRole('button', { name: /abrir periodo|cerrar periodo/i })).not.toBeInTheDocument()
+  })
+
+  it('requires an explicit confirmation and period write permission to open a period', async () => {
+    // Arrange
+    const user = userEvent.setup()
+    const { AcademicOperationsPage } = await loadPage()
+    const approved = { ...regularPeriod, status: 'APPROVED' as const }
+    const openPeriod = vi.fn().mockResolvedValue({ ...approved, status: 'OPEN' as const })
+    const client = createClient({
+      getAdminPeriods: vi.fn().mockResolvedValue([approved]),
+      openPeriod,
+    })
+    render(<AcademicOperationsPage
+      client={client}
+      loadPrograms={async () => programs}
+      authorization={{ accessToken: 'synthetic-access-token', canRead: true, canWrite: true }}
+    />)
+
+    // Act
+    await user.click(await screen.findByRole('button', { name: 'Abrir periodo 2026-2' }))
+
+    // Assert: require explicit confirmation and explain the limited effect.
+    expect(screen.getByText(/solo cambiará el estado del periodo; no publicará oferta ni abrirá matrículas/i)).toBeVisible()
+    expect(openPeriod).not.toHaveBeenCalled()
+
+    // Act
+    await user.click(screen.getByRole('button', { name: 'Confirmar apertura' }))
+
+    // Assert
+    expect(openPeriod).toHaveBeenCalledWith(approved.id, 'synthetic-access-token')
+    expect(await screen.findByText('Abierto')).toBeVisible()
+    expect(screen.getByRole('status')).toHaveTextContent(/el periodo 2026-2 quedó abierto/i)
+  })
+
+  it('shows approved and open periods for readers but hides transitions without write permission', async () => {
+    // Arrange
+    const { AcademicOperationsPage } = await loadPage()
+    const approved = { ...regularPeriod, status: 'APPROVED' as const }
+    const client = createClient({ getAdminPeriods: vi.fn().mockResolvedValue([approved, regularPeriod]) })
+    render(<AcademicOperationsPage
+      client={client}
+      loadPrograms={async () => programs}
+      authorization={{ accessToken: 'synthetic-read-token', canRead: true, canWrite: false }}
+    />)
+
+    // Act + Assert
+    expect(await screen.findByText('Aprobado')).toBeVisible()
+    expect(screen.getByText('Abierto')).toBeVisible()
+    expect(client.getAdminPeriods).toHaveBeenCalledWith('synthetic-read-token', expect.any(AbortSignal))
+    expect(screen.queryByRole('button', { name: /abrir periodo|cerrar periodo/i })).not.toBeInTheDocument()
+  })
+
+  it('allows a write-only operator to close a public open period but not open a hidden approved period', async () => {
+    // Arrange
+    const user = userEvent.setup()
+    const { AcademicOperationsPage } = await loadPage()
+    const closePeriod = vi.fn().mockResolvedValue({ ...regularPeriod, status: 'CLOSED' as const })
+    const client = createClient({ closePeriod })
+    render(<AcademicOperationsPage
+      client={client}
+      loadPrograms={async () => programs}
+      authorization={{ accessToken: 'synthetic-write-token', canRead: false, canWrite: true }}
+    />)
+
+    // Act
+    await user.click(await screen.findByRole('button', { name: 'Cerrar periodo 2026-2' }))
+    await user.click(screen.getByRole('button', { name: 'Confirmar cierre' }))
+
+    // Assert
+    expect(client.getOpenPeriods).toHaveBeenCalledOnce()
+    expect(client.getAdminPeriods).not.toHaveBeenCalled()
+    expect(closePeriod).toHaveBeenCalledWith(regularPeriod.id, 'synthetic-write-token')
+    expect(screen.queryByText('2026-2')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /abrir periodo/i })).not.toBeInTheDocument()
   })
 
   it('shows explicit empty states instead of sample programs or periods', async () => {

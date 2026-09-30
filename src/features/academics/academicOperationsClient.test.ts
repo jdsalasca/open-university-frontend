@@ -182,4 +182,76 @@ describe('academic operations client', () => {
     // Act + Assert
     await expect(client.getStructure()).rejects.toThrow(/request failed/i)
   })
+
+  it('loads every administrative period with the current bearer token and validates lifecycle states', async () => {
+    // Arrange
+    const { createAcademicOperationsClient } = await loadClient()
+    const draft = {
+      ...period,
+      id: 'f52a637b-4422-44d6-afda-9dd6b32f4e4f',
+      code: '2027-1',
+      status: 'DRAFT',
+      calendarRevisionId: null,
+      calendarRevisionNumber: null,
+      approvalReference: null,
+      officialReference: null,
+    }
+    const approved = { ...period, status: 'APPROVED' }
+    const closed = { ...period, id: '92e76bd6-d8c9-4c28-a6c9-7e54f69668bb', code: '2026-INT-1', status: 'CLOSED' }
+    const fetcher = vi.fn().mockResolvedValueOnce(jsonResponse([draft, approved, closed]))
+    const client = createAcademicOperationsClient(fetcher)
+    const signal = new AbortController().signal
+
+    // Act
+    const result = await client.getAdminPeriods('synthetic-access-token', signal)
+
+    // Assert
+    expect(result.map(({ status }) => status)).toEqual(['DRAFT', 'APPROVED', 'CLOSED'])
+    expect(fetcher).toHaveBeenCalledWith('/api/v1/admin/academic-periods', {
+      credentials: 'omit',
+      headers: { Accept: 'application/json', Authorization: 'Bearer synthetic-access-token' },
+      signal,
+    })
+  })
+
+  it('opens and closes a period through explicit bearer-protected transitions', async () => {
+    // Arrange
+    const { createAcademicOperationsClient } = await loadClient()
+    const opened = { ...period, status: 'OPEN' }
+    const closed = { ...period, status: 'CLOSED' }
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(jsonResponse(opened))
+      .mockResolvedValueOnce(jsonResponse(closed))
+    const client = createAcademicOperationsClient(fetcher)
+
+    // Act
+    const results = await Promise.all([
+      client.openPeriod(period.id, 'synthetic-access-token'),
+      client.closePeriod(period.id, 'synthetic-access-token'),
+    ])
+
+    // Assert
+    expect(results.map(({ status }) => status)).toEqual(['OPEN', 'CLOSED'])
+    expect(fetcher).toHaveBeenNthCalledWith(1, `/api/v1/admin/academic-periods/${period.id}/open`, {
+      credentials: 'omit',
+      method: 'POST',
+      headers: { Accept: 'application/json', Authorization: 'Bearer synthetic-access-token' },
+    })
+    expect(fetcher).toHaveBeenNthCalledWith(2, `/api/v1/admin/academic-periods/${period.id}/close`, {
+      credentials: 'omit',
+      method: 'POST',
+      headers: { Accept: 'application/json', Authorization: 'Bearer synthetic-access-token' },
+    })
+  })
+
+  it('rejects blank credentials and a transition response with the wrong status', async () => {
+    // Arrange
+    const { createAcademicOperationsClient } = await loadClient()
+    const fetcher = vi.fn().mockResolvedValue(jsonResponse({ ...period, status: 'CLOSED' }))
+    const client = createAcademicOperationsClient(fetcher)
+
+    // Act + Assert
+    await expect(client.getAdminPeriods('   ')).rejects.toThrow(/token/i)
+    await expect(client.openPeriod(period.id, 'synthetic-access-token')).rejects.toThrow(/malformed/i)
+  })
 })
