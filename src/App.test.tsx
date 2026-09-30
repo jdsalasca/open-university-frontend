@@ -5,6 +5,7 @@ import { App } from './App'
 import { BrandingProvider } from './features/branding/BrandingProvider'
 import { DEFAULT_BRANDING } from './features/branding/contracts'
 import type { AcademicCatalogClient } from './features/academics/contracts'
+import type { AcademicOperationsClient } from './features/academics/academicOperationsContracts'
 
 afterEach(() => {
   cleanup()
@@ -22,6 +23,15 @@ function emptyAcademicCatalogClient(): AcademicCatalogClient {
     previewCsv: async () => { throw new Error('Unexpected curriculum preview') },
     importCsv: async () => { throw new Error('Unexpected curriculum import') },
     publishCurriculum: async () => { throw new Error('Unexpected curriculum publication') },
+  }
+}
+
+function emptyAcademicOperationsClient(): AcademicOperationsClient {
+  return {
+    getStructure: async () => ({
+      units: [], organizationRelations: [], sites: [], siteRelations: [], programAffiliations: [],
+    }),
+    getOpenPeriods: async () => [],
   }
 }
 
@@ -95,5 +105,26 @@ describe('App', () => {
     expect(programsLink).toHaveAttribute('aria-current', 'page')
     expect(DEFAULT_BRANDING.modules.find((module) => module.key === 'programs')?.available).toBe(false)
     expect(screen.getByText(/Este módulo es una vista previa y no está habilitado para operación institucional/i)).toBeVisible()
+  })
+
+  it('opens academic structure and periods from the application navigation', async () => {
+    // Arrange
+    const user = userEvent.setup()
+    render(
+      <BrandingProvider loader={async () => DEFAULT_BRANDING}>
+        <App
+          catalogClient={emptyAcademicCatalogClient()}
+          academicOperationsClient={emptyAcademicOperationsClient()}
+        />
+      </BrandingProvider>,
+    )
+
+    // Act
+    const link = await screen.findByRole('link', { name: /estructura y periodos/i })
+    await user.click(link)
+
+    // Assert
+    expect(await screen.findByRole('heading', { name: /estructura y periodos académicos/i })).toBeVisible()
+    expect(link).toHaveAttribute('aria-current', 'page')
   })
 })
