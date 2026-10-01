@@ -22,6 +22,7 @@ import { CreateAcademicChildUnitForm } from './CreateAcademicChildUnitForm'
 import { CreateAcademicStructureRelationForm } from './CreateAcademicStructureRelationForm'
 import { CloseAcademicStructureRelationForm } from './CloseAcademicStructureRelationForm'
 import { CreateAcademicProgramAffiliationForm } from './CreateAcademicProgramAffiliationForm'
+import { ReassignAcademicProgramAffiliationForm } from './ReassignAcademicProgramAffiliationForm'
 import { AcademicPeriodHistoryPanel } from './AcademicPeriodHistoryPanel'
 import { CreateAcademicPeriodForm } from './AcademicPeriodForms'
 import './AcademicOperationsPage.scss'
@@ -500,6 +501,18 @@ export function AcademicOperationsPage({
                   client={client}
                   authorization={structureAuthorization}
                   onCreated={refreshStructureAfterEntryCreation}
+                  onAuthorizationRejected={onStructureAuthorizationRejected}
+                />
+              )}
+              {canManageStructure && structureAuthorization && (
+                <ReassignAcademicProgramAffiliationForm
+                  programs={visibleRequestData.programs}
+                  affiliations={visibleRequestData.administrativeStructure.programAffiliations}
+                  units={visibleRequestData.administrativeStructure.units}
+                  sites={visibleRequestData.administrativeStructure.sites}
+                  client={client}
+                  authorization={structureAuthorization}
+                  onReassigned={refreshStructureAfterEntryCreation}
                   onAuthorizationRejected={onStructureAuthorizationRejected}
                 />
               )}

@@ -170,6 +170,7 @@ function createClient(overrides: Partial<AcademicOperationsClient> = {}): Academ
     relateOrganizationUnits: vi.fn().mockResolvedValue(undefined),
     relateSites: vi.fn().mockResolvedValue(undefined),
     affiliateProgram: vi.fn().mockResolvedValue(undefined),
+    reassignProgramAffiliation: vi.fn().mockResolvedValue('34a06170-9acf-4718-854e-92e945a7db17'),
     closeProgramAffiliation: vi.fn().mockResolvedValue(undefined),
     openPeriod: vi.fn().mockImplementation(async (_periodId: string, _accessToken: string) => ({
       ...regularPeriod,
@@ -189,6 +190,124 @@ function createClient(overrides: Partial<AcademicOperationsClient> = {}): Academ
 }
 
 describe('AcademicOperationsPage', () => {
+  it('shows reassignment only when administrative read and write permissions are both present', async () => {
+    // Arrange
+    const { AcademicOperationsPage } = await loadPage()
+    const client = createClient()
+    const { rerender } = render(<AcademicOperationsPage client={client} loadPrograms={async () => programs} />)
+
+    // Assert public view does not expose the administrative form.
+    await screen.findByRole('heading', { name: /estructura y periodos académicos/i })
+    expect(screen.queryByRole('heading', { name: /reasignar programa entre unidades y sedes/i }))
+      .not.toBeInTheDocument()
+
+    // Act read-only
+    rerender(<AcademicOperationsPage client={client} loadPrograms={async () => programs}
+      structureAuthorization={{ accessToken: 'synthetic-structure-token', canRead: true, canWrite: false }} />)
+
+    // Assert
+    await screen.findByRole('heading', { name: 'Programas, unidades y lugares' })
+    expect(screen.queryByRole('heading', { name: /reasignar programa entre unidades y sedes/i }))
+      .not.toBeInTheDocument()
+
+    // Act read + write
+    rerender(<AcademicOperationsPage client={client} loadPrograms={async () => programs}
+      structureAuthorization={{ accessToken: 'synthetic-structure-token', canRead: true, canWrite: true }} />)
+
+    // Assert
+    expect(await screen.findByRole('heading', { name: /reasignar programa entre unidades y sedes/i }))
+      .toBeVisible()
+  })
+
+  it('submits one reviewed reassignment and reloads public and administrative structure', async () => {
+    // Arrange
+    const user = userEvent.setup()
+    const { AcademicOperationsPage } = await loadPage()
+    const updatedAdminStructure: AcademicStructureSnapshot = {
+      ...structure,
+      programAffiliations: [
+        { ...structure.programAffiliations[0]!, validThrough: '2027-05-31' },
+        {
+          ...structure.programAffiliations[0]!,
+          id: '34a06170-9acf-4718-854e-92e945a7db17',
+          organizationUnitId: structure.units[0]!.id,
+          validFrom: '2027-06-01',
+          displayOrder: 4,
+          sourceReference: 'Acta de reasignación confirmada',
+        },
+      ],
+    }
+    const getStructure = vi.fn().mockResolvedValue(structure)
+    const getAdminStructure = vi.fn().mockResolvedValueOnce(structure).mockResolvedValueOnce(updatedAdminStructure)
+    const reassignProgramAffiliation = vi.fn().mockResolvedValue('34a06170-9acf-4718-854e-92e945a7db17')
+    const client = createClient({ getStructure, getAdminStructure, reassignProgramAffiliation })
+    render(<AcademicOperationsPage
+      client={client}
+      loadPrograms={async () => programs}
+      structureAuthorization={{ accessToken: 'synthetic-structure-token', canRead: true, canWrite: true }}
+    />)
+    const form = within(await screen.findByRole('region', { name: /reasignar programa entre unidades y sedes/i }))
+
+    // Act
+    await user.selectOptions(form.getByLabelText('Adscripción de origen'), structure.programAffiliations[0]!.id)
+    await user.selectOptions(form.getByLabelText('Nueva unidad responsable'), structure.units[0]!.id)
+    await user.selectOptions(form.getByLabelText('Nueva sede de desarrollo'), structure.sites[0]!.id)
+    await user.type(form.getByLabelText('Fecha efectiva de reasignación'), '2027-06-01')
+    await user.type(form.getByLabelText('Orden del programa en la unidad'), '4')
+    await user.type(form.getByLabelText('Referencia institucional'), 'Acta de reasignación confirmada')
+    await user.click(form.getByRole('button', { name: 'Revisar reasignación' }))
+    const confirmation = await screen.findByRole('group', { name: 'Confirmar reasignación' })
+    await user.click(within(confirmation).getByRole('button', { name: 'Confirmar reasignación' }))
+
+    // Assert
+    await waitFor(() => expect(reassignProgramAffiliation).toHaveBeenCalledOnce())
+    await screen.findByText(/Prioridad 4 · Acta de reasignación confirmada/)
+    expect(getStructure).toHaveBeenCalledTimes(2)
+    expect(getAdminStructure).toHaveBeenCalledTimes(2)
+    expect(reassignProgramAffiliation).toHaveBeenCalledWith(programs[0]!.id, structure.programAffiliations[0]!.id, {
+      expectedValidFrom: '2026-01-01',
+      expectedValidThrough: null,
+      effectiveFrom: '2027-06-01',
+      organizationUnitId: structure.units[0]!.id,
+      siteId: structure.sites[0]!.id,
+      displayOrder: 4,
+      sourceReference: 'Acta de reasignación confirmada',
+    }, 'synthetic-structure-token')
+  })
+
+  it('reloads both structure snapshots after a reassignment conflict without retrying', async () => {
+    // Arrange
+    const user = userEvent.setup()
+    const { AcademicOperationsPage } = await loadPage()
+    const getStructure = vi.fn().mockResolvedValue(structure)
+    const getAdminStructure = vi.fn().mockResolvedValue(structure)
+    const reassignProgramAffiliation = vi.fn().mockRejectedValue(new AcademicOperationsApiError(409, 'Conflict'))
+    const client = createClient({ getStructure, getAdminStructure, reassignProgramAffiliation })
+    render(<AcademicOperationsPage
+      client={client}
+      loadPrograms={async () => programs}
+      structureAuthorization={{ accessToken: 'synthetic-structure-token', canRead: true, canWrite: true }}
+    />)
+    const form = within(await screen.findByRole('region', { name: /reasignar programa entre unidades y sedes/i }))
+
+    // Act
+    await user.selectOptions(form.getByLabelText('Adscripción de origen'), structure.programAffiliations[0]!.id)
+    await user.selectOptions(form.getByLabelText('Nueva unidad responsable'), structure.units[0]!.id)
+    await user.selectOptions(form.getByLabelText('Nueva sede de desarrollo'), structure.sites[0]!.id)
+    await user.type(form.getByLabelText('Fecha efectiva de reasignación'), '2027-06-01')
+    await user.type(form.getByLabelText('Orden del programa en la unidad'), '4')
+    await user.type(form.getByLabelText('Referencia institucional'), 'Referencia de conflicto')
+    await user.click(form.getByRole('button', { name: 'Revisar reasignación' }))
+    const confirmation = await screen.findByRole('group', { name: 'Confirmar reasignación' })
+    await user.click(within(confirmation).getByRole('button', { name: 'Confirmar reasignación' }))
+
+    // Assert
+    expect(await screen.findByRole('alert')).toHaveTextContent(/conflicto.*actualicé la estructura/i)
+    expect(reassignProgramAffiliation).toHaveBeenCalledOnce()
+    expect(getStructure).toHaveBeenCalledTimes(2)
+    expect(getAdminStructure).toHaveBeenCalledTimes(2)
+  })
+
   it('shows the dated relation closure control only inside the authorized structure console', async () => {
     // Arrange
     const { AcademicOperationsPage } = await loadPage()
