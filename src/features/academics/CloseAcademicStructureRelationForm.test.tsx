@@ -7,7 +7,9 @@ import type {
   AcademicOrganizationUnit,
   AcademicSite,
   AcademicSiteRelation,
+  AcademicProgramAffiliation,
 } from './academicOperationsContracts'
+import type { AcademicProgram } from './contracts'
 import { AcademicOperationsApiError } from './academicOperationsClient'
 
 const formModules = import.meta.glob<typeof import('./CloseAcademicStructureRelationForm')>(
@@ -102,6 +104,28 @@ const siteRelations: AcademicSiteRelation[] = [{
   validThrough: null,
 }]
 
+const programs: AcademicProgram[] = [{
+  id: '8ab62b62-b65b-4b70-9bf0-df868abfe7eb',
+  programCode: 'ING-SIS',
+  academicLevel: 'PREGRADO',
+  studyModality: 'PRESENCIAL',
+  campusCode: 'LEGACY-TUNJA',
+  programName: 'Ingeniería de Sistemas de prueba',
+  faculty: 'Texto legado que no se usa como relación',
+  campusName: 'Texto legado que no se usa como relación',
+}]
+
+const programAffiliations: AcademicProgramAffiliation[] = [{
+  id: '9ab62b62-b65b-4b70-9bf0-df868abfe7eb',
+  programId: programs[0]!.id,
+  organizationUnitId: units[0]!.id,
+  siteId: sites[0]!.id,
+  displayOrder: 1,
+  validFrom: '2024-01-01',
+  validThrough: null,
+  sourceReference: 'Referencia de adscripción',
+}]
+
 describe('CloseAcademicStructureRelationForm', () => {
   it('requires review and explicit confirmation, then closes only the selected dated relation', async () => {
     // Arrange
@@ -187,6 +211,52 @@ describe('CloseAcademicStructureRelationForm', () => {
     ))
     expect(onClosed).toHaveBeenCalledTimes(1)
     expect(await screen.findByRole('status')).toHaveTextContent(/relación.*cerrada/i)
+  })
+
+  it('closes one dated program affiliation without confusing it with the legacy faculty or campus labels', async () => {
+    // Arrange
+    const user = userEvent.setup()
+    const closeProgramAffiliation = vi.fn().mockResolvedValue(undefined)
+    const onClosed = vi.fn().mockResolvedValue(undefined)
+    const client = { closeProgramAffiliation } as unknown as Pick<AcademicOperationsClient, 'closeProgramAffiliation'>
+    const { CloseAcademicStructureRelationForm } = await loadForm()
+    render(<CloseAcademicStructureRelationForm
+      kind="affiliation"
+      programs={programs}
+      units={units}
+      sites={sites}
+      relations={programAffiliations}
+      client={client}
+      authorization={authorization}
+      onClosed={onClosed}
+    />)
+
+    await user.selectOptions(screen.getByLabelText('Adscripción de programa'),
+      `${programs[0]!.id}|${programAffiliations[0]!.id}|2024-01-01`)
+    await user.type(screen.getByLabelText('Último día de vigencia (inclusive)'), '2026-06-30')
+    await user.type(screen.getByLabelText('Referencia institucional'), 'Acta de adscripción de prueba')
+    await user.click(screen.getByRole('button', { name: 'Revisar cierre' }))
+
+    // Act
+    expect(screen.getByRole('region', { name: 'Confirmar cierre de relación' })).toHaveTextContent(
+      'Ingeniería de Sistemas de prueba → Facultad de prueba · Sede central de prueba',
+    )
+    expect(closeProgramAffiliation).not.toHaveBeenCalled()
+    await user.click(screen.getByRole('button', { name: 'Confirmar cierre de relación' }))
+
+    // Assert
+    await waitFor(() => expect(closeProgramAffiliation).toHaveBeenCalledWith(
+      programs[0]!.id,
+      programAffiliations[0]!.id,
+      {
+        validFrom: '2024-01-01',
+        effectiveThrough: '2026-06-30',
+        sourceReference: 'Acta de adscripción de prueba',
+      },
+      'institutional-access-token',
+    ))
+    expect(onClosed).toHaveBeenCalledTimes(1)
+    expect(await screen.findByRole('status')).toHaveTextContent(/relación cerrada/i)
   })
 
   it('refreshes after a concurrent change and does not retry the close automatically', async () => {

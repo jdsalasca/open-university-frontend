@@ -4,11 +4,13 @@ import type {
   AcademicOperationsClient,
   AcademicOrganizationRelation,
   AcademicOrganizationUnit,
+  AcademicProgramAffiliation,
   AcademicSite,
   AcademicSiteRelation,
   AcademicStructureAuthorization,
   AcademicStructureRelationCloseCommand,
 } from './academicOperationsContracts'
+import type { AcademicProgram } from './contracts'
 import { AcademicOperationsApiError } from './academicOperationsClient'
 import { containsAsciiControlCharacters } from '../../shared/inputValidation'
 import { localDateInputValue } from '../../shared/localDateInput'
@@ -32,6 +34,14 @@ type CloseAcademicStructureRelationFormProps = CommonProps & (
     relations: AcademicSiteRelation[]
     client: Pick<AcademicOperationsClient, 'closeSiteRelation'>
   }
+  | {
+    kind: 'affiliation'
+    programs: AcademicProgram[]
+    units: AcademicOrganizationUnit[]
+    sites: AcademicSite[]
+    relations: AcademicProgramAffiliation[]
+    client: Pick<AcademicOperationsClient, 'closeProgramAffiliation'>
+  }
 )
 
 type RelationDraft = {
@@ -45,13 +55,14 @@ type RelationOption = {
   childId: string
   validFrom: string
   validThrough: string | null
+  displayLabel: string
+  endpointsExist: boolean
 }
 
 type CloseConfirmation = {
   parentId: string
   childId: string
-  parentName: string
-  childName: string
+  displayLabel: string
   command: AcademicStructureRelationCloseCommand
 }
 
@@ -72,32 +83,68 @@ export function CloseAcademicStructureRelationForm(props: CloseAcademicStructure
   const [pending, setPending] = useState(false)
   const [feedback, setFeedback] = useState<Feedback | null>(null)
   const today = localDateInputValue()
-  const entriesById = new Map(props.entries.map((entry) => [entry.id, entry]))
-  const relationOptions: RelationOption[] = props.kind === 'unit'
-    ? props.relations.map((relation) => ({
-      parentId: relation.parentUnitId,
-      childId: relation.childUnitId,
-      validFrom: relation.validFrom,
-      validThrough: relation.validThrough,
-    }))
-    : props.relations.map((relation) => ({
-      parentId: relation.parentSiteId,
-      childId: relation.childSiteId,
-      validFrom: relation.validFrom,
-      validThrough: relation.validThrough,
-    }))
+  let relationOptions: RelationOption[]
+  if (props.kind === 'unit') {
+    const entriesById = new Map(props.entries.map((entry) => [entry.id, entry]))
+    relationOptions = props.relations.map((relation) => {
+      const parent = entriesById.get(relation.parentUnitId)
+      const child = entriesById.get(relation.childUnitId)
+      return {
+        parentId: relation.parentUnitId,
+        childId: relation.childUnitId,
+        validFrom: relation.validFrom,
+        validThrough: relation.validThrough,
+        displayLabel: `${parent?.displayName ?? 'Unidad no disponible'} → ${child?.displayName ?? 'Unidad no disponible'}`,
+        endpointsExist: parent !== undefined && child !== undefined,
+      }
+    })
+  } else if (props.kind === 'site') {
+    const entriesById = new Map(props.entries.map((entry) => [entry.id, entry]))
+    relationOptions = props.relations.map((relation) => {
+      const parent = entriesById.get(relation.parentSiteId)
+      const child = entriesById.get(relation.childSiteId)
+      return {
+        parentId: relation.parentSiteId,
+        childId: relation.childSiteId,
+        validFrom: relation.validFrom,
+        validThrough: relation.validThrough,
+        displayLabel: `${parent?.displayName ?? 'Sede no disponible'} → ${child?.displayName ?? 'Sede no disponible'}`,
+        endpointsExist: parent !== undefined && child !== undefined,
+      }
+    })
+  } else {
+    const programsById = new Map(props.programs.map((program) => [program.id, program]))
+    const unitsById = new Map(props.units.map((unit) => [unit.id, unit]))
+    const sitesById = new Map(props.sites.map((site) => [site.id, site]))
+    relationOptions = props.relations.map((relation) => {
+      const program = programsById.get(relation.programId)
+      const unit = unitsById.get(relation.organizationUnitId)
+      const site = sitesById.get(relation.siteId)
+      return {
+        parentId: relation.programId,
+        childId: relation.id,
+        validFrom: relation.validFrom,
+        validThrough: relation.validThrough,
+        displayLabel: `${program?.programName ?? 'Programa no disponible'} → ${unit?.displayName ?? 'Unidad no disponible'} · ${site?.displayName ?? 'Sede no disponible'}`,
+        endpointsExist: program !== undefined && unit !== undefined && site !== undefined,
+      }
+    })
+  }
   const closeableRelations = relationOptions
     .filter((relation) => {
-      const endpointsExist = entriesById.has(relation.parentId) && entriesById.has(relation.childId)
       const notExpired = relation.validThrough === null || relation.validThrough >= today
       const canShorten = relation.validThrough === null || relation.validThrough > relation.validFrom
-      return endpointsExist && notExpired && canShorten && relation.parentId !== relation.childId
+      return relation.endpointsExist && notExpired && canShorten && relation.parentId !== relation.childId
     })
     .sort((first, second) => first.validFrom.localeCompare(second.validFrom)
       || relationKey(first).localeCompare(relationKey(second)))
   const selectedRelation = closeableRelations.find((relation) => relationKey(relation) === draft.relationKey)
-  const relationLabel = props.kind === 'unit' ? 'Relación de unidades' : 'Relación de sedes'
-  const sectionTitle = props.kind === 'unit' ? 'Cerrar una relación de unidades' : 'Cerrar una relación de sedes'
+  const relationLabel = props.kind === 'unit'
+    ? 'Relación de unidades'
+    : props.kind === 'site' ? 'Relación de sedes' : 'Adscripción de programa'
+  const sectionTitle = props.kind === 'unit'
+    ? 'Cerrar una relación de unidades'
+    : props.kind === 'site' ? 'Cerrar una relación de sedes' : 'Cerrar una adscripción de programa'
 
   if (!props.authorization.canRead || !props.authorization.canWrite) return null
 
@@ -121,18 +168,11 @@ export function CloseAcademicStructureRelationForm(props: CloseAcademicStructure
       setFeedback({ type: 'error', text: 'La referencia institucional es obligatoria y debe tener hasta 240 caracteres válidos.' })
       return
     }
-    const parent = entriesById.get(relation.parentId)
-    const child = entriesById.get(relation.childId)
-    if (!parent || !child) {
-      setFeedback({ type: 'error', text: 'No se encontraron ambos registros. Actualiza la estructura antes de continuar.' })
-      return
-    }
     setFeedback(null)
     setConfirmation({
       parentId: relation.parentId,
       childId: relation.childId,
-      parentName: parent.displayName,
-      childName: child.displayName,
+      displayLabel: relation.displayLabel,
       command: {
         validFrom: relation.validFrom,
         effectiveThrough: draft.effectiveThrough,
@@ -150,8 +190,12 @@ export function CloseAcademicStructureRelationForm(props: CloseAcademicStructure
         await props.client.closeOrganizationRelation(
           confirmation.parentId, confirmation.childId, confirmation.command, props.authorization.accessToken,
         )
-      } else {
+      } else if (props.kind === 'site') {
         await props.client.closeSiteRelation(
+          confirmation.parentId, confirmation.childId, confirmation.command, props.authorization.accessToken,
+        )
+      } else {
+        await props.client.closeProgramAffiliation(
           confirmation.parentId, confirmation.childId, confirmation.command, props.authorization.accessToken,
         )
       }
@@ -238,11 +282,9 @@ export function CloseAcademicStructureRelationForm(props: CloseAcademicStructure
             >
               <option value="">Selecciona una relación fechada</option>
               {closeableRelations.map((relation) => {
-                const parent = entriesById.get(relation.parentId)!
-                const child = entriesById.get(relation.childId)!
                 return (
                   <option key={relationKey(relation)} value={relationKey(relation)}>
-                    {parent.displayName} → {child.displayName} · Desde {relation.validFrom}
+                    {relation.displayLabel} · Desde {relation.validFrom}
                     {relation.validThrough ? ` · Hasta ${relation.validThrough}` : ' · Sin cierre'}
                   </option>
                 )
@@ -292,7 +334,7 @@ export function CloseAcademicStructureRelationForm(props: CloseAcademicStructure
         <section className="academic-relation-close-confirmation" role="region" aria-label="Confirmar cierre de relación">
           <h4>Confirma el cierre</h4>
           <p>
-            {confirmation.parentName} → {confirmation.childName} quedará vigente hasta{' '}
+            {confirmation.displayLabel} quedará vigente hasta{' '}
             <time dateTime={confirmation.command.effectiveThrough}>{confirmation.command.effectiveThrough}</time>, inclusive.
             {' '}La operación conserva ambos registros y registra la referencia “{confirmation.command.sourceReference}”.
           </p>

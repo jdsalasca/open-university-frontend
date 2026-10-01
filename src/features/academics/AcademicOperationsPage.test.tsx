@@ -165,6 +165,7 @@ function createClient(overrides: Partial<AcademicOperationsClient> = {}): Academ
     relateOrganizationUnits: vi.fn().mockResolvedValue(undefined),
     relateSites: vi.fn().mockResolvedValue(undefined),
     affiliateProgram: vi.fn().mockResolvedValue(undefined),
+    closeProgramAffiliation: vi.fn().mockResolvedValue(undefined),
     openPeriod: vi.fn().mockImplementation(async (_periodId: string, _accessToken: string) => ({
       ...regularPeriod,
       status: 'OPEN',
@@ -202,6 +203,11 @@ describe('AcademicOperationsPage', () => {
       name: /Facultad de Ciencias → Escuela de Sistemas.*Desde 2026-01-01.*Sin cierre/i,
     })).toBeInTheDocument()
     expect(client.closeOrganizationRelation).not.toHaveBeenCalled()
+    const affiliationSelector = await screen.findByLabelText('Adscripción de programa')
+    expect(affiliationSelector).toBeVisible()
+    expect(within(affiliationSelector).getByRole('option', {
+      name: /Ingeniería de Sistemas → Escuela de Sistemas · Sede Central Tunja.*Desde 2026-01-01.*Sin cierre/i,
+    })).toBeInTheDocument()
   })
 
   it('shows the dated site-relation closure control in the authorized site panel', async () => {

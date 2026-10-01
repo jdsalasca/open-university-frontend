@@ -499,6 +499,19 @@ export function AcademicOperationsPage({
                   onAuthorizationRejected={onAuthorizationRejected}
                 />
               )}
+              {canManageStructure && structureAuthorization && (
+                <CloseAcademicStructureRelationForm
+                  kind="affiliation"
+                  programs={visibleRequestData.programs}
+                  units={visibleRequestData.administrativeStructure.units}
+                  sites={visibleRequestData.administrativeStructure.sites}
+                  relations={visibleRequestData.administrativeStructure.programAffiliations}
+                  client={client}
+                  authorization={structureAuthorization}
+                  onClosed={refreshStructureAfterEntryCreation}
+                  onAuthorizationRejected={onAuthorizationRejected}
+                />
+              )}
               <ProgramAffiliationTimeline
                 snapshot={visibleRequestData.administrativeStructure}
                 currentAffiliationIds={new Set(visibleRequestData.structure.programAffiliations.map(({ id }) => id))}

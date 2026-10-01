@@ -582,6 +582,42 @@ describe('academic operations client', () => {
     )
   })
 
+  it('closes a dated program affiliation through the same audited patch contract', async () => {
+    // Arrange
+    const { createAcademicOperationsClient } = await loadClient()
+    const programId = 'A4A06170-9ACF-4718-854E-92E945A7DB17'
+    const affiliationId = '94a06170-9acf-4718-854e-92e945a7db17'
+    const fetcher = vi.fn().mockResolvedValue(new Response(null, { status: 204 }))
+    const client = createAcademicOperationsClient(fetcher)
+    const command: AcademicStructureRelationCloseCommand = {
+      validFrom: '2024-01-01',
+      effectiveThrough: '2026-06-30',
+      sourceReference: 'Acta de adscripción',
+    }
+    const closeAffiliation = Reflect.get(client, 'closeProgramAffiliation') as
+      ((program: string, affiliation: string, value: AcademicStructureRelationCloseCommand,
+        token: string) => Promise<void>) | undefined
+    expect(closeAffiliation).toBeTypeOf('function')
+    if (!closeAffiliation) return
+
+    // Act
+    await closeAffiliation.call(client, programId, affiliationId, command, 'institutional-access-token')
+
+    // Assert
+    expect(fetcher).toHaveBeenCalledWith(
+      '/api/v1/admin/academic-structure/programs/a4a06170-9acf-4718-854e-92e945a7db17/affiliations/94a06170-9acf-4718-854e-92e945a7db17/close',
+      expect.objectContaining({
+        credentials: 'omit',
+        method: 'PATCH',
+        body: JSON.stringify(command),
+        headers: expect.objectContaining({
+          Authorization: 'Bearer institutional-access-token',
+          'Content-Type': 'application/json',
+        }),
+      }),
+    )
+  })
+
   it('rejects a relation closure that ends before its selected start date without calling the API', async () => {
     // Arrange
     const { createAcademicOperationsClient } = await loadClient()

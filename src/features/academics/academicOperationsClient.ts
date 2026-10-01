@@ -107,6 +107,11 @@ export function createAcademicOperationsClient(fetcher: typeof fetch = fetch): A
       }
     },
 
+    async closeProgramAffiliation(programId, affiliationId, command, accessToken, signal) {
+      await closeDatedRelationship(programAffiliationClosePath(programId, affiliationId), command,
+        accessToken, signal, fetcher)
+    },
+
     async getOpenPeriods(signal) {
       const response = await fetcher('/api/v1/academic-periods', requestOptions(signal))
       return parseOpenAcademicPeriods(await responseBody(response))
@@ -168,6 +173,11 @@ async function closeStructureRelation(kind: 'unit' | 'site', parentId: string, c
   command: AcademicStructureRelationCloseCommand, accessToken: string, signal: AbortSignal | undefined,
   fetcher: typeof fetch): Promise<void> {
   const path = `${structureRelationPath(kind, parentId, childId)}/close`
+  await closeDatedRelationship(path, command, accessToken, signal, fetcher)
+}
+
+async function closeDatedRelationship(path: string, command: AcademicStructureRelationCloseCommand,
+  accessToken: string, signal: AbortSignal | undefined, fetcher: typeof fetch): Promise<void> {
   await noContentResponse(await fetcher(
     path,
     jsonPatchRequestOptions(normalizeStructureRelationCloseCommand(command), accessToken, signal),
@@ -492,6 +502,11 @@ function childUnitPath(parentId: string): string {
 function programAffiliationPath(programId: string): string {
   if (!isUuid(programId)) throw new Error('The academic program affiliation identifier is invalid.')
   return `/api/v1/admin/academic-structure/programs/${programId.toLowerCase()}/affiliations`
+}
+
+function programAffiliationClosePath(programId: string, affiliationId: string): string {
+  if (!isUuid(affiliationId)) throw new Error('The academic program affiliation identifier is invalid.')
+  return `${programAffiliationPath(programId)}/${affiliationId.toLowerCase()}/close`
 }
 
 function normalizeProgramAffiliationCreateCommand(

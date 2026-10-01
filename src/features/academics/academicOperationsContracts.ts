@@ -132,6 +132,8 @@ export interface AcademicOperationsClient {
     accessToken: string, signal?: AbortSignal): Promise<void>
   affiliateProgram(programId: string, command: AcademicProgramAffiliationCreateCommand, accessToken: string,
     signal?: AbortSignal): Promise<void>
+  closeProgramAffiliation(programId: string, affiliationId: string,
+    command: AcademicStructureRelationCloseCommand, accessToken: string, signal?: AbortSignal): Promise<void>
   getOpenPeriods(signal?: AbortSignal): Promise<AcademicPeriod[]>
   getAdminPeriods(accessToken: string, signal?: AbortSignal): Promise<AcademicPeriod[]>
   openPeriod(periodId: string, accessToken: string, signal?: AbortSignal): Promise<AcademicPeriod>
