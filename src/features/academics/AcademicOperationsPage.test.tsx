@@ -158,6 +158,7 @@ function createClient(overrides: Partial<AcademicOperationsClient> = {}): Academ
     getOpenPeriods: vi.fn().mockResolvedValue([regularPeriod, intersemester]),
     getAdminPeriods: vi.fn().mockResolvedValue([regularPeriod, intersemester]),
     getPeriodHistory: vi.fn().mockResolvedValue({ period: regularPeriod, calendarRevisions: [], auditEvents: [] }),
+    getStructureAuditEvents: vi.fn().mockResolvedValue({ events: [], nextCursor: null }),
     createPeriod: vi.fn().mockResolvedValue(regularPeriod),
     createCalendar: vi.fn().mockResolvedValue({}),
     publishCalendar: vi.fn().mockResolvedValue({}),
@@ -190,6 +191,34 @@ function createClient(overrides: Partial<AcademicOperationsClient> = {}): Academ
 }
 
 describe('AcademicOperationsPage', () => {
+  it('loads and displays the structure audit panel only for readers with administrative structure access', async () => {
+    // Arrange
+    const { AcademicOperationsPage } = await loadPage()
+    const client = createClient()
+    const { rerender } = render(<AcademicOperationsPage client={client} loadPrograms={async () => programs} />)
+    await screen.findByRole('heading', { name: /estructura y periodos académicos/i })
+
+    // Act + Assert: public visitors cannot query or view the administrative log.
+    expect(screen.queryByRole('heading', { name: /bitácora de estructura académica/i })).not.toBeInTheDocument()
+    expect(client.getStructureAuditEvents).not.toHaveBeenCalled()
+
+    rerender(<AcademicOperationsPage client={client} loadPrograms={async () => programs}
+      structureAuthorization={{ accessToken: 'synthetic-structure-token', canRead: true, canWrite: false }} />)
+
+    // Assert
+    expect(await screen.findByRole('heading', { name: /bitácora de estructura académica/i })).toBeInTheDocument()
+    await waitFor(() => expect(client.getStructureAuditEvents).toHaveBeenCalledOnce())
+    expect(client.getStructureAuditEvents).toHaveBeenCalledWith(
+      { limit: 50 }, 'synthetic-structure-token', expect.any(AbortSignal))
+
+    // Act: revoking the server-confirmed read permission hides and clears the log.
+    rerender(<AcademicOperationsPage client={client} loadPrograms={async () => programs}
+      structureAuthorization={{ accessToken: 'synthetic-structure-token', canRead: false, canWrite: false }} />)
+
+    // Assert
+    expect(screen.queryByRole('heading', { name: /bitácora de estructura académica/i })).not.toBeInTheDocument()
+  })
+
   it('shows reassignment only when administrative read and write permissions are both present', async () => {
     // Arrange
     const { AcademicOperationsPage } = await loadPage()

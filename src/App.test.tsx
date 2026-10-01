@@ -104,6 +104,7 @@ function emptyAcademicOperationsClient(): AcademicOperationsClient {
     getOpenPeriods: async () => [],
     getAdminPeriods: async () => [],
     getPeriodHistory: async () => { throw new Error('Unexpected period history read') },
+    getStructureAuditEvents: async () => { throw new Error('Unexpected structure audit read') },
     createPeriod: async () => { throw new Error('Unexpected period creation') },
     createCalendar: async () => { throw new Error('Unexpected calendar revision creation') },
     publishCalendar: async () => { throw new Error('Unexpected calendar publication') },

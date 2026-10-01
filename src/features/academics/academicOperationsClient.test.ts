@@ -90,6 +90,68 @@ const period = {
 }
 
 describe('academic operations client', () => {
+  it('queries the authorized academic structure audit page with filters and an abort signal', async () => {
+    // Arrange
+    const { createAcademicOperationsClient } = await loadClient()
+    const entityId = 'fae06170-9acf-4718-854e-92e945a7db17'
+    const auditEvent = {
+      entityId,
+      actionKey: 'PROGRAM_AFFILIATED',
+      actor: 'opaque-actor-7c58',
+      occurredAt: '2026-09-30T15:30:00Z',
+      reference: 'Acta de prueba',
+      summary: 'Programa afiliado',
+    }
+    const fetcher = vi.fn().mockResolvedValue(jsonResponse({ events: [auditEvent], nextCursor: 'next-token' }))
+    const client = createAcademicOperationsClient(fetcher)
+    const auditClient = client as unknown as {
+      getStructureAuditEvents?: (query: Record<string, unknown>, token: string, signal?: AbortSignal) => Promise<unknown>
+    }
+    const signal = new AbortController().signal
+
+    // Act
+    expect(auditClient.getStructureAuditEvents).toBeTypeOf('function')
+    const page = await auditClient.getStructureAuditEvents!({
+      limit: 25,
+      before: 'opaque-cursor',
+      entityId,
+      actionKey: 'PROGRAM_AFFILIATED',
+    }, 'synthetic-access-token', signal)
+
+    // Assert
+    expect(page).toEqual({ events: [auditEvent], nextCursor: 'next-token' })
+    expect(fetcher).toHaveBeenCalledWith(
+      '/api/v1/admin/academic-structure/audit-events?limit=25&entityId=' + entityId
+        + '&actionKey=PROGRAM_AFFILIATED&before=opaque-cursor',
+      {
+        credentials: 'omit',
+        headers: { Accept: 'application/json', Authorization: 'Bearer synthetic-access-token' },
+        signal,
+      },
+    )
+  })
+
+  it('rejects invalid audit filters locally and rejects malformed audit pages', async () => {
+    // Arrange
+    const { createAcademicOperationsClient } = await loadClient()
+    const fetcher = vi.fn()
+    const client = createAcademicOperationsClient(fetcher)
+    const auditClient = client as unknown as {
+      getStructureAuditEvents?: (query: Record<string, unknown>, token: string) => Promise<unknown>
+    }
+
+    // Act + Assert
+    expect(auditClient.getStructureAuditEvents).toBeTypeOf('function')
+    await expect(auditClient.getStructureAuditEvents!({ limit: 101 }, 'synthetic-access-token'))
+      .rejects.toThrow(/audit|page|limit/i)
+    await expect(auditClient.getStructureAuditEvents!({ entityId: 'not-a-uuid' }, 'synthetic-access-token'))
+      .rejects.toThrow(/audit|entity|malformed/i)
+    expect(fetcher).not.toHaveBeenCalled()
+
+    fetcher.mockResolvedValue(jsonResponse({ events: [{ actionKey: 'UNKNOWN' }], nextCursor: null }))
+    await expect(auditClient.getStructureAuditEvents!({}, 'synthetic-access-token')).rejects.toThrow(/malformed/i)
+  })
+
   it('creates an authorized development site with normalized values and returns its identifier', async () => {
     // Arrange
     const { createAcademicOperationsClient } = await loadClient()

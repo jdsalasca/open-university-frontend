@@ -24,6 +24,7 @@ import { CloseAcademicStructureRelationForm } from './CloseAcademicStructureRela
 import { CreateAcademicProgramAffiliationForm } from './CreateAcademicProgramAffiliationForm'
 import { ReassignAcademicProgramAffiliationForm } from './ReassignAcademicProgramAffiliationForm'
 import { AcademicPeriodHistoryPanel } from './AcademicPeriodHistoryPanel'
+import { AcademicStructureAuditPanel } from './AcademicStructureAuditPanel'
 import { CreateAcademicPeriodForm } from './AcademicPeriodForms'
 import './AcademicOperationsPage.scss'
 
@@ -536,6 +537,16 @@ export function AcademicOperationsPage({
               />
               <p className="academic-panel-footnote">El árbol usa la vigencia actual; esta lista registra todas las afiliaciones con su intervalo y procedencia. Los nombres históricos del catálogo no se convierten en relaciones.</p>
             </section>
+          )}
+
+          {canReadStructure && visibleRequestData.administrativeStructure && structureAccessToken && (
+            <AcademicStructureAuditPanel
+              key={structureAccessToken}
+              canRead={canReadStructure}
+              accessToken={structureAccessToken}
+              client={client}
+              onAuthorizationRejected={onStructureAuthorizationRejected}
+            />
           )}
 
           <section className="academic-panel academic-periods-panel" aria-labelledby="academic-periods-title">

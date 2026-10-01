@@ -14,6 +14,22 @@ export type AcademicPeriodAuditAction =
   | 'PERIOD_CANCELLED'
   | 'PERIOD_CALENDAR_AMENDED'
 
+export type AcademicStructureAuditAction =
+  | 'UNIT_CREATED'
+  | 'UNIT_RELATED'
+  | 'SITE_CREATED'
+  | 'SITE_RELATED'
+  | 'PROGRAM_AFFILIATED'
+  | 'UNIT_ORDER_CHANGED'
+  | 'SITE_ORDER_CHANGED'
+  | 'UNIT_RELATION_ORDER_CHANGED'
+  | 'SITE_RELATION_ORDER_CHANGED'
+  | 'PROGRAM_ORDER_CHANGED'
+  | 'UNIT_RELATION_CLOSED'
+  | 'SITE_RELATION_CLOSED'
+  | 'PROGRAM_AFFILIATION_CLOSED'
+  | 'PROGRAM_AFFILIATION_REASSIGNED'
+
 export interface AcademicOrganizationUnit {
   id: string
   code: string
@@ -139,6 +155,27 @@ export interface AcademicPeriodHistory {
   auditEvents: AcademicPeriodAuditEvent[]
 }
 
+export interface AcademicStructureAuditEvent {
+  entityId: string
+  actionKey: AcademicStructureAuditAction
+  actor: string
+  occurredAt: string
+  reference: string
+  summary: string
+}
+
+export interface AcademicStructureAuditQuery {
+  limit?: number
+  before?: string
+  entityId?: string
+  actionKey?: AcademicStructureAuditAction
+}
+
+export interface AcademicStructureAuditPage {
+  events: AcademicStructureAuditEvent[]
+  nextCursor: string | null
+}
+
 export interface AcademicDisplayOrderCommand {
   expectedDisplayOrder: number
   displayOrder: number
@@ -211,6 +248,8 @@ export interface AcademicOperationsClient {
   getOpenPeriods(signal?: AbortSignal): Promise<AcademicPeriod[]>
   getAdminPeriods(accessToken: string, signal?: AbortSignal): Promise<AcademicPeriod[]>
   getPeriodHistory(periodId: string, accessToken: string, signal?: AbortSignal): Promise<AcademicPeriodHistory>
+  getStructureAuditEvents(query: AcademicStructureAuditQuery, accessToken: string,
+    signal?: AbortSignal): Promise<AcademicStructureAuditPage>
   createPeriod(command: AcademicPeriodCreateCommand, accessToken: string, signal?: AbortSignal): Promise<AcademicPeriod>
   createCalendar(periodId: string, command: AcademicCalendarDraftCommand, accessToken: string,
     signal?: AbortSignal): Promise<AcademicCalendarRevision>

@@ -14,6 +14,10 @@ import type {
   AcademicPeriod,
   AcademicPeriodAuditAction,
   AcademicPeriodHistory,
+  AcademicStructureAuditAction,
+  AcademicStructureAuditEvent,
+  AcademicStructureAuditPage,
+  AcademicStructureAuditQuery,
   AcademicPeriodKind,
   AcademicCalendarRevision,
   AcademicCalendarRevisionStatus,
@@ -37,6 +41,12 @@ const CALENDAR_REVISION_STATUSES = new Set<AcademicCalendarRevisionStatus>(['DRA
 const PERIOD_AUDIT_ACTIONS = new Set<AcademicPeriodAuditAction>([
   'PERIOD_CREATED', 'CALENDAR_CREATED', 'CALENDAR_PUBLISHED', 'PERIOD_APPROVED',
   'PERIOD_OPENED', 'PERIOD_CLOSED', 'PERIOD_CANCELLED', 'PERIOD_CALENDAR_AMENDED',
+])
+const STRUCTURE_AUDIT_ACTIONS = new Set<AcademicStructureAuditAction>([
+  'UNIT_CREATED', 'UNIT_RELATED', 'SITE_CREATED', 'SITE_RELATED', 'PROGRAM_AFFILIATED',
+  'UNIT_ORDER_CHANGED', 'SITE_ORDER_CHANGED', 'UNIT_RELATION_ORDER_CHANGED', 'SITE_RELATION_ORDER_CHANGED',
+  'PROGRAM_ORDER_CHANGED', 'UNIT_RELATION_CLOSED', 'SITE_RELATION_CLOSED', 'PROGRAM_AFFILIATION_CLOSED',
+  'PROGRAM_AFFILIATION_REASSIGNED',
 ])
 
 export class AcademicOperationsApiError extends Error {
@@ -146,6 +156,12 @@ export function createAcademicOperationsClient(fetcher: typeof fetch = fetch): A
     async getPeriodHistory(periodId, accessToken, signal) {
       const response = await fetcher(periodHistoryPath(periodId), authorizedRequestOptions(accessToken, signal))
       return parseAcademicPeriodHistory(await responseBody(response), periodId)
+    },
+
+    async getStructureAuditEvents(query, accessToken, signal) {
+      const normalized = normalizeStructureAuditQuery(query)
+      const response = await fetcher(structureAuditPath(normalized), authorizedRequestOptions(accessToken, signal))
+      return parseStructureAuditPage(await responseBody(response), normalized.limit ?? 50)
     },
 
     async createPeriod(command, accessToken, signal) {
@@ -305,6 +321,55 @@ function parseAcademicPeriodHistory(input: unknown, expectedPeriodId: string): A
   const auditEvents = input.auditEvents.map(parsePeriodAuditEvent)
   assertUnique(auditEvents.map(({ id }) => String(id)))
   return { period, calendarRevisions, auditEvents }
+}
+
+function parseStructureAuditPage(input: unknown, limit: number): AcademicStructureAuditPage {
+  if (!isRecord(input)
+    || !Array.isArray(input.events)
+    || input.events.length > limit
+    || !(input.nextCursor === null || isOpaqueAuditCursor(input.nextCursor))) throw malformedResponse()
+  return {
+    events: input.events.map(parseStructureAuditEvent),
+    nextCursor: input.nextCursor,
+  }
+}
+
+function parseStructureAuditEvent(input: unknown): AcademicStructureAuditEvent {
+  if (!isRecord(input)
+    || !isUuid(input.entityId)
+    || !isOneOf(STRUCTURE_AUDIT_ACTIONS, input.actionKey)
+    || !isBoundedText(input.actor, 180)
+    || containsAsciiControlCharacters(input.actor)
+    || !isIsoInstant(input.occurredAt)
+    || !isBoundedText(input.reference, 240)
+    || containsAsciiControlCharacters(input.reference)
+    || !isBoundedText(input.summary, 240)
+    || containsAsciiControlCharacters(input.summary)) throw malformedResponse()
+  return input as unknown as AcademicStructureAuditEvent
+}
+
+function normalizeStructureAuditQuery(query: AcademicStructureAuditQuery): Required<Pick<AcademicStructureAuditQuery, 'limit'>>
+  & Omit<AcademicStructureAuditQuery, 'limit'> {
+  if (!isRecord(query)) throw new Error('The academic structure audit query is invalid.')
+  const rawLimit = query.limit
+  const limit = rawLimit === undefined ? 50 : rawLimit
+  if (typeof limit !== 'number' || !Number.isSafeInteger(limit) || limit < 1 || limit > 100) {
+    throw new Error('The academic structure audit page limit must be between 1 and 100.')
+  }
+  const before = query.before
+  if (before !== undefined && !isOpaqueAuditCursor(before)) throw malformedResponse()
+  const entityId = query.entityId
+  if (entityId !== undefined && !isUuid(entityId)) throw new Error('The academic structure audit entity ID is invalid.')
+  const actionKey = query.actionKey
+  if (actionKey !== undefined && !isOneOf(STRUCTURE_AUDIT_ACTIONS, actionKey)) {
+    throw new Error('The academic structure audit action is invalid.')
+  }
+  return { limit, ...(entityId ? { entityId: entityId.toLowerCase() } : {}),
+    ...(actionKey ? { actionKey } : {}), ...(before ? { before } : {}) }
+}
+
+function isOpaqueAuditCursor(input: unknown): input is string {
+  return typeof input === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(input)
 }
 
 export function parseCalendarRevision(input: unknown): AcademicCalendarRevision {
@@ -736,6 +801,15 @@ function periodActionPath(periodId: string, action: 'open' | 'close'): string {
 function periodHistoryPath(periodId: string): string {
   if (!isUuid(periodId)) throw malformedResponse()
   return `/api/v1/admin/academic-periods/${periodId}/history`
+}
+
+function structureAuditPath(query: AcademicStructureAuditQuery): string {
+  const parameters = new URLSearchParams()
+  parameters.set('limit', String(query.limit))
+  if (query.entityId) parameters.set('entityId', query.entityId)
+  if (query.actionKey) parameters.set('actionKey', query.actionKey)
+  if (query.before) parameters.set('before', query.before)
+  return `/api/v1/admin/academic-structure/audit-events?${parameters.toString()}`
 }
 
 function requireAccessToken(accessToken: string): string {
