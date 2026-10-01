@@ -19,6 +19,7 @@ import type {
   AcademicCalendarRevisionStatus,
   AcademicCalendarActivity,
   AcademicProgramAffiliation,
+  AcademicProgramAffiliationReassignmentCommand,
   AcademicSite,
   AcademicSiteRelation,
   AcademicSiteType,
@@ -121,6 +122,15 @@ export function createAcademicOperationsClient(fetcher: typeof fetch = fetch): A
     async closeProgramAffiliation(programId, affiliationId, command, accessToken, signal) {
       await closeDatedRelationship(programAffiliationClosePath(programId, affiliationId), command,
         accessToken, signal, fetcher)
+    },
+
+    async reassignProgramAffiliation(programId, affiliationId, command, accessToken, signal) {
+      const path = programAffiliationReassignmentPath(programId, affiliationId)
+      const normalized = normalizeProgramAffiliationReassignmentCommand(command)
+      const response = await fetcher(path, jsonPostRequestOptions(normalized, accessToken, signal))
+      const body = await responseBody(response)
+      if (response.status !== 201 || !isRecord(body) || !isUuid(body.id)) throw malformedResponse()
+      return body.id
     },
 
     async getOpenPeriods(signal) {
@@ -612,6 +622,11 @@ function programAffiliationClosePath(programId: string, affiliationId: string): 
   return `${programAffiliationPath(programId)}/${affiliationId.toLowerCase()}/close`
 }
 
+function programAffiliationReassignmentPath(programId: string, affiliationId: string): string {
+  if (!isUuid(affiliationId)) throw new Error('The academic program affiliation identifier is invalid.')
+  return `${programAffiliationPath(programId)}/${affiliationId.toLowerCase()}/reassign`
+}
+
 function normalizeProgramAffiliationCreateCommand(
   command: AcademicProgramAffiliationCreateCommand,
 ): AcademicProgramAffiliationCreateCommand {
@@ -626,6 +641,36 @@ function normalizeProgramAffiliationCreateCommand(
     organizationUnitId: command.organizationUnitId.toLowerCase(),
     siteId: command.siteId.toLowerCase(),
     ...normalizedRelation,
+  }
+}
+
+function normalizeProgramAffiliationReassignmentCommand(
+  command: AcademicProgramAffiliationReassignmentCommand,
+): AcademicProgramAffiliationReassignmentCommand {
+  if (!isRecord(command)
+    || !isDate(command.expectedValidFrom)
+    || !(command.expectedValidThrough === null || isDate(command.expectedValidThrough))
+    || !isDate(command.effectiveFrom)
+    || command.effectiveFrom <= command.expectedValidFrom
+    || (command.expectedValidThrough !== null && command.effectiveFrom > command.expectedValidThrough)
+    || !isUuid(command.organizationUnitId)
+    || !isUuid(command.siteId)
+    || !isNonNegativeInteger(command.displayOrder)
+    || Number(command.displayOrder) > 100_000) {
+    throw new Error('The academic program affiliation reassignment request is invalid.')
+  }
+  const sourceReference = typeof command.sourceReference === 'string' ? command.sourceReference.trim() : ''
+  if (!isBoundedText(sourceReference, 240) || containsAsciiControlCharacters(sourceReference)) {
+    throw new Error('An institutional source reference is required and must be valid.')
+  }
+  return {
+    expectedValidFrom: command.expectedValidFrom,
+    expectedValidThrough: command.expectedValidThrough,
+    effectiveFrom: command.effectiveFrom,
+    organizationUnitId: command.organizationUnitId.toLowerCase(),
+    siteId: command.siteId.toLowerCase(),
+    displayOrder: command.displayOrder,
+    sourceReference,
   }
 }
 

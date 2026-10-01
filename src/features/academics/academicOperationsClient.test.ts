@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type {
   AcademicOperationsClient,
   AcademicOrganizationUnitCreateCommand,
+  AcademicProgramAffiliationReassignmentCommand,
   AcademicStructureRelationCloseCommand,
   AcademicSiteCreateCommand,
   AcademicStructureRelationCreateCommand,
@@ -616,6 +617,79 @@ describe('academic operations client', () => {
         }),
       }),
     )
+  })
+
+  it('reassigns a program affiliation with the expected version and returns the successor identifier', async () => {
+    // Arrange
+    const { createAcademicOperationsClient } = await loadClient()
+    const programId = 'A4A06170-9ACF-4718-854E-92E945A7DB17'
+    const affiliationId = '94a06170-9acf-4718-854e-92e945a7db17'
+    const nextAffiliationId = '34a06170-9acf-4718-854e-92e945a7db17'
+    const fetcher = vi.fn().mockResolvedValue(jsonResponse({ id: nextAffiliationId }, 201))
+    const client = createAcademicOperationsClient(fetcher)
+    const command = {
+      expectedValidFrom: '2027-01-01',
+      expectedValidThrough: null,
+      effectiveFrom: '2027-06-01',
+      organizationUnitId: 'FAE06170-9ACF-4718-854E-92E945A7DB17',
+      siteId: 'B16116A1-10BA-4D79-839B-4195E4851D73',
+      displayOrder: 4,
+      sourceReference: ' Acta institucional de adscripción ',
+    }
+    const signal = new AbortController().signal
+    const reassign = Reflect.get(client, 'reassignProgramAffiliation') as
+      ((program: string, affiliation: string, value: typeof command, token: string,
+        requestSignal?: AbortSignal) => Promise<string>) | undefined
+    expect(reassign).toBeTypeOf('function')
+    if (!reassign) return
+
+    // Act
+    const createdId = await reassign.call(client, programId, affiliationId, command,
+      'institutional-access-token', signal)
+
+    // Assert
+    expect(createdId).toBe(nextAffiliationId)
+    expect(fetcher).toHaveBeenCalledWith(
+      '/api/v1/admin/academic-structure/programs/a4a06170-9acf-4718-854e-92e945a7db17/affiliations/94a06170-9acf-4718-854e-92e945a7db17/reassign',
+      expect.objectContaining({
+        credentials: 'omit',
+        method: 'POST',
+        body: JSON.stringify({ ...command, organizationUnitId: command.organizationUnitId.toLowerCase(),
+          siteId: command.siteId.toLowerCase(), sourceReference: 'Acta institucional de adscripción' }),
+        headers: expect.objectContaining({
+          Authorization: 'Bearer institutional-access-token',
+          'Content-Type': 'application/json',
+        }),
+        signal,
+      }),
+    )
+  })
+
+  it('rejects an invalid reassignment before sending it to the server', async () => {
+    // Arrange
+    const { createAcademicOperationsClient } = await loadClient()
+    const fetcher = vi.fn()
+    const client = createAcademicOperationsClient(fetcher)
+    const reassign = Reflect.get(client, 'reassignProgramAffiliation') as
+      ((program: string, affiliation: string, command: AcademicProgramAffiliationReassignmentCommand,
+        token: string) => Promise<string>) | undefined
+    expect(reassign).toBeTypeOf('function')
+    if (!reassign) return
+    const command: AcademicProgramAffiliationReassignmentCommand = {
+      expectedValidFrom: '2027-01-01',
+      expectedValidThrough: null,
+      effectiveFrom: '2027-01-01',
+      organizationUnitId: 'fae06170-9acf-4718-854e-92e945a7db17',
+      siteId: 'b16116a1-10ba-4d79-839b-4195e4851d73',
+      displayOrder: -1,
+      sourceReference: 'Referencia',
+    }
+
+    // Act + Assert
+    await expect(reassign.call(client, 'a4a06170-9acf-4718-854e-92e945a7db17',
+      '94a06170-9acf-4718-854e-92e945a7db17', command, 'institutional-access-token'))
+      .rejects.toThrow(/invalid|valid/i)
+    expect(fetcher).not.toHaveBeenCalled()
   })
 
   it('rejects a relation closure that ends before its selected start date without calling the API', async () => {

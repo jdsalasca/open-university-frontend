@@ -163,6 +163,16 @@ export interface AcademicProgramAffiliationCreateCommand extends AcademicStructu
   siteId: string
 }
 
+export interface AcademicProgramAffiliationReassignmentCommand {
+  expectedValidFrom: string
+  expectedValidThrough: string | null
+  effectiveFrom: string
+  organizationUnitId: string
+  siteId: string
+  displayOrder: number
+  sourceReference: string
+}
+
 export interface AcademicStructureEntryCreateCommand<Type extends AcademicOrganizationUnitType | AcademicSiteType> {
   code: string
   type: Type
@@ -194,6 +204,8 @@ export interface AcademicOperationsClient {
     accessToken: string, signal?: AbortSignal): Promise<void>
   affiliateProgram(programId: string, command: AcademicProgramAffiliationCreateCommand, accessToken: string,
     signal?: AbortSignal): Promise<void>
+  reassignProgramAffiliation(programId: string, affiliationId: string,
+    command: AcademicProgramAffiliationReassignmentCommand, accessToken: string, signal?: AbortSignal): Promise<string>
   closeProgramAffiliation(programId: string, affiliationId: string,
     command: AcademicStructureRelationCloseCommand, accessToken: string, signal?: AbortSignal): Promise<void>
   getOpenPeriods(signal?: AbortSignal): Promise<AcademicPeriod[]>

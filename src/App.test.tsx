@@ -99,6 +99,7 @@ function emptyAcademicOperationsClient(): AcademicOperationsClient {
     relateOrganizationUnits: async () => { throw new Error('Unexpected organization relation creation') },
     relateSites: async () => { throw new Error('Unexpected site relation creation') },
     affiliateProgram: async () => { throw new Error('Unexpected program affiliation creation') },
+    reassignProgramAffiliation: async () => { throw new Error('Unexpected program affiliation reassignment') },
     closeProgramAffiliation: async () => { throw new Error('Unexpected program affiliation closure') },
     getOpenPeriods: async () => [],
     getAdminPeriods: async () => [],
