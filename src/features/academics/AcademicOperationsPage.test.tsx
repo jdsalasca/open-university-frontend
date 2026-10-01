@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { AcademicProgram } from './contracts'
@@ -157,6 +157,7 @@ function createClient(overrides: Partial<AcademicOperationsClient> = {}): Academ
     getOpenPeriods: vi.fn().mockResolvedValue([regularPeriod, intersemester]),
     getAdminPeriods: vi.fn().mockResolvedValue([regularPeriod, intersemester]),
     createOrganizationUnit: vi.fn().mockResolvedValue('34a06170-9acf-4718-854e-92e945a7db17'),
+    createSite: vi.fn().mockResolvedValue('94a06170-9acf-4718-854e-92e945a7db17'),
     openPeriod: vi.fn().mockImplementation(async (_periodId: string, _accessToken: string) => ({
       ...regularPeriod,
       status: 'OPEN',
@@ -699,6 +700,7 @@ describe('AcademicOperationsPage', () => {
     )
     expect(await screen.findByText('Facultad de Ciencias')).toBeVisible()
     expect(screen.queryByRole('button', { name: 'Crear facultad' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Crear lugar' })).not.toBeInTheDocument()
 
     // Act
     rerender(
@@ -711,6 +713,64 @@ describe('AcademicOperationsPage', () => {
 
     // Assert
     expect(await screen.findByRole('button', { name: 'Crear facultad' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Crear lugar' })).toBeVisible()
+  })
+
+  it('creates a root site only for an authorized structure writer and reloads the server structure', async () => {
+    // Arrange
+    const user = userEvent.setup()
+    const { AcademicOperationsPage } = await loadPage()
+    const siteId = '94a06170-9acf-4718-854e-92e945a7db17'
+    const createdSite = {
+      id: siteId,
+      code: 'LUGAR-REGIONAL-PRUEBA',
+      type: 'REGIONAL' as const,
+      displayName: 'Lugar regional de prueba',
+      displayOrder: 2,
+      status: 'ACTIVE' as const,
+      validFrom: '2026-09-30',
+      validThrough: null,
+    }
+    const updatedStructure: AcademicStructureSnapshot = {
+      ...structure,
+      sites: [...structure.sites, createdSite],
+    }
+    const getStructure = vi.fn()
+      .mockResolvedValueOnce(structure)
+      .mockResolvedValueOnce(updatedStructure)
+    const createSite = vi.fn().mockResolvedValue(siteId)
+    const client = createClient({ getStructure, createSite })
+    render(
+      <AcademicOperationsPage
+        client={client}
+        loadPrograms={async () => programs}
+        structureAuthorization={{ accessToken: 'synthetic-structure-token', canWrite: true }}
+      />,
+    )
+    await screen.findByText('Sede Central Tunja')
+    const siteForm = within(screen.getByRole('region', { name: 'Registrar lugar académico' }))
+    await user.type(siteForm.getByLabelText('Código del lugar'), 'lugar-regional-prueba')
+    await user.selectOptions(siteForm.getByLabelText('Tipo de lugar'), 'REGIONAL')
+    await user.type(siteForm.getByLabelText('Nombre del lugar'), 'Lugar regional de prueba')
+    await user.clear(siteForm.getByLabelText('Prioridad del lugar'))
+    await user.type(siteForm.getByLabelText('Prioridad del lugar'), '2')
+    await user.type(siteForm.getByLabelText('Referencia institucional'), 'Acto institucional de prueba')
+
+    // Act
+    await user.click(screen.getByRole('button', { name: 'Crear lugar' }))
+
+    // Assert
+    expect(createSite).toHaveBeenCalledWith({
+      code: 'lugar-regional-prueba',
+      type: 'REGIONAL',
+      displayName: 'Lugar regional de prueba',
+      displayOrder: 2,
+      validFrom: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+      validThrough: null,
+      sourceReference: 'Acto institucional de prueba',
+    }, 'synthetic-structure-token')
+    expect(await screen.findByText('Lugar regional de prueba')).toBeVisible()
+    expect(getStructure).toHaveBeenCalledTimes(2)
   })
 
   it('creates a faculty through the protected client and reloads the authoritative structure', async () => {
@@ -745,13 +805,14 @@ describe('AcademicOperationsPage', () => {
       />,
     )
     await screen.findByText('Facultad de Ciencias')
-    await user.type(screen.getByLabelText('Código institucional'), 'fac-aplicadas')
-    await user.type(screen.getByLabelText('Nombre de la facultad'), 'Facultad de Ciencias Aplicadas')
-    await user.clear(screen.getByLabelText('Prioridad de visualización'))
-    await user.type(screen.getByLabelText('Prioridad de visualización'), '3')
-    await user.clear(screen.getByLabelText('Vigente desde'))
-    await user.type(screen.getByLabelText('Vigente desde'), '2026-09-30')
-    await user.type(screen.getByLabelText('Referencia institucional'), 'Acuerdo institucional de prueba')
+    const facultyForm = within(screen.getByRole('region', { name: 'Registrar facultad raíz' }))
+    await user.type(facultyForm.getByLabelText('Código institucional'), 'fac-aplicadas')
+    await user.type(facultyForm.getByLabelText('Nombre de la facultad'), 'Facultad de Ciencias Aplicadas')
+    await user.clear(facultyForm.getByLabelText('Prioridad de visualización'))
+    await user.type(facultyForm.getByLabelText('Prioridad de visualización'), '3')
+    await user.clear(facultyForm.getByLabelText('Vigente desde'))
+    await user.type(facultyForm.getByLabelText('Vigente desde'), '2026-09-30')
+    await user.type(facultyForm.getByLabelText('Referencia institucional'), 'Acuerdo institucional de prueba')
 
     // Act
     await user.click(screen.getByRole('button', { name: 'Crear facultad' }))

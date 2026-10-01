@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { AcademicOperationsClient, AcademicOrganizationUnitCreateCommand } from './academicOperationsContracts'
+import type {
+  AcademicOperationsClient,
+  AcademicOrganizationUnitCreateCommand,
+  AcademicSiteCreateCommand,
+} from './academicOperationsContracts'
 
 const clientModules = import.meta.glob<typeof import('./academicOperationsClient')>('./academicOperationsClient.ts')
 
@@ -83,6 +87,93 @@ const period = {
 }
 
 describe('academic operations client', () => {
+  it('creates an authorized development site with normalized values and returns its identifier', async () => {
+    // Arrange
+    const { createAcademicOperationsClient } = await loadClient()
+    const siteId = '34a06170-9acf-4718-854e-92e945a7db17'
+    const fetcher = vi.fn().mockResolvedValue(jsonResponse({ id: siteId }, 201))
+    const client = createAcademicOperationsClient(fetcher)
+    const command: AcademicSiteCreateCommand = {
+      code: ' aguazul ',
+      type: 'REGIONAL',
+      displayName: ' Sede Regional de Aguazul ',
+      displayOrder: 2,
+      validFrom: '2026-09-30',
+      validThrough: null,
+      sourceReference: ' Resolución institucional 2026 ',
+    }
+    const signal = new AbortController().signal
+
+    // Act
+    const createdSiteId = await client.createSite(command, 'institutional-access-token', signal)
+
+    // Assert
+    expect(createdSiteId).toBe(siteId)
+    expect(fetcher).toHaveBeenCalledWith('/api/v1/admin/academic-structure/sites', {
+      credentials: 'omit',
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        Authorization: 'Bearer institutional-access-token',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        code: 'AGUAZUL',
+        type: 'REGIONAL',
+        displayName: 'Sede Regional de Aguazul',
+        displayOrder: 2,
+        validFrom: '2026-09-30',
+        validThrough: null,
+        sourceReference: 'Resolución institucional 2026',
+      }),
+      signal,
+    })
+  })
+
+  it('rejects an invalid site command before sending it to the server', async () => {
+    // Arrange
+    const { createAcademicOperationsClient } = await loadClient()
+    const fetcher = vi.fn()
+    const client = createAcademicOperationsClient(fetcher)
+    // Act
+    const request = client.createSite({
+      code: 'AGUA ZUL',
+      type: 'REGIONAL',
+      displayName: 'Sede Regional de Aguazul',
+      displayOrder: -1,
+      validFrom: '2026-09-30',
+      validThrough: '2026-09-29',
+      sourceReference: '',
+    }, 'institutional-access-token')
+
+    // Assert
+    await expect(request).rejects.toThrow(/invalid|valid/i)
+    expect(fetcher).not.toHaveBeenCalled()
+  })
+
+  it('preserves a server conflict when a site code already exists', async () => {
+    // Arrange
+    const { createAcademicOperationsClient } = await loadClient()
+    const fetcher = vi.fn().mockResolvedValue(jsonResponse({ code: 'academic_structure_conflict', message: 'Conflicto de estructura' }, 409))
+    const client = createAcademicOperationsClient(fetcher)
+    const command: AcademicSiteCreateCommand = {
+      code: 'AGUAZUL',
+      type: 'REGIONAL',
+      displayName: 'Sede Regional de Aguazul',
+      displayOrder: 2,
+      validFrom: '2026-09-30',
+      validThrough: null,
+      sourceReference: 'Resolución institucional',
+    }
+
+    // Act
+    const request = client.createSite(command, 'institutional-access-token')
+
+    // Assert
+    await expect(request).rejects.toMatchObject({ status: 409, message: 'Conflicto de estructura' })
+    expect(fetcher).toHaveBeenCalledTimes(1)
+  })
+
   it('creates an authorized faculty with normalized values and returns its identifier', async () => {
     // Arrange
     const { createAcademicOperationsClient } = await loadClient()

@@ -3,6 +3,8 @@ import type {
   AcademicDisplayOrderCommand,
   AcademicOperationsClient,
   AcademicOrganizationUnitCreateCommand,
+  AcademicSiteCreateCommand,
+  AcademicStructureEntryCreateCommand,
   AcademicOrganizationRelation,
   AcademicOrganizationUnit,
   AcademicOrganizationUnitType,
@@ -42,7 +44,15 @@ export function createAcademicOperationsClient(fetcher: typeof fetch = fetch): A
 
     async createOrganizationUnit(command, accessToken, signal) {
       const response = await fetcher('/api/v1/admin/academic-structure/units',
-        jsonPostRequestOptions(normalizeOrganizationUnitCommand(command), accessToken, signal))
+        jsonPostRequestOptions(normalizeStructureEntryCommand(command, UNIT_TYPES), accessToken, signal))
+      const body = await responseBody(response)
+      if (!isRecord(body) || !isUuid(body.id)) throw malformedResponse()
+      return body.id
+    },
+
+    async createSite(command, accessToken, signal) {
+      const response = await fetcher('/api/v1/admin/academic-structure/sites',
+        jsonPostRequestOptions(normalizeStructureEntryCommand(command, SITE_TYPES), accessToken, signal))
       const body = await responseBody(response)
       if (!isRecord(body) || !isUuid(body.id)) throw malformedResponse()
       return body.id
@@ -329,15 +339,16 @@ function jsonPostRequestOptions(body: unknown, accessToken: string, signal?: Abo
   }
 }
 
-function normalizeOrganizationUnitCommand(
-  command: AcademicOrganizationUnitCreateCommand,
-): AcademicOrganizationUnitCreateCommand {
-  if (!isRecord(command)) throw new Error('The academic organization unit request is invalid.')
+function normalizeStructureEntryCommand<Type extends AcademicOrganizationUnitCreateCommand['type'] | AcademicSiteCreateCommand['type']>(
+  command: unknown,
+  allowedTypes: ReadonlySet<Type>,
+): AcademicStructureEntryCreateCommand<Type> {
+  if (!isRecord(command)) throw new Error('The academic structure entry request is invalid.')
   const code = typeof command.code === 'string' ? command.code.trim().toLocaleUpperCase('en-US') : ''
   const displayName = typeof command.displayName === 'string' ? command.displayName.trim() : ''
   const sourceReference = typeof command.sourceReference === 'string' ? command.sourceReference.trim() : ''
   if (!isIdentifier(code)
-    || !isOneOf(UNIT_TYPES, command.type)
+    || !isOneOf(allowedTypes, command.type)
     || !isBoundedText(displayName, 240)
     || !isNonNegativeInteger(command.displayOrder)
     || Number(command.displayOrder) > 2_147_483_647
@@ -348,11 +359,11 @@ function normalizeOrganizationUnitCommand(
     || containsAsciiControlCharacters(code)
     || containsAsciiControlCharacters(displayName)
     || containsAsciiControlCharacters(sourceReference)) {
-    throw new Error('The academic organization unit request is invalid.')
+    throw new Error('The academic structure entry request is invalid.')
   }
   return {
     code,
-    type: command.type,
+    type: command.type as Type,
     displayName,
     displayOrder: command.displayOrder,
     validFrom: command.validFrom,

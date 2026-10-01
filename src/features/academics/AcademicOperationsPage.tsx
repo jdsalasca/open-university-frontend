@@ -17,7 +17,7 @@ import type {
 } from './academicOperationsContracts'
 import { AcademicOperationsApiError } from './academicOperationsClient'
 import { containsAsciiControlCharacters } from '../../shared/inputValidation'
-import { CreateFacultyForm } from './CreateFacultyForm'
+import { CreateFacultyForm, CreateSiteForm } from './CreateFacultyForm'
 import './AcademicOperationsPage.scss'
 
 type RequestState = 'loading' | 'ready' | 'error'
@@ -235,7 +235,7 @@ export function AcademicOperationsPage({
     }
   }
 
-  async function refreshStructureAfterFacultyCreation(_unitId: string): Promise<void> {
+  async function refreshStructureAfterEntryCreation(_entryId: string): Promise<void> {
     const refreshed = await client.getStructure()
     setRequestData((current) => current ? { ...current, structure: refreshed } : current)
   }
@@ -318,7 +318,7 @@ export function AcademicOperationsPage({
                 <CreateFacultyForm
                   client={client}
                   authorization={structureAuthorization}
-                  onCreated={refreshStructureAfterFacultyCreation}
+                  onCreated={refreshStructureAfterEntryCreation}
                   onAuthorizationRejected={onAuthorizationRejected}
                 />
               )}
@@ -339,6 +339,14 @@ export function AcademicOperationsPage({
                     canChangeOrder={canChangeStructureOrder}
                     onSaveOrder={saveStructureOrder}
                   />}
+              {canChangeStructureOrder && structureAuthorization && (
+                <CreateSiteForm
+                  client={client}
+                  authorization={structureAuthorization}
+                  onCreated={refreshStructureAfterEntryCreation}
+                  onAuthorizationRejected={onAuthorizationRejected}
+                />
+              )}
               <p className="academic-panel-footnote">Las sedes se administran aparte de las facultades.</p>
             </section>
           </div>

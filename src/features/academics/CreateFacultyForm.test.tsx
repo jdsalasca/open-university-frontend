@@ -15,6 +15,56 @@ async function loadForm() {
 afterEach(() => cleanup())
 
 describe('CreateFacultyForm', () => {
+  it('provides a site creation form for authorized institution-managed places', async () => {
+    // Arrange
+    const { CreateSiteForm } = await loadForm()
+
+    // Act + Assert
+    expect(CreateSiteForm).toBeTypeOf('function')
+  })
+
+  it('creates an audited site with an explicitly selected institutional type', async () => {
+    // Arrange
+    const user = userEvent.setup()
+    const siteId = '94a06170-9acf-4718-854e-92e945a7db17'
+    const createSite = vi.fn().mockResolvedValue(siteId)
+    const onCreated = vi.fn().mockResolvedValue(undefined)
+    const client = { createSite } as unknown as Pick<AcademicOperationsClient, 'createSite'>
+    const { CreateSiteForm } = await loadForm()
+    expect(CreateSiteForm).toBeTypeOf('function')
+    if (typeof CreateSiteForm !== 'function') return
+    render(
+      <CreateSiteForm
+        client={client}
+        authorization={{ accessToken: 'institutional-access-token', canWrite: true }}
+        onCreated={onCreated}
+      />,
+    )
+
+    await user.type(screen.getByLabelText('Código del lugar'), 'lugar-regional-prueba')
+    await user.selectOptions(screen.getByLabelText('Tipo de lugar'), 'REGIONAL')
+    await user.type(screen.getByLabelText('Nombre del lugar'), 'Lugar regional de prueba')
+    await user.clear(screen.getByLabelText('Prioridad del lugar'))
+    await user.type(screen.getByLabelText('Prioridad del lugar'), '2')
+    await user.type(screen.getByLabelText('Referencia institucional'), 'Acto institucional de prueba')
+
+    // Act
+    await user.click(screen.getByRole('button', { name: 'Crear lugar' }))
+
+    // Assert
+    await waitFor(() => expect(createSite).toHaveBeenCalledWith({
+      code: 'lugar-regional-prueba',
+      type: 'REGIONAL',
+      displayName: 'Lugar regional de prueba',
+      displayOrder: 2,
+      validFrom: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+      validThrough: null,
+      sourceReference: 'Acto institucional de prueba',
+    }, 'institutional-access-token'))
+    expect(onCreated).toHaveBeenCalledWith(siteId)
+    expect(await screen.findByRole('status')).toHaveTextContent(/lugar registrado/i)
+  })
+
   it('creates a root faculty with an institutional reference and refreshes the structure', async () => {
     // Arrange
     const user = userEvent.setup()

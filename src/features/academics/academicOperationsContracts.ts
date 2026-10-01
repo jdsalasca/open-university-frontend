@@ -83,9 +83,9 @@ export interface AcademicDisplayOrderCommand {
   sourceReference: string
 }
 
-export interface AcademicOrganizationUnitCreateCommand {
+export interface AcademicStructureEntryCreateCommand<Type extends AcademicOrganizationUnitType | AcademicSiteType> {
   code: string
-  type: AcademicOrganizationUnitType
+  type: Type
   displayName: string
   displayOrder: number
   validFrom: string
@@ -93,10 +93,14 @@ export interface AcademicOrganizationUnitCreateCommand {
   sourceReference: string
 }
 
+export type AcademicOrganizationUnitCreateCommand = AcademicStructureEntryCreateCommand<AcademicOrganizationUnitType>
+export type AcademicSiteCreateCommand = AcademicStructureEntryCreateCommand<AcademicSiteType>
+
 export interface AcademicOperationsClient {
   getStructure(signal?: AbortSignal): Promise<AcademicStructureSnapshot>
   createOrganizationUnit(command: AcademicOrganizationUnitCreateCommand, accessToken: string,
     signal?: AbortSignal): Promise<string>
+  createSite(command: AcademicSiteCreateCommand, accessToken: string, signal?: AbortSignal): Promise<string>
   getOpenPeriods(signal?: AbortSignal): Promise<AcademicPeriod[]>
   getAdminPeriods(accessToken: string, signal?: AbortSignal): Promise<AcademicPeriod[]>
   openPeriod(periodId: string, accessToken: string, signal?: AbortSignal): Promise<AcademicPeriod>

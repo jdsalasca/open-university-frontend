@@ -2,20 +2,28 @@ import { useState } from 'react'
 import type { FormEvent } from 'react'
 import type {
   AcademicOperationsClient,
-  AcademicOrganizationUnitCreateCommand,
+  AcademicSiteType,
   AcademicStructureAuthorization,
 } from './academicOperationsContracts'
 import { AcademicOperationsApiError } from './academicOperationsClient'
 
-interface CreateFacultyFormProps {
-  client: Pick<AcademicOperationsClient, 'createOrganizationUnit'>
+interface SharedCreateEntryProps {
   authorization: AcademicStructureAuthorization
-  onCreated(unitId: string): Promise<void>
+  onCreated(entryId: string): Promise<void>
   onAuthorizationRejected?: (accessToken: string) => Promise<void>
 }
 
-interface FacultyDraft {
+interface FacultyCreateProps extends SharedCreateEntryProps {
+  client: Pick<AcademicOperationsClient, 'createOrganizationUnit'>
+}
+
+interface SiteCreateProps extends SharedCreateEntryProps {
+  client: Pick<AcademicOperationsClient, 'createSite'>
+}
+
+interface EntryDraft {
   code: string
+  siteType: AcademicSiteType | ''
   displayName: string
   displayOrder: string
   validFrom: string
@@ -25,15 +33,25 @@ interface FacultyDraft {
 
 type Feedback = { type: 'success' | 'error' | 'warning'; text: string }
 
+const siteTypeOptions: Array<{ value: AcademicSiteType; label: string }> = [
+  { value: 'CENTRAL', label: 'Central' },
+  { value: 'SECCIONAL', label: 'Seccional' },
+  { value: 'REGIONAL', label: 'Regional' },
+  { value: 'CREAD', label: 'CREAD' },
+  { value: 'CAMPUS', label: 'Campus' },
+  { value: 'OTHER', label: 'Otro lugar' },
+]
+
 function localDate(): string {
   const now = new Date()
   const local = new Date(now.getTime() - now.getTimezoneOffset() * 60_000)
   return local.toISOString().slice(0, 10)
 }
 
-function emptyFacultyDraft(): FacultyDraft {
+function emptyEntryDraft(): EntryDraft {
   return {
     code: '',
+    siteType: '',
     displayName: '',
     displayOrder: '0',
     validFrom: localDate(),
@@ -42,23 +60,39 @@ function emptyFacultyDraft(): FacultyDraft {
   }
 }
 
-export function CreateFacultyForm({
+export function CreateFacultyForm(props: FacultyCreateProps) {
+  return <AcademicStructureEntryForm {...props} kind="faculty" />
+}
+
+export function CreateSiteForm(props: SiteCreateProps) {
+  return <AcademicStructureEntryForm {...props} kind="site" />
+}
+
+function AcademicStructureEntryForm({
+  kind,
   client,
   authorization,
   onCreated,
   onAuthorizationRejected,
-}: CreateFacultyFormProps) {
-  const [draft, setDraft] = useState<FacultyDraft>(emptyFacultyDraft)
+}: (FacultyCreateProps & { kind: 'faculty' }) | (SiteCreateProps & { kind: 'site' })) {
+  const [draft, setDraft] = useState<EntryDraft>(emptyEntryDraft)
   const [pending, setPending] = useState(false)
   const [feedback, setFeedback] = useState<Feedback | null>(null)
+  const isFaculty = kind === 'faculty'
+  const displayEntity = isFaculty ? 'facultad' : 'lugar'
+  const displayEntityTitle = isFaculty ? 'facultad raíz' : 'lugar académico'
+  const title = isFaculty ? 'Registrar facultad raíz' : 'Registrar lugar académico'
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (pending || !authorization.canWrite) return
+    if (!isFaculty && !draft.siteType) {
+      setFeedback({ type: 'error', text: 'Selecciona el tipo de lugar antes de continuar.' })
+      return
+    }
 
-    const command: AcademicOrganizationUnitCreateCommand = {
+    const command = {
       code: draft.code,
-      type: 'FACULTY',
       displayName: draft.displayName,
       displayOrder: Number(draft.displayOrder),
       validFrom: draft.validFrom,
@@ -68,16 +102,18 @@ export function CreateFacultyForm({
 
     setPending(true)
     setFeedback(null)
-    let unitId: string
+    let entryId: string
     try {
-      unitId = await client.createOrganizationUnit(command, authorization.accessToken)
+      entryId = isFaculty
+        ? await client.createOrganizationUnit({ ...command, type: 'FACULTY' }, authorization.accessToken)
+        : await client.createSite({ ...command, type: draft.siteType as AcademicSiteType }, authorization.accessToken)
     } catch (error) {
       if (error instanceof AcademicOperationsApiError && (error.status === 401 || error.status === 403)) {
         setFeedback({
           type: 'error',
           text: error.status === 401
             ? 'El servidor rechazó la sesión. Estoy comprobando la identidad; inicia sesión de nuevo si hace falta.'
-            : 'El servidor negó el permiso para crear facultades. Estoy volviendo a comprobar los permisos.',
+            : `El servidor negó el permiso para crear ${displayEntity}. Estoy volviendo a comprobar los permisos.`,
         })
         try {
           await onAuthorizationRejected?.(authorization.accessToken)
@@ -92,26 +128,27 @@ export function CreateFacultyForm({
       } else if (error instanceof AcademicOperationsApiError && error.status === 400) {
         setFeedback({ type: 'error', text: 'El servidor rechazó los datos. Revisa código, vigencia y referencia institucional.' })
       } else {
-        setFeedback({ type: 'error', text: 'No fue posible registrar la facultad. Verifica la conexión e inténtalo de nuevo.' })
+        setFeedback({ type: 'error', text: `No fue posible registrar el ${displayEntity}. Verifica la conexión e inténtalo de nuevo.` })
       }
       setPending(false)
       return
     }
 
-    setDraft(emptyFacultyDraft())
+    setDraft(emptyEntryDraft())
     const futureEffectiveDate = command.validFrom > localDate()
+    const registeredEntity = isFaculty ? 'Facultad' : 'Lugar'
     setFeedback({
       type: 'success',
       text: futureEffectiveDate
-        ? `Facultad registrada. Aparecerá en la estructura vigente desde ${command.validFrom}.`
-        : 'Facultad registrada y estructura actualizada.',
+        ? `${registeredEntity} ${isFaculty ? 'registrada' : 'registrado'}. Aparecerá en la estructura vigente desde ${command.validFrom}.`
+        : `${registeredEntity} ${isFaculty ? 'registrada' : 'registrado'} y estructura actualizada.`,
     })
     try {
-      await onCreated(unitId)
+      await onCreated(entryId)
     } catch {
       setFeedback({
         type: 'warning',
-        text: 'La facultad quedó registrada, pero no pude actualizar la vista. Recarga antes de continuar.',
+        text: `El ${displayEntity} quedó registrado, pero no pude actualizar la vista. Recarga antes de continuar.`,
       })
     } finally {
       setPending(false)
@@ -119,20 +156,20 @@ export function CreateFacultyForm({
   }
 
   return (
-    <section className="academic-create-faculty" aria-labelledby="academic-create-faculty-title">
-      <div className="academic-create-faculty-heading">
+    <section className="academic-create-entry" aria-labelledby={`academic-create-${kind}-title`}>
+      <div className="academic-create-entry-heading">
         <div>
           <p className="academic-panel-kicker">ALTA AUDITADA</p>
-          <h3 id="academic-create-faculty-title">Registrar facultad raíz</h3>
+          <h3 id={`academic-create-${kind}-title`}>{title}</h3>
         </div>
         <span aria-hidden="true">＋</span>
       </div>
-      <p className="academic-create-faculty-intro">
-        Crea una facultad con código, vigencia y referencia institucional validados. No se cargan registros de ejemplo.
+      <p className="academic-create-entry-intro">
+        Registra un {displayEntityTitle} con código, vigencia y referencia institucional. No se cargan registros de ejemplo.
       </p>
-      <form className="academic-create-faculty-form" onSubmit={(event) => void submit(event)}>
+      <form className="academic-create-entry-form" onSubmit={(event) => void submit(event)}>
         <label>
-          Código institucional
+          {isFaculty ? 'Código institucional' : 'Código del lugar'}
           <input
             autoComplete="off"
             maxLength={64}
@@ -146,8 +183,27 @@ export function CreateFacultyForm({
             }}
           />
         </label>
+        {!isFaculty && (
+          <label>
+            Tipo de lugar
+            <select
+              required
+              value={draft.siteType}
+              disabled={pending}
+              onChange={(event) => {
+                const siteType = event.currentTarget.value as AcademicSiteType | ''
+                setDraft((current) => ({ ...current, siteType }))
+              }}
+            >
+              <option value="">Selecciona un tipo</option>
+              {siteTypeOptions.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </label>
+        )}
         <label>
-          Nombre de la facultad
+          {isFaculty ? 'Nombre de la facultad' : 'Nombre del lugar'}
           <input
             autoComplete="organization"
             maxLength={240}
@@ -161,7 +217,7 @@ export function CreateFacultyForm({
           />
         </label>
         <label>
-          Prioridad de visualización
+          {isFaculty ? 'Prioridad de visualización' : 'Prioridad del lugar'}
           <input
             type="number"
             min={0}
@@ -202,7 +258,7 @@ export function CreateFacultyForm({
             }}
           />
         </label>
-        <label className="academic-create-faculty-reference">
+        <label className="academic-create-entry-reference">
           Referencia institucional
           <input
             autoComplete="off"
@@ -216,15 +272,15 @@ export function CreateFacultyForm({
             }}
           />
         </label>
-        <div className="academic-create-faculty-actions">
+        <div className="academic-create-entry-actions">
           <button type="submit" disabled={pending || !authorization.canWrite}>
-            {pending ? 'Registrando…' : 'Crear facultad'}
+            {pending ? 'Registrando…' : `Crear ${displayEntity}`}
           </button>
           <p>La escritura requiere permiso institucional y queda auditada.</p>
         </div>
       </form>
       {feedback && (
-        <p className={`academic-create-faculty-feedback is-${feedback.type}`}
+        <p className={`academic-create-entry-feedback is-${feedback.type}`}
           role={feedback.type === 'error' ? 'alert' : 'status'}>
           {feedback.text}
         </p>
