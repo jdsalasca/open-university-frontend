@@ -11,6 +11,9 @@ import type {
 import { useBranding } from './features/branding/useBranding'
 import { spaceGuideClient as defaultSpaceGuideClient } from './features/spaces/spaceGuideClient'
 import type { SpaceGuideClient } from './features/spaces/spaceGuideClient'
+import { roleAccessClient as defaultRoleAccessClient } from './features/access/roleAccessClient'
+import type { RoleAccessClient, RoleScopeKind } from './features/access/roleAccessContracts'
+import type { RoleAccessScopeOption } from './features/access/RoleAccessPage'
 import { IdentityProvider } from './features/identity/IdentityProvider'
 import type { IdentitySessionManager } from './features/identity/IdentityProvider'
 import { useIdentity } from './features/identity/identityContext'
@@ -38,6 +41,10 @@ const VisualIdentityCenter = lazy(() =>
   import('./features/branding/VisualIdentityCenter')
     .then(({ VisualIdentityCenter: page }) => ({ default: page })),
 )
+const RoleAccessPage = lazy(() =>
+  import('./features/access/RoleAccessPage')
+    .then(({ RoleAccessPage: page }) => ({ default: page })),
+)
 
 interface AppProps {
   catalogClient?: AcademicCatalogClient
@@ -46,9 +53,10 @@ interface AppProps {
   oidcConfiguration?: OidcConfigurationResult
   identityManager?: IdentitySessionManager
   currentIdentityClient?: IdentityClient
+  roleAccessClient?: RoleAccessClient
 }
 
-type ApplicationView = 'identity' | 'programs' | 'academia' | 'admissions' | 'spaces'
+type ApplicationView = 'identity' | 'programs' | 'academia' | 'admissions' | 'spaces' | 'access'
 
 const MODULE_SYMBOLS: Record<string, string> = {
   home: '⌂',
@@ -69,6 +77,7 @@ export function App({
   oidcConfiguration,
   identityManager,
   currentIdentityClient,
+  roleAccessClient = defaultRoleAccessClient,
 }: AppProps = {}) {
   return (
     <IdentityProvider
@@ -76,7 +85,8 @@ export function App({
       manager={identityManager}
       identityClient={currentIdentityClient}
     >
-      <ApplicationShell catalogClient={catalogClient} operationsClient={operationsClient} spaceGuideClient={guideClient} />
+      <ApplicationShell catalogClient={catalogClient} operationsClient={operationsClient}
+        spaceGuideClient={guideClient} roleAccessClient={roleAccessClient} />
     </IdentityProvider>
   )
 }
@@ -85,15 +95,18 @@ function ApplicationShell({
   catalogClient,
   operationsClient,
   spaceGuideClient,
+  roleAccessClient,
 }: {
   catalogClient: AcademicCatalogClient
   operationsClient: AcademicOperationsClient
   spaceGuideClient: SpaceGuideClient
+  roleAccessClient: RoleAccessClient
 }) {
   const { branding, status } = useBranding()
   const { state: identity, login, logout, retry, loginAvailable } = useIdentity()
   const [view, setView] = useState<ApplicationView>(() => readApplicationView())
   const [rejectedStructureAccessToken, setRejectedStructureAccessToken] = useState<string | null>(null)
+  const [rejectedRoleAccessToken, setRejectedRoleAccessToken] = useState<string | null>(null)
   useEffect(() => {
     const onHashChange = () => setView(readApplicationView())
     window.addEventListener('hashchange', onHashChange)
@@ -116,6 +129,7 @@ function ApplicationShell({
   const isAcademicOperationsView = view === 'academia'
   const isAdmissionsView = view === 'admissions'
   const isSpacesView = view === 'spaces'
+  const isRoleAccessView = view === 'access'
   const isIdentityView = view === 'identity'
   const authenticatedIdentity = identity.status === 'authenticated' ? identity : null
   const hasInstitutionalSession = authenticatedIdentity !== null
@@ -142,10 +156,48 @@ function ApplicationShell({
         && authenticatedIdentity.accessToken !== rejectedStructureAccessToken,
     }
     : null
+  const roleAccessAuthorization = authenticatedIdentity
+    ? {
+      accessToken: authenticatedIdentity.accessToken,
+      canRead: authenticatedIdentity.permissions.includes('identity:roles:read')
+        && authenticatedIdentity.accessToken !== rejectedRoleAccessToken,
+      canWrite: authenticatedIdentity.permissions.includes('identity:roles:write')
+        && authenticatedIdentity.accessToken !== rejectedRoleAccessToken,
+    }
+    : null
   const revalidateRejectedStructureAccess = useCallback(async (accessToken: string): Promise<void> => {
     setRejectedStructureAccessToken(accessToken)
     await retry()
   }, [retry])
+  const revalidateRejectedRoleAccess = useCallback(async (accessToken: string): Promise<void> => {
+    setRejectedRoleAccessToken(accessToken)
+    await retry()
+  }, [retry])
+  const loadRoleScopeOptions = useCallback(async (
+    kind: RoleScopeKind,
+    signal?: AbortSignal,
+  ): Promise<RoleAccessScopeOption[]> => {
+    if (kind === 'SITE' || kind === 'FACULTY') {
+      const structure = await operationsClient.getStructure(signal)
+      if (kind === 'SITE') {
+        return structure.sites
+          .filter((site) => site.status === 'ACTIVE')
+          .sort((left, right) => left.displayName.localeCompare(right.displayName, 'es'))
+          .map((site) => ({ reference: site.id, label: `${site.code} · ${site.displayName}` }))
+      }
+      return structure.units
+        .filter((unit) => unit.type === 'FACULTY' && unit.status === 'ACTIVE')
+        .sort((left, right) => left.displayName.localeCompare(right.displayName, 'es'))
+        .map((unit) => ({ reference: unit.id, label: `${unit.code} · ${unit.displayName}` }))
+    }
+    if (kind === 'PROGRAM') {
+      const programs = await catalogClient.listPrograms(signal)
+      return programs
+        .sort((left, right) => left.programName.localeCompare(right.programName, 'es'))
+        .map((program) => ({ reference: program.id, label: `${program.programCode} · ${program.programName}` }))
+    }
+    return []
+  }, [catalogClient, operationsClient])
   const sessionLabel = identity.status === 'authenticated' ? 'Sesión institucional activa'
     : identity.status === 'loading' ? 'Verificando sesión…'
       : identity.status === 'unconfigured' ? 'Acceso institucional pendiente de configuración'
@@ -153,7 +205,8 @@ function ApplicationShell({
           : identity.reason === 'expired' ? 'Sesión vencida · Sin acceso'
             : 'Sin sesión institucional'
   const identityCenterKey = `${branding.revision}:${authenticatedIdentity?.subject ?? 'anonymous'}`
-  const currentPageLabel = isAdmissionsView ? admissionsLabel
+  const currentPageLabel = isRoleAccessView ? 'Accesos y perfiles'
+    : isAdmissionsView ? admissionsLabel
     : isSpacesView ? spacesLabel
     : isProgramsView ? programsLabel
     : isAcademicOperationsView ? 'Estructura y periodos'
@@ -184,6 +237,14 @@ function ApplicationShell({
               <span>{identityLabel}</span>
               {isIdentityView && <span className="nav-status" aria-hidden="true" />}
             </a>
+            {roleAccessAuthorization?.canRead && (
+              <a className={`nav-item${isRoleAccessView ? ' active' : ''}`} href="#accesos"
+                aria-current={isRoleAccessView ? 'page' : undefined}>
+                <span className="nav-glyph" aria-hidden="true">⌑</span>
+                <span>Accesos y perfiles</span>
+                {isRoleAccessView && <span className="nav-status" aria-hidden="true" />}
+              </a>
+            )}
             <a className={`nav-item${isProgramsView ? ' active' : ''}`} href="#programas" aria-current={isProgramsView ? 'page' : undefined}>
               <span className="nav-glyph" aria-hidden="true">▧</span>
               <span>{programsLabel} · Vista previa</span>
@@ -234,9 +295,11 @@ function ApplicationShell({
         <header className="topbar">
           <div className="breadcrumbs"><span>{isProgramsView || isAcademicOperationsView || isAdmissionsView || isSpacesView ? 'Vida universitaria' : 'Administración'}</span><span aria-hidden="true">/</span><strong>{currentPageLabel}</strong></div>
           <div className="topbar-meta">
-            <span className="autosave-indicator"><span aria-hidden="true" />{isAdmissionsView ? 'Consulta de admisiones' : isSpacesView ? 'Consulta de espacios' : isProgramsView ? 'Consulta de programas' : isAcademicOperationsView ? 'Consulta académica' : status === 'ready' ? 'Identidad sincronizada' : 'Identidad de respaldo'}</span>
+            <span className="autosave-indicator"><span aria-hidden="true" />{isRoleAccessView ? 'Control administrativo' : isAdmissionsView ? 'Consulta de admisiones' : isSpacesView ? 'Consulta de espacios' : isProgramsView ? 'Consulta de programas' : isAcademicOperationsView ? 'Consulta académica' : status === 'ready' ? 'Identidad sincronizada' : 'Identidad de respaldo'}</span>
             <span className="topbar-divider" aria-hidden="true" />
-            {isAdmissionsView
+            {isRoleAccessView
+              ? <span className="revision-chip">PERFILES · IDENTIDAD</span>
+              : isAdmissionsView
               ? <span className="revision-chip">PREGRADO · 2027-I</span>
               : isSpacesView
                 ? <span className="revision-chip">SEDES · CREAD</span>
@@ -269,8 +332,8 @@ function ApplicationShell({
           </div>
         </header>
 
-        <main id={view === 'identity' ? 'inicio' : view === 'programs' ? 'programas' : isAdmissionsView ? 'admisiones' : isSpacesView ? 'espacios' : 'academia'}
-          className={isAdmissionsView ? 'admissions-page-content' : isSpacesView ? 'spaces-page-content' : isProgramsView ? 'catalog-page-content' : isAcademicOperationsView ? 'academic-page-content' : 'page-content identity-page-content'}>
+        <main id={view === 'identity' ? 'inicio' : view === 'programs' ? 'programas' : isAdmissionsView ? 'admisiones' : isSpacesView ? 'espacios' : isRoleAccessView ? 'accesos' : 'academia'}
+          className={isRoleAccessView ? 'role-access-page-content' : isAdmissionsView ? 'admissions-page-content' : isSpacesView ? 'spaces-page-content' : isProgramsView ? 'catalog-page-content' : isAcademicOperationsView ? 'academic-page-content' : 'page-content identity-page-content'}>
           {isIdentityView && status === 'fallback' && (
             <div className="status-banner" role="status">
               <span className="status-banner-icon" aria-hidden="true">i</span>
@@ -285,14 +348,19 @@ function ApplicationShell({
               ? 'la agenda de admisiones'
               : isSpacesView
                 ? 'la guía de espacios'
+                : isRoleAccessView
+                  ? 'la consola de accesos'
               : isProgramsView || isAcademicOperationsView
                 ? 'el módulo académico'
                 : 'el centro de identidad visual'} />}
           >
             <Suspense fallback={<p className="module-loading" role="status" aria-live="polite">
-              Cargando {isAdmissionsView ? 'agenda de admisiones' : isSpacesView ? 'guía de espacios' : isProgramsView || isAcademicOperationsView ? 'módulo académico' : 'centro de identidad visual'}…
+              Cargando {isRoleAccessView ? 'consola de accesos' : isAdmissionsView ? 'agenda de admisiones' : isSpacesView ? 'guía de espacios' : isProgramsView || isAcademicOperationsView ? 'módulo académico' : 'centro de identidad visual'}…
             </p>}>
-              {isProgramsView
+              {isRoleAccessView
+                ? <RoleAccessPage client={roleAccessClient} authorization={roleAccessAuthorization}
+                  loadScopeOptions={loadRoleScopeOptions} onAuthorizationRejected={revalidateRejectedRoleAccess} />
+                : isProgramsView
                 ? <AcademicCatalogPage client={catalogClient} authorization={catalogAuthorization} />
                 : isAcademicOperationsView
                   ? <AcademicOperationsPage
@@ -315,7 +383,11 @@ function ApplicationShell({
             </Suspense>
           </ModuleLoadBoundary>
 
-          <footer className="page-footer"><span>{branding.institutionName}</span><span>{isAdmissionsView
+          <footer className="page-footer"><span>{branding.institutionName}</span><span>{isRoleAccessView
+            ? roleAccessAuthorization?.canWrite
+              ? 'Gestión de perfiles · permisos asignados y auditados en el servidor'
+              : 'Consulta de perfiles · escritura requiere autorización institucional'
+            : isAdmissionsView
             ? 'Calendario público de admisiones · Información de ACRA'
             : isSpacesView
               ? 'Guía pública de ubicaciones · Consulta la fuente oficial antes de desplazarte'
@@ -340,6 +412,7 @@ function readApplicationView(): ApplicationView {
   if (window.location.hash === '#academia') return 'academia'
   if (window.location.hash === '#admisiones') return 'admissions'
   if (window.location.hash === '#espacios') return 'spaces'
+  if (window.location.hash === '#accesos') return 'access'
   return 'identity'
 }
 

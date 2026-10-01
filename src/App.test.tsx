@@ -12,6 +12,7 @@ import type { CurrentIdentity, IdentityClient } from './features/identity/identi
 import { IdentityApiError } from './features/identity/identityClient'
 import type { IdentitySessionManager } from './features/identity/IdentityProvider'
 import type { OidcConfigurationResult } from './features/identity/oidcConfiguration'
+import type { RoleAccessClient, RoleProfile } from './features/access/roleAccessContracts'
 
 const oidcConfiguration: OidcConfigurationResult = {
   status: 'configured',
@@ -39,6 +40,26 @@ function authenticatedSessionManager(): IdentitySessionManager {
 
 function identityClientWithPermissions(permissions: CurrentIdentity['permissions']): IdentityClient {
   return { current: async () => ({ subject: 'synthetic-subject', permissions }) }
+}
+
+function readOnlyRoleAccessClient(): RoleAccessClient {
+  const profiles: RoleProfile[] = [
+    { key: 'APPLICANT', displayName: 'Aspirante', manuallyAssignable: false, allowedScopeKinds: [], permissions: [] },
+    { key: 'ADMITTED', displayName: 'Admitido', manuallyAssignable: false, allowedScopeKinds: [], permissions: [] },
+    { key: 'STUDENT', displayName: 'Estudiante', manuallyAssignable: false, allowedScopeKinds: [], permissions: [] },
+    { key: 'TEACHER', displayName: 'Docente', manuallyAssignable: true, allowedScopeKinds: ['UNIVERSITY', 'SITE', 'FACULTY', 'PROGRAM', 'JOB_APPOINTMENT'], permissions: [] },
+    { key: 'ADMINISTRATIVE', displayName: 'Administrativo', manuallyAssignable: true, allowedScopeKinds: ['UNIVERSITY', 'SITE', 'FACULTY', 'PROGRAM', 'JOB_APPOINTMENT'], permissions: [] },
+    { key: 'ADMISSIONS', displayName: 'Admisiones', manuallyAssignable: true, allowedScopeKinds: ['UNIVERSITY', 'SITE', 'FACULTY', 'PROGRAM', 'JOB_APPOINTMENT'], permissions: [] },
+    { key: 'DIRECTIVE', displayName: 'Directivo', manuallyAssignable: true, allowedScopeKinds: ['UNIVERSITY', 'SITE', 'FACULTY', 'PROGRAM', 'JOB_APPOINTMENT'], permissions: [] },
+    { key: 'ADMINISTRATOR', displayName: 'Administrador', manuallyAssignable: true, allowedScopeKinds: ['UNIVERSITY'], permissions: ['identity:roles:read', 'identity:roles:write'] },
+  ]
+  return {
+    roleProfiles: vi.fn().mockResolvedValue(profiles),
+    searchIdentities: async () => [],
+    assignments: async () => [],
+    assign: async () => { throw new Error('Unexpected role assignment') },
+    revoke: async () => { throw new Error('Unexpected role revocation') },
+  }
 }
 
 afterEach(() => {
@@ -117,6 +138,60 @@ function publicSpaceGuideClient(): SpaceGuideClient {
 }
 
 describe('App', () => {
+  it('keeps the access route closed when the current identity has no read permission', async () => {
+    // Arrange
+    const roleAccessClient: RoleAccessClient = {
+      ...readOnlyRoleAccessClient(),
+      roleProfiles: vi.fn().mockResolvedValue([]),
+    }
+    window.history.replaceState(null, '', '#accesos')
+    render(
+      <BrandingProvider loader={async () => DEFAULT_BRANDING}>
+        <App
+          oidcConfiguration={oidcConfiguration}
+          identityManager={authenticatedSessionManager()}
+          currentIdentityClient={identityClientWithPermissions([])}
+          roleAccessClient={roleAccessClient}
+        />
+      </BrandingProvider>,
+    )
+
+    // Act
+    const lockedState = await screen.findByText(/requiere el permiso identity:roles:read/i)
+
+    // Assert
+    expect(lockedState).toBeVisible()
+    expect(screen.queryByRole('link', { name: /accesos y perfiles/i })).not.toBeInTheDocument()
+    expect(roleAccessClient.roleProfiles).not.toHaveBeenCalled()
+  })
+
+  it('shows role profiles in the protected read-only route without exposing assignment controls', async () => {
+    // Arrange
+    const roleAccessClient = readOnlyRoleAccessClient()
+    window.history.replaceState(null, '', '#inicio')
+    render(
+      <BrandingProvider loader={async () => DEFAULT_BRANDING}>
+        <App
+          oidcConfiguration={oidcConfiguration}
+          identityManager={authenticatedSessionManager()}
+          currentIdentityClient={identityClientWithPermissions(['identity:roles:read'])}
+          roleAccessClient={roleAccessClient}
+        />
+      </BrandingProvider>,
+    )
+
+    // Act
+    const accessLink = await screen.findByRole('link', { name: /accesos y perfiles/i })
+    await userEvent.setup().click(accessLink)
+
+    // Assert
+    expect(await screen.findByRole('heading', { name: 'Accesos y perfiles' })).toBeVisible()
+    expect(roleAccessClient.roleProfiles).toHaveBeenCalledOnce()
+    expect(roleAccessClient.roleProfiles).toHaveBeenCalledWith('synthetic-access-token', expect.any(AbortSignal))
+    expect(screen.queryByRole('button', { name: 'Asignar perfil' })).not.toBeInTheDocument()
+    expect(accessLink).toHaveAttribute('aria-current', 'page')
+  })
+
   it('applies institution name, published logo, and module label to the application shell', async () => {
     // Arrange
     const branding = {

@@ -261,6 +261,8 @@
 .admissions-page-content > .page-footer { width: min(calc(100% - clamp(36px, 6.4vw, 96px)), 1510px); margin: 0 auto 18px; }
 .spaces-page-content { min-width: 0; min-height: calc(100vh - 69px); padding: 0; }
 .spaces-page-content > .page-footer { width: min(calc(100% - clamp(36px, 6.4vw, 96px)), 1510px); margin: 0 auto 18px; }
+.role-access-page-content { min-width: 0; min-height: calc(100vh - 69px); padding: 0; }
+.role-access-page-content > .page-footer { width: min(calc(100% - clamp(36px, 6.4vw, 96px)), 1510px); margin: 0 auto 18px; }
 
 @media (min-width: 1500px) {
   .page-content { padding-top: 42px; }
