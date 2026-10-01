@@ -15,11 +15,13 @@ import type {
   AcademicProgram,
   CatalogAuthorization,
 } from './contracts'
+import type { AcademicOperationsClient, AcademicStructureSnapshot } from './academicOperationsContracts'
 
 afterEach(cleanup)
 
 interface AcademicCatalogPageProps {
   client: AcademicCatalogClient
+  structureClient?: Pick<AcademicOperationsClient, 'getStructure'>
   authorization?: CatalogAuthorization | null
 }
 
@@ -32,7 +34,8 @@ async function renderCatalogPage(props: AcademicCatalogPageProps) {
   expect(loader, 'the accessible academic catalog page is implemented').toBeTypeOf('function')
   const module = await loader!()
   const Page = module.AcademicCatalogPage
-  return { ...render(Page ? <Page {...props} /> : null), Page }
+  const structureClient = props.structureClient ?? { getStructure: vi.fn().mockResolvedValue(currentStructure) }
+  return { ...render(Page ? <Page {...props} structureClient={structureClient} /> : null), Page, structureClient }
 }
 
 const program: AcademicProgram = {
@@ -54,6 +57,41 @@ const secondProgram: AcademicProgram = {
   programName: 'Física de Prueba',
   faculty: 'Facultad de Ciencias',
   campusName: 'Sogamoso',
+}
+
+const currentStructure: AcademicStructureSnapshot = {
+  units: [{
+    id: '10000000-0000-4000-8000-000000000001',
+    code: 'FING',
+    type: 'FACULTY',
+    displayName: 'Facultad de Ingeniería vigente',
+    displayOrder: 1,
+    status: 'ACTIVE',
+    validFrom: '2020-01-01',
+    validThrough: null,
+  }],
+  organizationRelations: [],
+  sites: [{
+    id: '20000000-0000-4000-8000-000000000001',
+    code: 'CENTRAL',
+    type: 'CENTRAL',
+    displayName: 'Sede Central vigente',
+    displayOrder: 1,
+    status: 'ACTIVE',
+    validFrom: '2020-01-01',
+    validThrough: null,
+  }],
+  siteRelations: [],
+  programAffiliations: [{
+    id: '30000000-0000-4000-8000-000000000001',
+    programId: program.id,
+    organizationUnitId: '10000000-0000-4000-8000-000000000001',
+    siteId: '20000000-0000-4000-8000-000000000001',
+    displayOrder: 1,
+    validFrom: '2020-01-01',
+    validThrough: null,
+    sourceReference: 'Referencia de prueba',
+  }],
 }
 
 const publishedCurriculum: AcademicCurriculum = {
@@ -216,6 +254,65 @@ function createClient(overrides: Partial<AcademicCatalogClient> = {}): AcademicC
 }
 
 describe('AcademicCatalogPage', () => {
+  it('uses the current academic affiliation for program placement and search instead of CSV snapshots', async () => {
+    // Arrange
+    const client = createClient({
+      listPrograms: vi.fn().mockResolvedValue([program]),
+      listCurricula: vi.fn().mockResolvedValue([publishedCurriculum]),
+    })
+    await renderCatalogPage({ client })
+
+    // Act
+    const programOption = await screen.findByRole('button', { name: /Ingeniería de Prueba/i })
+
+    // Assert
+    expect(within(programOption).getByText('Facultad de Ingeniería vigente · Sede Central vigente')).toBeVisible()
+    expect(within(programOption).queryByText(/Facultad de Prueba/)).not.toBeInTheDocument()
+    const curriculumCard = await screen.findByRole('article', { name: /2026-A/i })
+    expect(within(curriculumCard).getByText('Sede Central vigente')).toBeVisible()
+    expect(screen.getByText('PLANES PUBLICADOS · SEDE CENTRAL VIGENTE')).toBeVisible()
+
+    // Act: the current affiliation is searchable; the legacy import snapshot is not.
+    await userEvent.type(screen.getByRole('searchbox', { name: /buscar programa/i }), 'Sede Central vigente')
+
+    // Assert
+    expect(screen.getByRole('button', { name: /Ingeniería de Prueba/i })).toBeVisible()
+    await userEvent.clear(screen.getByRole('searchbox', { name: /buscar programa/i }))
+    await userEvent.type(screen.getByRole('searchbox', { name: /buscar programa/i }), 'Tunja')
+    expect(within(screen.getByRole('group', { name: /seleccionar programa/i })).getByRole('status'))
+      .toHaveTextContent(/ningún programa coincide/i)
+  })
+
+  it('labels a published program with no current affiliation as pending validation', async () => {
+    // Arrange: secondProgram has legacy CSV values but no current affiliation in the snapshot.
+    const client = createClient({
+      listPrograms: vi.fn().mockResolvedValue([secondProgram]),
+      listCurricula: vi.fn().mockResolvedValue([secondPublishedCurriculum]),
+    })
+    await renderCatalogPage({ client })
+
+    // Act
+    const programOption = await screen.findByRole('button', { name: /Física de Prueba/i })
+
+    // Assert
+    expect(within(programOption).getByText('Adscripción pendiente de validar')).toBeVisible()
+    expect(within(programOption).queryByText(/Facultad de Ciencias/)).not.toBeInTheDocument()
+  })
+
+  it('fails closed when current academic structure cannot be loaded', async () => {
+    // Arrange
+    const client = createClient({ listPrograms: vi.fn().mockResolvedValue([program]) })
+    const structureClient = { getStructure: vi.fn().mockRejectedValue(new Error('offline')) }
+    await renderCatalogPage({ client, structureClient })
+
+    // Act
+    const error = await screen.findByRole('alert')
+
+    // Assert
+    expect(error).toHaveTextContent(/adscripción académica vigente/i)
+    expect(screen.queryByRole('button', { name: /Ingeniería de Prueba/i })).not.toBeInTheDocument()
+  })
+
   it('shows the explicit empty state and keeps all administrative controls unavailable without institutional authorization', async () => {
     // Arrange
     const client = createClient()

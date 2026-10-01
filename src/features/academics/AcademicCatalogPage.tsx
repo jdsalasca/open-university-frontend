@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ChangeEvent } from 'react'
 import { academicCatalogClient } from './academicCatalogClient'
+import { academicOperationsClient } from './academicOperationsClient'
+import type { AcademicOperationsClient, AcademicStructureSnapshot } from './academicOperationsContracts'
 import type {
   AcademicCatalogClient,
   AcademicCatalogIssue,
@@ -22,7 +24,20 @@ import './AcademicCatalogPage.scss'
 
 interface AcademicCatalogPageProps {
   client?: AcademicCatalogClient
+  structureClient?: Pick<AcademicOperationsClient, 'getStructure'>
   authorization?: CatalogAuthorization | null
+}
+
+interface ProgramPlacement {
+  organizationUnitName: string
+  siteName: string
+  displayName: string
+}
+
+const PENDING_PROGRAM_PLACEMENT: ProgramPlacement = {
+  organizationUnitName: 'Adscripción pendiente de validar',
+  siteName: 'Adscripción pendiente de validar',
+  displayName: 'Adscripción pendiente de validar',
 }
 
 type RequestState = 'loading' | 'ready' | 'error'
@@ -35,6 +50,7 @@ interface ApiFailure extends Error {
 
 export function AcademicCatalogPage({
   client = academicCatalogClient,
+  structureClient = academicOperationsClient,
   authorization = null,
 }: AcademicCatalogPageProps) {
   const accessToken = authorization?.accessToken.trim() ? authorization.accessToken : null
@@ -42,6 +58,7 @@ export function AcademicCatalogPage({
     && authorization?.permissions.includes('academic:catalog:read') === true
 
   const [programs, setPrograms] = useState<AcademicProgram[]>([])
+  const [programPlacements, setProgramPlacements] = useState<Record<string, ProgramPlacement>>({})
   const [programsState, setProgramsState] = useState<RequestState>('loading')
   const [programsError, setProgramsError] = useState('')
   const [programRetry, setProgramRetry] = useState(0)
@@ -54,9 +71,13 @@ export function AcademicCatalogPage({
   const [selectedCurriculum, setSelectedCurriculum] = useState<AcademicCurriculum | null>(null)
   useEffect(() => {
     const controller = new AbortController()
-    client.listPrograms(controller.signal)
-      .then((result) => {
+    Promise.all([
+      client.listPrograms(controller.signal),
+      structureClient.getStructure(controller.signal),
+    ])
+      .then(([result, structure]) => {
         setPrograms(result)
+        setProgramPlacements(resolveProgramPlacements(result, structure))
         setProgramsState('ready')
         setSelectedProgramId(result[0]?.id ?? '')
         setCurricula([])
@@ -66,11 +87,11 @@ export function AcademicCatalogPage({
       })
       .catch(() => {
         if (controller.signal.aborted) return
-        setProgramsError('No se pudo cargar el catálogo. Comprueba la conexión e inténtalo de nuevo.')
+        setProgramsError('No se pudo cargar el catálogo y la adscripción académica vigente. Comprueba la conexión e inténtalo de nuevo.')
         setProgramsState('error')
       })
     return () => controller.abort()
-  }, [client, programRetry])
+  }, [client, structureClient, programRetry])
 
   useEffect(() => {
     if (!selectedProgramId) return
@@ -99,11 +120,10 @@ export function AcademicCatalogPage({
     return programs.filter((program) => normalizeSearchText([
       program.programCode,
       program.programName,
-      program.faculty,
-      program.campusCode,
-      program.campusName,
+      programPlacements[program.id]?.organizationUnitName ?? PENDING_PROGRAM_PLACEMENT.organizationUnitName,
+      programPlacements[program.id]?.siteName ?? PENDING_PROGRAM_PLACEMENT.siteName,
     ].join(' ')).includes(normalizedSearch))
-  }, [programs, programSearch])
+  }, [programPlacements, programs, programSearch])
   function retryPrograms() {
     setProgramsState('loading')
     setProgramsError('')
@@ -205,7 +225,7 @@ export function AcademicCatalogPage({
                   type="button"
                 >
                   <span className="catalog-program-mark" aria-hidden="true">{program.programCode.slice(0, 1)}</span>
-                  <span className="catalog-program-copy"><strong>{program.programName}</strong><small>{program.faculty} · {program.campusName}</small></span>
+                  <span className="catalog-program-copy"><strong>{program.programName}</strong><small>{programPlacements[program.id]?.displayName ?? PENDING_PROGRAM_PLACEMENT.displayName}</small></span>
                   <span className="catalog-program-arrow" aria-hidden="true">↗</span>
                 </button>
               ))}
@@ -224,7 +244,7 @@ export function AcademicCatalogPage({
           <div className="catalog-curricula-panel">
             {selectedProgram && (
               <div className="catalog-section-heading catalog-curricula-heading">
-                <div><p className="catalog-eyebrow">PLANES PUBLICADOS · {selectedProgram.campusName.toLocaleUpperCase('es-CO')}</p><h2>{selectedProgram.programName}</h2></div>
+                <div><p className="catalog-eyebrow">PLANES PUBLICADOS · {(programPlacements[selectedProgram.id]?.siteName ?? PENDING_PROGRAM_PLACEMENT.siteName).toLocaleUpperCase('es-CO')}</p><h2>{selectedProgram.programName}</h2></div>
                 <span className="catalog-campus-tag">{selectedProgram.programCode}</span>
               </div>
             )}
@@ -247,6 +267,7 @@ export function AcademicCatalogPage({
                   <CurriculumCard
                     curriculum={curriculum}
                     key={curriculum.id}
+                    siteName={programPlacements[selectedProgramId]?.siteName ?? PENDING_PROGRAM_PLACEMENT.siteName}
                     onView={() => setSelectedCurriculum(curriculum)}
                   />
                 ))}
@@ -872,12 +893,13 @@ function CurriculumImportPreviewPanel({ preview }: { preview: CurriculumImportPr
       <dl className="catalog-import-preview-meta">
         <div><dt>Programa</dt><dd>{preview.programCode}</dd></div>
         <div><dt>Código SNIES</dt><dd>{preview.sniesCode ?? 'Sin código'}</dd></div>
-        <div><dt>Facultad</dt><dd>{preview.faculty}</dd></div>
-        <div><dt>Sede</dt><dd>{preview.campusName} · {preview.campusCode}</dd></div>
+        <div><dt>Facultad declarada en el archivo</dt><dd>{preview.faculty}</dd></div>
+        <div><dt>Sede declarada en el archivo</dt><dd>{preview.campusName} · {preview.campusCode}</dd></div>
         <div><dt>Cohortes</dt><dd>{preview.cohortFrom} a {preview.cohortThrough ?? 'sin fecha final'}</dd></div>
         <div><dt>Referencia</dt><dd>{preview.approvalReference}</dd></div>
         <div><dt>Semestres</dt><dd>{preview.semesters.join(', ')}</dd></div>
       </dl>
+      <p className="catalog-import-preview-note">Facultad y sede se conservan como datos del archivo de origen; la adscripción vigente se administra en estructura académica.</p>
       <p className="catalog-import-preview-count">{numberFormat.format(preview.entryCount)} asignaturas · {numberFormat.format(preview.semesters.length)} {preview.semesters.length === 1 ? 'semestre' : 'semestres'}</p>
       <div className="catalog-review-table-wrap">
         <table className="catalog-review-table">
@@ -931,13 +953,13 @@ function CatalogAdminHeading() {
   )
 }
 
-function CurriculumCard({ curriculum, onView }: { curriculum: AcademicCurriculum; onView: () => void }) {
+function CurriculumCard({ curriculum, siteName, onView }: { curriculum: AcademicCurriculum; siteName: string; onView: () => void }) {
   return (
     <article className="catalog-curriculum-card" aria-label={`Versión ${curriculum.curriculumVersion}`}>
       <div className="catalog-curriculum-card-top"><span className="catalog-version-label">VERSIÓN</span><span className="catalog-published-indicator"><i aria-hidden="true" /> Publicado</span></div>
       <h3>{curriculum.curriculumVersion}</h3>
       <div className="catalog-cohort-band"><span aria-hidden="true">◷</span><span><small>COHORTE</small><strong>{cohortLabel(curriculum)}</strong></span><span className="catalog-card-arrow" aria-hidden="true">↗</span></div>
-      <div className="catalog-curriculum-card-bottom"><span>{curriculum.entryCount} actividades</span><span>{curriculum.campusName}</span></div>
+      <div className="catalog-curriculum-card-bottom"><span>{curriculum.entryCount} actividades</span><span>{siteName}</span></div>
       <button
         aria-label={`Ver asignaturas de la versión ${curriculum.curriculumVersion}`}
         className="catalog-button catalog-button-secondary catalog-curriculum-view"
@@ -979,6 +1001,36 @@ function cohortLabel(curriculum: AcademicCurriculum): string {
 
 function normalizeSearchText(value: string): string {
   return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('es-CO').trim()
+}
+
+function resolveProgramPlacements(
+  programs: readonly AcademicProgram[],
+  structure: AcademicStructureSnapshot,
+): Record<string, ProgramPlacement> {
+  const unitsById = new Map(structure.units.map((unit) => [unit.id, unit.displayName]))
+  const sitesById = new Map(structure.sites.map((site) => [site.id, site.displayName]))
+  const affiliationsByProgramId = new Map<string, typeof structure.programAffiliations>()
+  for (const affiliation of structure.programAffiliations) {
+    const affiliations = affiliationsByProgramId.get(affiliation.programId) ?? []
+    affiliations.push(affiliation)
+    affiliationsByProgramId.set(affiliation.programId, affiliations)
+  }
+
+  return Object.fromEntries(programs.map((program) => {
+    const affiliations = affiliationsByProgramId.get(program.id) ?? []
+    if (affiliations.length !== 1) return [program.id, PENDING_PROGRAM_PLACEMENT]
+
+    const affiliation = affiliations[0]
+    const organizationUnitName = unitsById.get(affiliation.organizationUnitId)
+    const siteName = sitesById.get(affiliation.siteId)
+    if (!organizationUnitName || !siteName) return [program.id, PENDING_PROGRAM_PLACEMENT]
+
+    return [program.id, {
+      organizationUnitName,
+      siteName,
+      displayName: `${organizationUnitName} · ${siteName}`,
+    }]
+  }))
 }
 
 function clientFailure(status: number, code: string, message: string): ApiFailure {
