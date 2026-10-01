@@ -158,6 +158,8 @@ function createClient(overrides: Partial<AcademicOperationsClient> = {}): Academ
     getAdminPeriods: vi.fn().mockResolvedValue([regularPeriod, intersemester]),
     createOrganizationUnit: vi.fn().mockResolvedValue('34a06170-9acf-4718-854e-92e945a7db17'),
     createSite: vi.fn().mockResolvedValue('94a06170-9acf-4718-854e-92e945a7db17'),
+    relateOrganizationUnits: vi.fn().mockResolvedValue(undefined),
+    relateSites: vi.fn().mockResolvedValue(undefined),
     openPeriod: vi.fn().mockImplementation(async (_periodId: string, _accessToken: string) => ({
       ...regularPeriod,
       status: 'OPEN',
@@ -701,6 +703,8 @@ describe('AcademicOperationsPage', () => {
     expect(await screen.findByText('Facultad de Ciencias')).toBeVisible()
     expect(screen.queryByRole('button', { name: 'Crear facultad' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Crear lugar' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Vincular unidades' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Vincular lugares' })).not.toBeInTheDocument()
 
     // Act
     rerender(
@@ -714,6 +718,8 @@ describe('AcademicOperationsPage', () => {
     // Assert
     expect(await screen.findByRole('button', { name: 'Crear facultad' })).toBeVisible()
     expect(screen.getByRole('button', { name: 'Crear lugar' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Vincular unidades' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Vincular lugares' })).toBeDisabled()
   })
 
   it('creates a root site only for an authorized structure writer and reloads the server structure', async () => {
@@ -770,6 +776,72 @@ describe('AcademicOperationsPage', () => {
       sourceReference: 'Acto institucional de prueba',
     }, 'synthetic-structure-token')
     expect(await screen.findByText('Lugar regional de prueba')).toBeVisible()
+    expect(getStructure).toHaveBeenCalledTimes(2)
+  })
+
+  it('creates a dated site hierarchy relation and refreshes the authoritative tree', async () => {
+    // Arrange
+    const user = userEvent.setup()
+    const { AcademicOperationsPage } = await loadPage()
+    const secondSite = {
+      ...structure.sites[0]!,
+      id: '34a06170-9acf-4718-854e-92e945a7db17',
+      code: 'SITE-CAMPUS-PRUEBA',
+      type: 'CAMPUS' as const,
+      displayName: 'Campus de prueba',
+      displayOrder: 2,
+    }
+    const initialStructure: AcademicStructureSnapshot = {
+      ...structure,
+      sites: [...structure.sites, secondSite],
+      siteRelations: [],
+    }
+    const relatedStructure: AcademicStructureSnapshot = {
+      ...initialStructure,
+      siteRelations: [{
+        parentSiteId: structure.sites[0]!.id,
+        childSiteId: secondSite.id,
+        displayOrder: 2,
+        validFrom: '2026-09-30',
+        validThrough: null,
+      }],
+    }
+    const getStructure = vi.fn()
+      .mockResolvedValueOnce(initialStructure)
+      .mockResolvedValueOnce(relatedStructure)
+    const relateSites = vi.fn().mockResolvedValue(undefined)
+    const client = createClient({ getStructure, relateSites })
+    render(
+      <AcademicOperationsPage
+        client={client}
+        loadPrograms={async () => programs}
+        structureAuthorization={{ accessToken: 'synthetic-structure-token', canWrite: true }}
+      />,
+    )
+    await screen.findByText('Campus de prueba')
+    const relationForm = within(screen.getByRole('region', { name: 'Definir jerarquía de lugares' }))
+    await user.selectOptions(relationForm.getByLabelText('Lugar superior'), structure.sites[0]!.id)
+    await user.selectOptions(relationForm.getByLabelText('Lugar subordinado'), secondSite.id)
+    await user.clear(relationForm.getByLabelText('Orden dentro del lugar superior'))
+    await user.type(relationForm.getByLabelText('Orden dentro del lugar superior'), '2')
+    await user.type(relationForm.getByLabelText('Referencia institucional'), 'Resolución de ubicación de prueba')
+
+    // Act
+    await user.click(relationForm.getByRole('button', { name: 'Vincular lugares' }))
+
+    // Assert
+    expect(relateSites).toHaveBeenCalledWith(
+      structure.sites[0]!.id,
+      secondSite.id,
+      {
+        displayOrder: 2,
+        validFrom: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+        validThrough: null,
+        sourceReference: 'Resolución de ubicación de prueba',
+      },
+      'synthetic-structure-token',
+    )
+    expect(await relationForm.findByRole('status')).toHaveTextContent(/relación de lugares registrada/i)
     expect(getStructure).toHaveBeenCalledTimes(2)
   })
 

@@ -83,6 +83,13 @@ export interface AcademicDisplayOrderCommand {
   sourceReference: string
 }
 
+export interface AcademicStructureRelationCreateCommand {
+  displayOrder: number
+  validFrom: string
+  validThrough: string | null
+  sourceReference: string
+}
+
 export interface AcademicStructureEntryCreateCommand<Type extends AcademicOrganizationUnitType | AcademicSiteType> {
   code: string
   type: Type
@@ -101,6 +108,10 @@ export interface AcademicOperationsClient {
   createOrganizationUnit(command: AcademicOrganizationUnitCreateCommand, accessToken: string,
     signal?: AbortSignal): Promise<string>
   createSite(command: AcademicSiteCreateCommand, accessToken: string, signal?: AbortSignal): Promise<string>
+  relateOrganizationUnits(parentUnitId: string, childUnitId: string, command: AcademicStructureRelationCreateCommand,
+    accessToken: string, signal?: AbortSignal): Promise<void>
+  relateSites(parentSiteId: string, childSiteId: string, command: AcademicStructureRelationCreateCommand,
+    accessToken: string, signal?: AbortSignal): Promise<void>
   getOpenPeriods(signal?: AbortSignal): Promise<AcademicPeriod[]>
   getAdminPeriods(accessToken: string, signal?: AbortSignal): Promise<AcademicPeriod[]>
   openPeriod(periodId: string, accessToken: string, signal?: AbortSignal): Promise<AcademicPeriod>

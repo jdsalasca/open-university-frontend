@@ -3,6 +3,7 @@ import type {
   AcademicOperationsClient,
   AcademicOrganizationUnitCreateCommand,
   AcademicSiteCreateCommand,
+  AcademicStructureRelationCreateCommand,
 } from './academicOperationsContracts'
 
 const clientModules = import.meta.glob<typeof import('./academicOperationsClient')>('./academicOperationsClient.ts')
@@ -172,6 +173,85 @@ describe('academic operations client', () => {
     // Assert
     await expect(request).rejects.toMatchObject({ status: 409, message: 'Conflicto de estructura' })
     expect(fetcher).toHaveBeenCalledTimes(1)
+  })
+
+  it.each([
+    ['relateOrganizationUnits', 'fae06170-9acf-4718-854e-92e945a7db17', '127d89c9-a72a-436a-9a90-26da60bc9570',
+      '/api/v1/admin/academic-structure/units/fae06170-9acf-4718-854e-92e945a7db17/children/127d89c9-a72a-436a-9a90-26da60bc9570'],
+    ['relateSites', 'b16116a1-10ba-4d79-839b-4195e4851d73', '34a06170-9acf-4718-854e-92e945a7db17',
+      '/api/v1/admin/academic-structure/sites/b16116a1-10ba-4d79-839b-4195e4851d73/children/34a06170-9acf-4718-854e-92e945a7db17'],
+  ] as const)('creates an audited %s relation and accepts the server 201 response', async (method, parentId, childId, path) => {
+    // Arrange
+    const { createAcademicOperationsClient } = await loadClient()
+    const fetcher = vi.fn().mockResolvedValue(new Response(null, { status: 201 }))
+    const client = createAcademicOperationsClient(fetcher)
+    const command: AcademicStructureRelationCreateCommand = {
+      displayOrder: 2,
+      validFrom: '2026-09-30',
+      validThrough: null,
+      sourceReference: ' Referencia institucional ',
+    }
+
+    // Act
+    if (method === 'relateOrganizationUnits') {
+      await client.relateOrganizationUnits(parentId, childId, command, 'institutional-access-token')
+    } else {
+      await client.relateSites(parentId, childId, command, 'institutional-access-token')
+    }
+
+    // Assert
+    expect(fetcher).toHaveBeenCalledWith(path, {
+      credentials: 'omit',
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        Authorization: 'Bearer institutional-access-token',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        displayOrder: 2,
+        validFrom: '2026-09-30',
+        validThrough: null,
+        sourceReference: 'Referencia institucional',
+      }),
+    })
+  })
+
+  it('rejects self-relations before making a request', async () => {
+    // Arrange
+    const { createAcademicOperationsClient } = await loadClient()
+    const fetcher = vi.fn()
+    const client = createAcademicOperationsClient(fetcher)
+
+    // Act
+    const request = client.relateOrganizationUnits(structure.units[0]!.id, structure.units[0]!.id, {
+      displayOrder: 1,
+      validFrom: '2026-09-30',
+      validThrough: null,
+      sourceReference: 'Referencia institucional',
+    }, 'institutional-access-token')
+
+    // Assert
+    await expect(request).rejects.toThrow(/invalid/i)
+    expect(fetcher).not.toHaveBeenCalled()
+  })
+
+  it('preserves a conflict when a relation would create an invalid hierarchy', async () => {
+    // Arrange
+    const { createAcademicOperationsClient } = await loadClient()
+    const fetcher = vi.fn().mockResolvedValue(jsonResponse({ code: 'academic_structure_conflict', message: 'Conflicto de estructura' }, 409))
+    const client = createAcademicOperationsClient(fetcher)
+
+    // Act
+    const request = client.relateSites(structure.sites[0]!.id, '34a06170-9acf-4718-854e-92e945a7db17', {
+      displayOrder: 1,
+      validFrom: '2026-09-30',
+      validThrough: null,
+      sourceReference: 'Referencia institucional',
+    }, 'institutional-access-token')
+
+    // Assert
+    await expect(request).rejects.toMatchObject({ status: 409, message: 'Conflicto de estructura' })
   })
 
   it('creates an authorized faculty with normalized values and returns its identifier', async () => {

@@ -68,6 +68,8 @@ function emptyAcademicOperationsClient(): AcademicOperationsClient {
       throw new Error('Unexpected organization unit creation')
     },
     createSite: async () => { throw new Error('Unexpected site creation') },
+    relateOrganizationUnits: async () => { throw new Error('Unexpected organization relation creation') },
+    relateSites: async () => { throw new Error('Unexpected site relation creation') },
     getOpenPeriods: async () => [],
     getAdminPeriods: async () => [],
     openPeriod: async () => { throw new Error('Unexpected period opening') },

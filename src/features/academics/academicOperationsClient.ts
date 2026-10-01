@@ -8,6 +8,7 @@ import type {
   AcademicOrganizationRelation,
   AcademicOrganizationUnit,
   AcademicOrganizationUnitType,
+  AcademicStructureRelationCreateCommand,
   AcademicPeriod,
   AcademicPeriodKind,
   AcademicProgramAffiliation,
@@ -56,6 +57,20 @@ export function createAcademicOperationsClient(fetcher: typeof fetch = fetch): A
       const body = await responseBody(response)
       if (!isRecord(body) || !isUuid(body.id)) throw malformedResponse()
       return body.id
+    },
+
+    async relateOrganizationUnits(parentUnitId, childUnitId, command, accessToken, signal) {
+      const path = structureRelationPath('unit', parentUnitId, childUnitId)
+      const response = await fetcher(path,
+        jsonPostRequestOptions(normalizeStructureRelationCommand(command), accessToken, signal))
+      await createdResponse(response)
+    },
+
+    async relateSites(parentSiteId, childSiteId, command, accessToken, signal) {
+      const path = structureRelationPath('site', parentSiteId, childSiteId)
+      const response = await fetcher(path,
+        jsonPostRequestOptions(normalizeStructureRelationCommand(command), accessToken, signal))
+      await createdResponse(response)
     },
 
     async getOpenPeriods(signal) {
@@ -372,6 +387,35 @@ function normalizeStructureEntryCommand<Type extends AcademicOrganizationUnitCre
   }
 }
 
+function normalizeStructureRelationCommand(command: AcademicStructureRelationCreateCommand): AcademicStructureRelationCreateCommand {
+  if (!isRecord(command)
+    || !isNonNegativeInteger(command.displayOrder)
+    || Number(command.displayOrder) > 2_147_483_647
+    || !isDate(command.validFrom)
+    || !(command.validThrough === null || isDate(command.validThrough))
+    || (command.validThrough !== null && command.validThrough < command.validFrom)) {
+    throw new Error('The academic structure relation request is invalid.')
+  }
+  const sourceReference = typeof command.sourceReference === 'string' ? command.sourceReference.trim() : ''
+  if (!isBoundedText(sourceReference, 240) || containsAsciiControlCharacters(sourceReference)) {
+    throw new Error('An institutional source reference is required and must be valid.')
+  }
+  return {
+    displayOrder: command.displayOrder,
+    validFrom: command.validFrom,
+    validThrough: command.validThrough,
+    sourceReference,
+  }
+}
+
+function structureRelationPath(kind: 'unit' | 'site', parentId: string, childId: string): string {
+  if (!isUuid(parentId) || !isUuid(childId) || parentId === childId) {
+    throw new Error('The academic structure relation identifiers are invalid.')
+  }
+  const resource = kind === 'unit' ? 'units' : 'sites'
+  return `/api/v1/admin/academic-structure/${resource}/${parentId}/children/${childId}`
+}
+
 function normalizeOrderCommand(command: AcademicDisplayOrderCommand): AcademicDisplayOrderCommand {
   if (!isRecord(command)
     || !isNonNegativeInteger(command.expectedDisplayOrder)
@@ -394,6 +438,16 @@ function normalizeOrderCommand(command: AcademicDisplayOrderCommand): AcademicDi
 
 async function noContentResponse(response: Response): Promise<void> {
   if (response.status === 204) return
+  await responseBody(response)
+  throw malformedResponse()
+}
+
+async function createdResponse(response: Response): Promise<void> {
+  if (response.status === 201) {
+    const body = await response.text()
+    if (!body) return
+    throw malformedResponse()
+  }
   await responseBody(response)
   throw malformedResponse()
 }

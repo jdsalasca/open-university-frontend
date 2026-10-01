@@ -18,6 +18,7 @@ import type {
 import { AcademicOperationsApiError } from './academicOperationsClient'
 import { containsAsciiControlCharacters } from '../../shared/inputValidation'
 import { CreateFacultyForm, CreateSiteForm } from './CreateFacultyForm'
+import { CreateAcademicStructureRelationForm } from './CreateAcademicStructureRelationForm'
 import './AcademicOperationsPage.scss'
 
 type RequestState = 'loading' | 'ready' | 'error'
@@ -235,7 +236,7 @@ export function AcademicOperationsPage({
     }
   }
 
-  async function refreshStructureAfterEntryCreation(_entryId: string): Promise<void> {
+  async function refreshStructureAfterEntryCreation(_entryId?: string): Promise<void> {
     const refreshed = await client.getStructure()
     setRequestData((current) => current ? { ...current, structure: refreshed } : current)
   }
@@ -322,6 +323,16 @@ export function AcademicOperationsPage({
                   onAuthorizationRejected={onAuthorizationRejected}
                 />
               )}
+              {canChangeStructureOrder && structureAuthorization && (
+                <CreateAcademicStructureRelationForm
+                  kind="unit"
+                  entries={sortedUnits}
+                  client={client}
+                  authorization={structureAuthorization}
+                  onCreated={refreshStructureAfterEntryCreation}
+                  onAuthorizationRejected={onAuthorizationRejected}
+                />
+              )}
               <p className="academic-panel-footnote">La jerarquía y el orden vienen de relaciones institucionales fechadas.</p>
             </section>
 
@@ -341,6 +352,16 @@ export function AcademicOperationsPage({
                   />}
               {canChangeStructureOrder && structureAuthorization && (
                 <CreateSiteForm
+                  client={client}
+                  authorization={structureAuthorization}
+                  onCreated={refreshStructureAfterEntryCreation}
+                  onAuthorizationRejected={onAuthorizationRejected}
+                />
+              )}
+              {canChangeStructureOrder && structureAuthorization && (
+                <CreateAcademicStructureRelationForm
+                  kind="site"
+                  entries={sortedSites}
                   client={client}
                   authorization={structureAuthorization}
                   onCreated={refreshStructureAfterEntryCreation}
