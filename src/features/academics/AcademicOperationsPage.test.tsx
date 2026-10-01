@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { AcademicProgram } from './contracts'
@@ -154,12 +154,14 @@ const structureWithAllOrderTargets: AcademicStructureSnapshot = {
 function createClient(overrides: Partial<AcademicOperationsClient> = {}): AcademicOperationsClient {
   return {
     getStructure: vi.fn().mockResolvedValue(structure),
+    getAdminStructure: vi.fn().mockResolvedValue(structure),
     getOpenPeriods: vi.fn().mockResolvedValue([regularPeriod, intersemester]),
     getAdminPeriods: vi.fn().mockResolvedValue([regularPeriod, intersemester]),
     createOrganizationUnit: vi.fn().mockResolvedValue('34a06170-9acf-4718-854e-92e945a7db17'),
     createSite: vi.fn().mockResolvedValue('94a06170-9acf-4718-854e-92e945a7db17'),
     relateOrganizationUnits: vi.fn().mockResolvedValue(undefined),
     relateSites: vi.fn().mockResolvedValue(undefined),
+    affiliateProgram: vi.fn().mockResolvedValue(undefined),
     openPeriod: vi.fn().mockImplementation(async (_periodId: string, _accessToken: string) => ({
       ...regularPeriod,
       status: 'OPEN',
@@ -357,21 +359,32 @@ describe('AcademicOperationsPage', () => {
     expect(siteChildren.children[3]?.querySelector('.academic-sort-order')).toHaveTextContent('08')
   })
 
-  it('shows audited order controls for every active structure relationship only to writers', async () => {
+  it('shows audited order controls only when administrative read and write permissions are present', async () => {
     // Arrange
     const { AcademicOperationsPage } = await loadPage()
-    const client = createClient({ getStructure: vi.fn().mockResolvedValue(structureWithAllOrderTargets) })
+    const client = createClient({
+      getStructure: vi.fn().mockResolvedValue(structureWithAllOrderTargets),
+      getAdminStructure: vi.fn().mockResolvedValue(structureWithAllOrderTargets),
+    })
     const { rerender } = render(<AcademicOperationsPage client={client} loadPrograms={async () => programs} />)
 
     // Act + Assert: public readers continue to see persisted order without write controls.
     expect(await screen.findByText('Seccional Chiquinquirá')).toBeVisible()
     expect(screen.queryByRole('button', { name: /cambiar orden de/i })).not.toBeInTheDocument()
 
-    // Act: server-resolved structure write permission enables the five supported order targets.
+    // Act: write permission without administrative read cannot expose structure controls.
     rerender(<AcademicOperationsPage
       client={client}
       loadPrograms={async () => programs}
-      structureAuthorization={{ accessToken: 'synthetic-structure-token', canWrite: true }}
+      structureAuthorization={{ accessToken: 'synthetic-structure-token', canRead: false, canWrite: true }}
+    />)
+    expect(screen.queryByRole('button', { name: /cambiar orden de/i })).not.toBeInTheDocument()
+
+    // Act: read and write permissions select the complete administrative structure.
+    rerender(<AcademicOperationsPage
+      client={client}
+      loadPrograms={async () => programs}
+      structureAuthorization={{ accessToken: 'synthetic-structure-token', canRead: true, canWrite: true }}
     />)
 
     // Assert
@@ -399,12 +412,15 @@ describe('AcademicOperationsPage', () => {
     const getStructure = vi.fn()
       .mockResolvedValueOnce(structureWithAllOrderTargets)
       .mockResolvedValueOnce(updatedStructure)
+    const getAdminStructure = vi.fn()
+      .mockResolvedValueOnce(structureWithAllOrderTargets)
+      .mockResolvedValueOnce(updatedStructure)
     const changeOrganizationUnitOrder = vi.fn().mockResolvedValue(undefined)
-    const client = createClient({ getStructure, changeOrganizationUnitOrder })
+    const client = createClient({ getStructure, getAdminStructure, changeOrganizationUnitOrder })
     render(<AcademicOperationsPage
       client={client}
       loadPrograms={async () => programs}
-      structureAuthorization={{ accessToken: 'synthetic-structure-token', canWrite: true }}
+      structureAuthorization={{ accessToken: 'synthetic-structure-token', canRead: true, canWrite: true }}
     />)
 
     // Act
@@ -420,7 +436,7 @@ describe('AcademicOperationsPage', () => {
       { expectedDisplayOrder: 2, displayOrder: 7, sourceReference: 'Resolución 123 de 2026' },
       'synthetic-structure-token',
     )
-    expect(getStructure).toHaveBeenCalledTimes(2)
+    expect(getAdminStructure).toHaveBeenCalledTimes(2)
     expect(await screen.findByText('07')).toBeVisible()
     expect(screen.getByRole('status')).toHaveTextContent(/prioridad actualizada/i)
   })
@@ -438,12 +454,15 @@ describe('AcademicOperationsPage', () => {
     const getStructure = vi.fn()
       .mockResolvedValueOnce(structureWithAllOrderTargets)
       .mockResolvedValueOnce(concurrentStructure)
+    const getAdminStructure = vi.fn()
+      .mockResolvedValueOnce(structureWithAllOrderTargets)
+      .mockResolvedValueOnce(concurrentStructure)
     const changeSiteOrder = vi.fn().mockRejectedValue(new AcademicOperationsApiError(409, 'Conflict'))
-    const client = createClient({ getStructure, changeSiteOrder })
+    const client = createClient({ getStructure, getAdminStructure, changeSiteOrder })
     render(<AcademicOperationsPage
       client={client}
       loadPrograms={async () => programs}
-      structureAuthorization={{ accessToken: 'synthetic-structure-token', canWrite: true }}
+      structureAuthorization={{ accessToken: 'synthetic-structure-token', canRead: true, canWrite: true }}
     />)
 
     // Act
@@ -455,7 +474,7 @@ describe('AcademicOperationsPage', () => {
 
     // Assert
     expect(await screen.findByRole('alert')).toHaveTextContent(/estructura cambió|prioridad cambió/i)
-    expect(getStructure).toHaveBeenCalledTimes(2)
+    expect(getAdminStructure).toHaveBeenCalledTimes(2)
     expect(await screen.findByText('08')).toBeVisible()
     expect(changeSiteOrder).toHaveBeenCalledOnce()
   })
@@ -469,7 +488,7 @@ describe('AcademicOperationsPage', () => {
     render(<AcademicOperationsPage
       client={client}
       loadPrograms={async () => programs}
-      structureAuthorization={{ accessToken: 'synthetic-structure-token', canWrite: true }}
+      structureAuthorization={{ accessToken: 'synthetic-structure-token', canRead: true, canWrite: true }}
     />)
 
     // Act
@@ -652,6 +671,149 @@ describe('AcademicOperationsPage', () => {
     expect(screen.getByRole('status')).toHaveTextContent(/consultando estructura/i)
   })
 
+  it('hides the full administrative structure immediately when its read permission is lost', async () => {
+    // Arrange
+    const { AcademicOperationsPage } = await loadPage()
+    const getStructure = vi.fn()
+      .mockResolvedValueOnce(structure)
+      .mockReturnValueOnce(new Promise<AcademicStructureSnapshot>(() => {}))
+    const getAdminStructure = vi.fn().mockResolvedValue(structureWithOrderedPrograms)
+    const client = createClient({ getStructure, getAdminStructure })
+    const { rerender } = render(<AcademicOperationsPage
+      client={client}
+      loadPrograms={async () => programs}
+      structureAuthorization={{ accessToken: 'synthetic-read-token', canRead: true, canWrite: false }}
+    />)
+    const affiliationTimeline = within(await screen.findByRole('list', { name: 'Vigencias de adscripción' }))
+    expect(affiliationTimeline.getByText('Programa ordenado después')).toBeVisible()
+    expect(screen.queryByRole('button', { name: 'Crear afiliación' })).not.toBeInTheDocument()
+
+    // Act: the remaining public request has not resolved yet, so administrative data must expire immediately.
+    rerender(<AcademicOperationsPage
+      client={client}
+      loadPrograms={async () => programs}
+      structureAuthorization={{ accessToken: 'synthetic-write-token', canRead: false, canWrite: true }}
+    />)
+
+    // Assert
+    expect(screen.queryByRole('button', { name: /cambiar orden de/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent(/consultando estructura/i)
+    expect(getStructure).toHaveBeenCalled()
+  })
+
+  it('revalidates identity when the administrative structure read is rejected', async () => {
+    // Arrange
+    const { AcademicOperationsPage } = await loadPage()
+    const accessToken = 'synthetic-rejected-read-token'
+    const onAuthorizationRejected = vi.fn().mockResolvedValue(undefined)
+    const getAdminStructure = vi.fn().mockRejectedValue(new AcademicOperationsApiError(403, 'Forbidden'))
+    let resolvePublicStructure!: (snapshot: AcademicStructureSnapshot) => void
+    const getStructure = vi.fn().mockReturnValue(new Promise<AcademicStructureSnapshot>((resolve) => {
+      resolvePublicStructure = resolve
+    }))
+    const client = createClient({ getStructure, getAdminStructure })
+    render(<AcademicOperationsPage
+      client={client}
+      loadPrograms={async () => programs}
+      structureAuthorization={{ accessToken, canRead: true, canWrite: true }}
+      onAuthorizationRejected={onAuthorizationRejected}
+    />)
+
+    // Act: keep the public tree pending while authorization is revalidated.
+    await waitFor(() => expect(onAuthorizationRejected).toHaveBeenCalledWith(accessToken))
+
+    // Assert: no stale administration or misleading failure is shown during fallback.
+    expect(screen.getByRole('status')).toHaveTextContent(/consultando estructura/i)
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(screen.queryByRole('list', { name: 'Vigencias de adscripción' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /crear afiliación/i })).not.toBeInTheDocument()
+
+    // The public tree completes without restoring rejected administrative controls.
+    resolvePublicStructure(structure)
+    expect(await screen.findByText('Facultad de Ciencias')).toBeVisible()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(client.getStructure).toHaveBeenCalled()
+  })
+
+  it('does not revalidate identity when a canceled administrative read later returns 403', async () => {
+    // Arrange
+    const { AcademicOperationsPage } = await loadPage()
+    const onAuthorizationRejected = vi.fn().mockResolvedValue(undefined)
+    let rejectAdminStructure!: (reason: unknown) => void
+    let requestSignal: AbortSignal | undefined
+    const getAdminStructure = vi.fn().mockImplementation((_accessToken: string, signal: AbortSignal) => {
+      requestSignal = signal
+      return new Promise<AcademicStructureSnapshot>((_resolve, reject) => {
+        rejectAdminStructure = reject
+      })
+    })
+    const client = createClient({ getAdminStructure })
+    const { unmount } = render(<AcademicOperationsPage
+      client={client}
+      loadPrograms={async () => programs}
+      structureAuthorization={{ accessToken: 'synthetic-obsolete-token', canRead: true, canWrite: true }}
+      onAuthorizationRejected={onAuthorizationRejected}
+    />)
+    await waitFor(() => expect(getAdminStructure).toHaveBeenCalledOnce())
+
+    // Act: the view is canceled before the server's forbidden response arrives.
+    unmount()
+    expect(requestSignal?.aborted).toBe(true)
+    await act(async () => {
+      rejectAdminStructure(new AcademicOperationsApiError(403, 'Forbidden'))
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    // Assert
+    expect(onAuthorizationRejected).not.toHaveBeenCalled()
+  })
+
+  it('cancels an administrative refresh started after a creation when the view unmounts', async () => {
+    // Arrange
+    const user = userEvent.setup()
+    const { AcademicOperationsPage } = await loadPage()
+    let rejectAdminStructure!: (reason: unknown) => void
+    let refreshSignal: AbortSignal | undefined
+    const getAdminStructure = vi.fn()
+      .mockResolvedValueOnce(structure)
+      .mockImplementationOnce((_accessToken: string, signal?: AbortSignal) => {
+        refreshSignal = signal
+        return new Promise<AcademicStructureSnapshot>((_resolve, reject) => {
+          rejectAdminStructure = reject
+        })
+      })
+    const onAuthorizationRejected = vi.fn().mockResolvedValue(undefined)
+    const client = createClient({
+      getAdminStructure,
+      createOrganizationUnit: vi.fn().mockResolvedValue('34a06170-9acf-4718-854e-92e945a7db17'),
+    })
+    const { unmount } = render(<AcademicOperationsPage
+      client={client}
+      loadPrograms={async () => programs}
+      structureAuthorization={{ accessToken: 'synthetic-refresh-token', canRead: true, canWrite: true }}
+      onAuthorizationRejected={onAuthorizationRejected}
+    />)
+    const facultyForm = within(await screen.findByRole('region', { name: 'Registrar facultad raíz' }))
+    await user.type(facultyForm.getByLabelText('Código institucional'), 'fac-prueba')
+    await user.type(facultyForm.getByLabelText('Nombre de la facultad'), 'Facultad de prueba')
+    await user.type(facultyForm.getByLabelText('Referencia institucional'), 'Acta institucional de prueba')
+
+    // Act: create succeeds and starts a follow-up admin read; then leave the view.
+    await user.click(screen.getByRole('button', { name: 'Crear facultad' }))
+    await waitFor(() => expect(getAdminStructure).toHaveBeenCalledTimes(2))
+    unmount()
+    expect(refreshSignal?.aborted).toBe(true)
+    await act(async () => {
+      rejectAdminStructure(new AcademicOperationsApiError(403, 'Forbidden'))
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    // Assert
+    expect(onAuthorizationRejected).not.toHaveBeenCalled()
+  })
+
   it('allows a write-only operator to close a public open period but not open a hidden approved period', async () => {
     // Arrange
     const user = userEvent.setup()
@@ -703,6 +865,7 @@ describe('AcademicOperationsPage', () => {
     expect(await screen.findByText('Facultad de Ciencias')).toBeVisible()
     expect(screen.queryByRole('button', { name: 'Crear facultad' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Crear lugar' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Crear afiliación' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Vincular unidades' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Vincular lugares' })).not.toBeInTheDocument()
 
@@ -711,13 +874,25 @@ describe('AcademicOperationsPage', () => {
       <AcademicOperationsPage
         client={client}
         loadPrograms={async () => programs}
-        structureAuthorization={{ accessToken: 'synthetic-structure-token', canWrite: true }}
+        structureAuthorization={{ accessToken: 'synthetic-structure-token', canRead: false, canWrite: true }}
+      />,
+    )
+
+    // Assert: write permission alone cannot expose a view that cannot refresh the authoritative timeline.
+    expect(screen.queryByRole('button', { name: 'Crear facultad' })).not.toBeInTheDocument()
+
+    rerender(
+      <AcademicOperationsPage
+        client={client}
+        loadPrograms={async () => programs}
+        structureAuthorization={{ accessToken: 'synthetic-structure-token', canRead: true, canWrite: true }}
       />,
     )
 
     // Assert
     expect(await screen.findByRole('button', { name: 'Crear facultad' })).toBeVisible()
     expect(screen.getByRole('button', { name: 'Crear lugar' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Crear afiliación' })).toBeEnabled()
     expect(screen.getByRole('button', { name: 'Vincular unidades' })).toBeVisible()
     expect(screen.getByRole('button', { name: 'Vincular lugares' })).toBeDisabled()
   })
@@ -744,13 +919,16 @@ describe('AcademicOperationsPage', () => {
     const getStructure = vi.fn()
       .mockResolvedValueOnce(structure)
       .mockResolvedValueOnce(updatedStructure)
+    const getAdminStructure = vi.fn()
+      .mockResolvedValueOnce(structure)
+      .mockResolvedValueOnce(updatedStructure)
     const createSite = vi.fn().mockResolvedValue(siteId)
-    const client = createClient({ getStructure, createSite })
+    const client = createClient({ getStructure, getAdminStructure, createSite })
     render(
       <AcademicOperationsPage
         client={client}
         loadPrograms={async () => programs}
-        structureAuthorization={{ accessToken: 'synthetic-structure-token', canWrite: true }}
+        structureAuthorization={{ accessToken: 'synthetic-structure-token', canRead: true, canWrite: true }}
       />,
     )
     await screen.findByText('Sede Central Tunja')
@@ -776,7 +954,7 @@ describe('AcademicOperationsPage', () => {
       sourceReference: 'Acto institucional de prueba',
     }, 'synthetic-structure-token')
     expect(await screen.findByText('Lugar regional de prueba')).toBeVisible()
-    expect(getStructure).toHaveBeenCalledTimes(2)
+    expect(getAdminStructure).toHaveBeenCalledTimes(2)
   })
 
   it('creates a dated site hierarchy relation and refreshes the authoritative tree', async () => {
@@ -809,13 +987,16 @@ describe('AcademicOperationsPage', () => {
     const getStructure = vi.fn()
       .mockResolvedValueOnce(initialStructure)
       .mockResolvedValueOnce(relatedStructure)
+    const getAdminStructure = vi.fn()
+      .mockResolvedValueOnce(initialStructure)
+      .mockResolvedValueOnce(relatedStructure)
     const relateSites = vi.fn().mockResolvedValue(undefined)
-    const client = createClient({ getStructure, relateSites })
+    const client = createClient({ getStructure, getAdminStructure, relateSites })
     render(
       <AcademicOperationsPage
         client={client}
         loadPrograms={async () => programs}
-        structureAuthorization={{ accessToken: 'synthetic-structure-token', canWrite: true }}
+        structureAuthorization={{ accessToken: 'synthetic-structure-token', canRead: true, canWrite: true }}
       />,
     )
     await screen.findByText('Campus de prueba')
@@ -842,7 +1023,7 @@ describe('AcademicOperationsPage', () => {
       'synthetic-structure-token',
     )
     expect(await relationForm.findByRole('status')).toHaveTextContent(/relación de lugares registrada/i)
-    expect(getStructure).toHaveBeenCalledTimes(2)
+    expect(getAdminStructure).toHaveBeenCalledTimes(2)
   })
 
   it('creates a faculty through the protected client and reloads the authoritative structure', async () => {
@@ -867,13 +1048,16 @@ describe('AcademicOperationsPage', () => {
     const getStructure = vi.fn()
       .mockResolvedValueOnce(structure)
       .mockResolvedValueOnce(updatedStructure)
+    const getAdminStructure = vi.fn()
+      .mockResolvedValueOnce(structure)
+      .mockResolvedValueOnce(updatedStructure)
     const createOrganizationUnit = vi.fn().mockResolvedValue(facultyId)
-    const client = createClient({ getStructure, createOrganizationUnit })
+    const client = createClient({ getStructure, getAdminStructure, createOrganizationUnit })
     render(
       <AcademicOperationsPage
         client={client}
         loadPrograms={async () => programs}
-        structureAuthorization={{ accessToken: 'synthetic-structure-token', canWrite: true }}
+        structureAuthorization={{ accessToken: 'synthetic-structure-token', canRead: true, canWrite: true }}
       />,
     )
     await screen.findByText('Facultad de Ciencias')
@@ -900,7 +1084,113 @@ describe('AcademicOperationsPage', () => {
       sourceReference: 'Acuerdo institucional de prueba',
     }, 'synthetic-structure-token')
     expect(await screen.findByText('Facultad de Ciencias Aplicadas')).toBeVisible()
-    expect(getStructure).toHaveBeenCalledTimes(2)
+    expect(getAdminStructure).toHaveBeenCalledTimes(2)
+  })
+
+  it('creates a program affiliation through the protected client and reloads its academic hierarchy', async () => {
+    // Arrange
+    const user = userEvent.setup()
+    const { AcademicOperationsPage } = await loadPage()
+    const updatedStructure: AcademicStructureSnapshot = {
+      ...structure,
+      programAffiliations: [
+        ...structure.programAffiliations,
+        {
+          id: '8a751e5d-65ad-4a33-b48c-d95ae7b07915',
+          programId: programs[1]!.id,
+          organizationUnitId: structure.units[0]!.id,
+          siteId: structure.sites[0]!.id,
+          displayOrder: 3,
+          validFrom: '2027-01-01',
+          validThrough: null,
+          sourceReference: 'Resolución institucional de prueba',
+        },
+      ],
+    }
+    const getAdminStructure = vi.fn()
+      .mockResolvedValueOnce(structure)
+      .mockResolvedValueOnce(updatedStructure)
+    const affiliateProgram = vi.fn().mockResolvedValue(undefined)
+    const client = createClient({ getAdminStructure, affiliateProgram })
+    render(
+      <AcademicOperationsPage
+        client={client}
+        loadPrograms={async () => programs}
+        structureAuthorization={{ accessToken: 'synthetic-structure-token', canRead: true, canWrite: true }}
+      />,
+    )
+    const affiliationForm = within(await screen.findByRole('region', { name: 'Adscribir programa publicado' }))
+    await user.selectOptions(affiliationForm.getByLabelText('Programa publicado'), programs[1]!.id)
+    await user.selectOptions(affiliationForm.getByLabelText('Unidad responsable'), structure.units[0]!.id)
+    await user.selectOptions(affiliationForm.getByLabelText('Lugar de desarrollo'), structure.sites[0]!.id)
+    await user.clear(affiliationForm.getByLabelText('Orden del programa en la unidad'))
+    await user.type(affiliationForm.getByLabelText('Orden del programa en la unidad'), '3')
+    await user.clear(affiliationForm.getByLabelText('Vigente desde'))
+    await user.type(affiliationForm.getByLabelText('Vigente desde'), '2027-01-01')
+    await user.type(affiliationForm.getByLabelText('Referencia institucional'), 'Resolución institucional de prueba')
+
+    // Act
+    await user.click(affiliationForm.getByRole('button', { name: 'Crear afiliación' }))
+
+    // Assert
+    expect(affiliateProgram).toHaveBeenCalledWith(programs[1]!.id, {
+      organizationUnitId: structure.units[0]!.id,
+      siteId: structure.sites[0]!.id,
+      displayOrder: 3,
+      validFrom: '2027-01-01',
+      validThrough: null,
+      sourceReference: 'Resolución institucional de prueba',
+    }, 'synthetic-structure-token')
+    const affiliationTimeline = within(await screen.findByRole('list', { name: 'Vigencias de adscripción' }))
+    expect(affiliationTimeline.getByText('Programa ordenado después')).toBeVisible()
+    expect(affiliationTimeline.getByText(/2027-01-01/)).toBeVisible()
+    expect(affiliationTimeline.getByText(/Fuera de vigencia en la consulta pública/)).toBeVisible()
+    expect(within(screen.getByRole('list', { name: 'Jerarquía académica' }))
+      .queryByText('Programa ordenado después')).not.toBeInTheDocument()
+    expect(getAdminStructure).toHaveBeenCalledTimes(2)
+  })
+
+  it('refreshes the administrative affiliation timeline after a concurrent future affiliation conflict', async () => {
+    // Arrange
+    const user = userEvent.setup()
+    const { AcademicOperationsPage } = await loadPage()
+    const concurrentAffiliation = {
+      ...structure.programAffiliations[0]!,
+      id: 'c4011f06-4a61-42f2-8e28-24b71ff8ee12',
+      programId: programs[1]!.id,
+      validFrom: '2027-02-01',
+      sourceReference: 'Resolución concurrente',
+    }
+    const concurrentStructure = {
+      ...structure,
+      programAffiliations: [...structure.programAffiliations, concurrentAffiliation],
+    }
+    const getAdminStructure = vi.fn()
+      .mockResolvedValueOnce(structure)
+      .mockResolvedValueOnce(concurrentStructure)
+    const affiliateProgram = vi.fn().mockRejectedValue(new AcademicOperationsApiError(409, 'Conflict'))
+    const client = createClient({ getAdminStructure, affiliateProgram })
+    render(<AcademicOperationsPage
+      client={client}
+      loadPrograms={async () => programs}
+      structureAuthorization={{ accessToken: 'synthetic-structure-token', canRead: true, canWrite: true }}
+    />)
+    const form = within(await screen.findByRole('region', { name: 'Adscribir programa publicado' }))
+    await user.selectOptions(form.getByLabelText('Programa publicado'), programs[1]!.id)
+    await user.selectOptions(form.getByLabelText('Unidad responsable'), structure.units[0]!.id)
+    await user.selectOptions(form.getByLabelText('Lugar de desarrollo'), structure.sites[0]!.id)
+    await user.type(form.getByLabelText('Referencia institucional'), 'Referencia de conflicto')
+
+    // Act
+    await user.click(form.getByRole('button', { name: 'Crear afiliación' }))
+
+    // Assert
+    expect(await form.findByRole('alert')).toHaveTextContent(/conflicto.*actualicé la estructura/i)
+    const timeline = within(await screen.findByRole('list', { name: 'Vigencias de adscripción' }))
+    expect(timeline.getByText('Programa ordenado después')).toBeVisible()
+    expect(timeline.getByText(/2027-02-01/)).toBeVisible()
+    expect(affiliateProgram).toHaveBeenCalledOnce()
+    expect(getAdminStructure).toHaveBeenCalledTimes(2)
   })
 
   it('lets the user retry a failed public request', async () => {

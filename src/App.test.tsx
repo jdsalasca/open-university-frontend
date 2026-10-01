@@ -64,12 +64,16 @@ function emptyAcademicOperationsClient(): AcademicOperationsClient {
     getStructure: async () => ({
       units: [], organizationRelations: [], sites: [], siteRelations: [], programAffiliations: [],
     }),
+    getAdminStructure: async () => ({
+      units: [], organizationRelations: [], sites: [], siteRelations: [], programAffiliations: [],
+    }),
     createOrganizationUnit: async (_command: AcademicOrganizationUnitCreateCommand) => {
       throw new Error('Unexpected organization unit creation')
     },
     createSite: async () => { throw new Error('Unexpected site creation') },
     relateOrganizationUnits: async () => { throw new Error('Unexpected organization relation creation') },
     relateSites: async () => { throw new Error('Unexpected site relation creation') },
+    affiliateProgram: async () => { throw new Error('Unexpected program affiliation creation') },
     getOpenPeriods: async () => [],
     getAdminPeriods: async () => [],
     openPeriod: async () => { throw new Error('Unexpected period opening') },
@@ -326,7 +330,7 @@ describe('App', () => {
     expect(openPeriod).toHaveBeenCalledWith(period.id, 'synthetic-access-token')
   })
 
-  it('passes only academic structure write permission to the audited order editor', async () => {
+  it('requires administrative read and write permissions for the audited order editor', async () => {
     // Arrange
     const user = userEvent.setup()
     const unitId = 'fae06170-9acf-4718-854e-92e945a7db17'
@@ -347,6 +351,7 @@ describe('App', () => {
       siteRelations: [],
       programAffiliations: [],
     })
+    operations.getAdminStructure = async (_accessToken) => operations.getStructure()
     const changeOrganizationUnitOrder = vi.fn().mockResolvedValue(undefined)
     operations.changeOrganizationUnitOrder = changeOrganizationUnitOrder
     window.history.replaceState(null, '', '#academia')
@@ -357,12 +362,12 @@ describe('App', () => {
           academicOperationsClient={operations}
           oidcConfiguration={oidcConfiguration}
           identityManager={authenticatedSessionManager()}
-          currentIdentityClient={identityClientWithPermissions(['academic:structure:write'])}
+          currentIdentityClient={identityClientWithPermissions(['academic:structure:read', 'academic:structure:write'])}
         />
       </BrandingProvider>,
     )
 
-    // Act: open the only action authorized by the structure permission.
+    // Act: open an action after the identity grants both structure permissions.
     await user.click(await screen.findByRole('button', { name: 'Cambiar orden de Facultad de Ciencias' }))
     await user.clear(screen.getByLabelText('Nuevo orden de Facultad de Ciencias'))
     await user.type(screen.getByLabelText('Nuevo orden de Facultad de Ciencias'), '6')
@@ -389,7 +394,7 @@ describe('App', () => {
     const user = userEvent.setup()
     const unitId = 'fae06170-9acf-4718-854e-92e945a7db17'
     const identityCurrent = vi.fn()
-      .mockResolvedValueOnce({ subject: 'synthetic-subject', permissions: ['academic:structure:write'] })
+      .mockResolvedValueOnce({ subject: 'synthetic-subject', permissions: ['academic:structure:read', 'academic:structure:write'] })
       .mockImplementationOnce(() => revalidatedIdentity instanceof Error
         ? Promise.reject(revalidatedIdentity)
         : Promise.resolve(revalidatedIdentity))
@@ -411,6 +416,7 @@ describe('App', () => {
       programAffiliations: [],
     })
     operations.getStructure = getStructure
+    operations.getAdminStructure = async (_accessToken) => getStructure()
     operations.changeOrganizationUnitOrder = vi.fn().mockRejectedValue(
       new AcademicOperationsApiError(status, 'Authorization rejected'),
     )

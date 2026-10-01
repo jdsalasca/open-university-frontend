@@ -90,6 +90,11 @@ export interface AcademicStructureRelationCreateCommand {
   sourceReference: string
 }
 
+export interface AcademicProgramAffiliationCreateCommand extends AcademicStructureRelationCreateCommand {
+  organizationUnitId: string
+  siteId: string
+}
+
 export interface AcademicStructureEntryCreateCommand<Type extends AcademicOrganizationUnitType | AcademicSiteType> {
   code: string
   type: Type
@@ -105,6 +110,7 @@ export type AcademicSiteCreateCommand = AcademicStructureEntryCreateCommand<Acad
 
 export interface AcademicOperationsClient {
   getStructure(signal?: AbortSignal): Promise<AcademicStructureSnapshot>
+  getAdminStructure(accessToken: string, signal?: AbortSignal): Promise<AcademicStructureSnapshot>
   createOrganizationUnit(command: AcademicOrganizationUnitCreateCommand, accessToken: string,
     signal?: AbortSignal): Promise<string>
   createSite(command: AcademicSiteCreateCommand, accessToken: string, signal?: AbortSignal): Promise<string>
@@ -112,6 +118,8 @@ export interface AcademicOperationsClient {
     accessToken: string, signal?: AbortSignal): Promise<void>
   relateSites(parentSiteId: string, childSiteId: string, command: AcademicStructureRelationCreateCommand,
     accessToken: string, signal?: AbortSignal): Promise<void>
+  affiliateProgram(programId: string, command: AcademicProgramAffiliationCreateCommand, accessToken: string,
+    signal?: AbortSignal): Promise<void>
   getOpenPeriods(signal?: AbortSignal): Promise<AcademicPeriod[]>
   getAdminPeriods(accessToken: string, signal?: AbortSignal): Promise<AcademicPeriod[]>
   openPeriod(periodId: string, accessToken: string, signal?: AbortSignal): Promise<AcademicPeriod>
@@ -136,5 +144,6 @@ export interface AcademicPeriodAuthorization {
 
 export interface AcademicStructureAuthorization {
   accessToken: string
+  canRead: boolean
   canWrite: boolean
 }

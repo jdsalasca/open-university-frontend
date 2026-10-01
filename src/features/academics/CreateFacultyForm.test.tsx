@@ -36,7 +36,7 @@ describe('CreateFacultyForm', () => {
     render(
       <CreateSiteForm
         client={client}
-        authorization={{ accessToken: 'institutional-access-token', canWrite: true }}
+        authorization={{ accessToken: 'institutional-access-token', canRead: true, canWrite: true }}
         onCreated={onCreated}
       />,
     )
@@ -76,7 +76,7 @@ describe('CreateFacultyForm', () => {
     render(
       <CreateFacultyForm
         client={client}
-        authorization={{ accessToken: 'institutional-access-token', canWrite: true }}
+        authorization={{ accessToken: 'institutional-access-token', canRead: true, canWrite: true }}
         onCreated={onCreated}
       />,
     )
@@ -116,7 +116,7 @@ describe('CreateFacultyForm', () => {
     render(
       <CreateFacultyForm
         client={client}
-        authorization={{ accessToken: 'institutional-access-token', canWrite: true }}
+        authorization={{ accessToken: 'institutional-access-token', canRead: true, canWrite: true }}
         onCreated={onCreated}
       />,
     )
@@ -142,7 +142,7 @@ describe('CreateFacultyForm', () => {
     render(
       <CreateFacultyForm
         client={client}
-        authorization={{ accessToken: 'institutional-access-token', canWrite: true }}
+        authorization={{ accessToken: 'institutional-access-token', canRead: true, canWrite: true }}
         onCreated={vi.fn()}
         onAuthorizationRejected={onAuthorizationRejected}
       />,

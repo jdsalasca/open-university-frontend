@@ -8,6 +8,7 @@ import type {
   AcademicOrganizationRelation,
   AcademicOrganizationUnit,
   AcademicOrganizationUnitType,
+  AcademicProgramAffiliationCreateCommand,
   AcademicStructureRelationCreateCommand,
   AcademicPeriod,
   AcademicPeriodKind,
@@ -43,6 +44,11 @@ export function createAcademicOperationsClient(fetcher: typeof fetch = fetch): A
       return parseAcademicStructure(await responseBody(response))
     },
 
+    async getAdminStructure(accessToken, signal) {
+      const response = await fetcher('/api/v1/admin/academic-structure', authorizedRequestOptions(accessToken, signal))
+      return parseAcademicStructure(await responseBody(response))
+    },
+
     async createOrganizationUnit(command, accessToken, signal) {
       const response = await fetcher('/api/v1/admin/academic-structure/units',
         jsonPostRequestOptions(normalizeStructureEntryCommand(command, UNIT_TYPES), accessToken, signal))
@@ -71,6 +77,16 @@ export function createAcademicOperationsClient(fetcher: typeof fetch = fetch): A
       const response = await fetcher(path,
         jsonPostRequestOptions(normalizeStructureRelationCommand(command), accessToken, signal))
       await createdResponse(response)
+    },
+
+    async affiliateProgram(programId, command, accessToken, signal) {
+      const path = programAffiliationPath(programId)
+      const normalized = normalizeProgramAffiliationCreateCommand(command)
+      const response = await fetcher(path, jsonPostRequestOptions(normalized, accessToken, signal))
+      const body = await responseBody(response)
+      if (!isRecord(body) || !isUuid(body.id) || body.id.toLowerCase() !== programId.toLowerCase()) {
+        throw malformedResponse()
+      }
     },
 
     async getOpenPeriods(signal) {
@@ -419,6 +435,28 @@ function structureRelationPath(kind: 'unit' | 'site', parentId: string, childId:
   }
   const resource = kind === 'unit' ? 'units' : 'sites'
   return `/api/v1/admin/academic-structure/${resource}/${canonicalParentId}/children/${canonicalChildId}`
+}
+
+function programAffiliationPath(programId: string): string {
+  if (!isUuid(programId)) throw new Error('The academic program affiliation identifier is invalid.')
+  return `/api/v1/admin/academic-structure/programs/${programId.toLowerCase()}/affiliations`
+}
+
+function normalizeProgramAffiliationCreateCommand(
+  command: AcademicProgramAffiliationCreateCommand,
+): AcademicProgramAffiliationCreateCommand {
+  if (!isRecord(command) || !isUuid(command.organizationUnitId) || !isUuid(command.siteId)) {
+    throw new Error('The academic program affiliation identifiers are invalid.')
+  }
+  const normalizedRelation = normalizeStructureRelationCommand(command)
+  if (normalizedRelation.displayOrder > 100_000) {
+    throw new Error('The academic program affiliation display order is invalid.')
+  }
+  return {
+    organizationUnitId: command.organizationUnitId.toLowerCase(),
+    siteId: command.siteId.toLowerCase(),
+    ...normalizedRelation,
+  }
 }
 
 function normalizeOrderCommand(command: AcademicDisplayOrderCommand): AcademicDisplayOrderCommand {

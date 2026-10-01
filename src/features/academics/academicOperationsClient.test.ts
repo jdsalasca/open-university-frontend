@@ -275,6 +275,139 @@ describe('academic operations client', () => {
     await expect(request).rejects.toMatchObject({ status: 409, message: 'Conflicto de estructura' })
   })
 
+  it('creates an audited program affiliation using explicit identities and validity', async () => {
+    // Arrange
+    const { createAcademicOperationsClient } = await loadClient()
+    const programId = 'FAE06170-9ACF-4718-854E-92E945A7DB17'
+    const unitId = '127d89c9-a72a-436a-9a90-26da60bc9570'
+    const siteId = '34a06170-9acf-4718-854e-92e945a7db17'
+    const fetcher = vi.fn().mockResolvedValue(jsonResponse({ id: programId.toLowerCase() }, 201))
+    const client = createAcademicOperationsClient(fetcher)
+    const affiliateProgram = Reflect.get(client, 'affiliateProgram') as AcademicOperationsClient['affiliateProgram'] | undefined
+    expect(affiliateProgram).toBeTypeOf('function')
+    if (!affiliateProgram) return
+
+    // Act
+    await affiliateProgram.call(client, programId, {
+      organizationUnitId: unitId,
+      siteId,
+      displayOrder: 4,
+      validFrom: '2026-10-01',
+      validThrough: null,
+      sourceReference: ' Resolución institucional 2026 ',
+    }, 'institutional-access-token')
+
+    // Assert
+    expect(fetcher).toHaveBeenCalledTimes(1)
+    expect(fetcher).toHaveBeenCalledWith(
+      `/api/v1/admin/academic-structure/programs/${programId.toLowerCase()}/affiliations`,
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({ Authorization: 'Bearer institutional-access-token' }),
+        body: JSON.stringify({
+          organizationUnitId: unitId,
+          siteId,
+          displayOrder: 4,
+          validFrom: '2026-10-01',
+          validThrough: null,
+          sourceReference: 'Resolución institucional 2026',
+        }),
+      }),
+    )
+  })
+
+  it('rejects an invalid program affiliation before sending a request', async () => {
+    // Arrange
+    const { createAcademicOperationsClient } = await loadClient()
+    const fetcher = vi.fn()
+    const client = createAcademicOperationsClient(fetcher)
+    const affiliateProgram = Reflect.get(client, 'affiliateProgram') as AcademicOperationsClient['affiliateProgram'] | undefined
+    expect(affiliateProgram).toBeTypeOf('function')
+    if (!affiliateProgram) return
+
+    // Act
+    const request = affiliateProgram.call(client, 'invalid-program-id', {
+      organizationUnitId: 'invalid-unit-id',
+      siteId: 'invalid-site-id',
+      displayOrder: -1,
+      validFrom: '2026-10-01',
+      validThrough: '2026-09-30',
+      sourceReference: 'Referencia institucional',
+    }, 'institutional-access-token')
+
+    // Assert
+    await expect(request).rejects.toThrow(/invalid|valid/i)
+    expect(fetcher).not.toHaveBeenCalled()
+  })
+
+  it('rejects program affiliation order above the database limit before sending a request', async () => {
+    // Arrange
+    const { createAcademicOperationsClient } = await loadClient()
+    const fetcher = vi.fn()
+    const client = createAcademicOperationsClient(fetcher)
+
+    // Act
+    const request = client.affiliateProgram('fae06170-9acf-4718-854e-92e945a7db17', {
+      organizationUnitId: '127d89c9-a72a-436a-9a90-26da60bc9570',
+      siteId: '34a06170-9acf-4718-854e-92e945a7db17',
+      displayOrder: 100_001,
+      validFrom: '2026-10-01',
+      validThrough: null,
+      sourceReference: 'Referencia institucional',
+    }, 'institutional-access-token')
+
+    // Assert
+    await expect(request).rejects.toThrow(/display order/i)
+    expect(fetcher).not.toHaveBeenCalled()
+  })
+
+  it('preserves program affiliation conflicts from the server', async () => {
+    // Arrange
+    const { createAcademicOperationsClient } = await loadClient()
+    const programId = 'fae06170-9acf-4718-854e-92e945a7db17'
+    const fetcher = vi.fn().mockResolvedValue(jsonResponse({ code: 'academic_structure_conflict', message: 'Conflicto de estructura' }, 409))
+    const client = createAcademicOperationsClient(fetcher)
+    const affiliateProgram = Reflect.get(client, 'affiliateProgram') as AcademicOperationsClient['affiliateProgram'] | undefined
+    expect(affiliateProgram).toBeTypeOf('function')
+    if (!affiliateProgram) return
+
+    // Act
+    const request = affiliateProgram.call(client, programId, {
+      organizationUnitId: '127d89c9-a72a-436a-9a90-26da60bc9570',
+      siteId: '34a06170-9acf-4718-854e-92e945a7db17',
+      displayOrder: 0,
+      validFrom: '2026-10-01',
+      validThrough: null,
+      sourceReference: 'Referencia institucional',
+    }, 'institutional-access-token')
+
+    // Assert
+    await expect(request).rejects.toMatchObject({ status: 409, message: 'Conflicto de estructura' })
+    expect(fetcher).toHaveBeenCalledTimes(1)
+  })
+
+  it('rejects a created program affiliation response for a different program', async () => {
+    // Arrange
+    const { createAcademicOperationsClient } = await loadClient()
+    const programId = 'fae06170-9acf-4718-854e-92e945a7db17'
+    const fetcher = vi.fn().mockResolvedValue(jsonResponse({ id: '8a751e5d-65ad-4a33-b48c-d95ae7b07915' }, 201))
+    const client = createAcademicOperationsClient(fetcher)
+
+    // Act
+    const request = client.affiliateProgram(programId, {
+      organizationUnitId: '127d89c9-a72a-436a-9a90-26da60bc9570',
+      siteId: '34a06170-9acf-4718-854e-92e945a7db17',
+      displayOrder: 0,
+      validFrom: '2026-10-01',
+      validThrough: null,
+      sourceReference: 'Referencia institucional',
+    }, 'institutional-access-token')
+
+    // Assert
+    await expect(request).rejects.toThrow(/invalid|malformed/i)
+    expect(fetcher).toHaveBeenCalledTimes(1)
+  })
+
   it('creates an authorized faculty with normalized values and returns its identifier', async () => {
     // Arrange
     const { createAcademicOperationsClient } = await loadClient()
@@ -401,6 +534,32 @@ describe('academic operations client', () => {
     expect(fetcher).toHaveBeenNthCalledWith(2, '/api/v1/academic-periods', {
       credentials: 'omit',
       headers: { Accept: 'application/json' },
+      signal,
+    })
+  })
+
+  it('loads the administrative structure snapshot with the read permission bearer token', async () => {
+    // Arrange
+    const { createAcademicOperationsClient } = await loadClient()
+    const futureStructure = {
+      ...structure,
+      programAffiliations: [{
+        ...structure.programAffiliations[0]!,
+        validFrom: '2027-01-01',
+      }],
+    }
+    const fetcher = vi.fn().mockResolvedValue(jsonResponse(futureStructure))
+    const client = createAcademicOperationsClient(fetcher)
+    const signal = new AbortController().signal
+
+    // Act
+    const result = await client.getAdminStructure('institutional-read-token', signal)
+
+    // Assert
+    expect(result.programAffiliations[0]?.validFrom).toBe('2027-01-01')
+    expect(fetcher).toHaveBeenCalledWith('/api/v1/admin/academic-structure', {
+      credentials: 'omit',
+      headers: { Accept: 'application/json', Authorization: 'Bearer institutional-read-token' },
       signal,
     })
   })

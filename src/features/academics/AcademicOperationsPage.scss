@@ -84,6 +84,16 @@
 .academic-program-node small { margin-left: auto; color: #9a9b93; font-size: 8px; }
 .academic-unattached-programs { margin-top: 14px; padding: 11px 12px; border: 1px dashed #e5d8aa; border-radius: 8px; background: #fffcf1; }
 .academic-unattached-programs > p { margin: 0 0 5px; color: #7b6a30; font-size: 8px; font-weight: 700; }
+.academic-affiliation-timeline { margin-top: 15px; padding-top: 13px; border-top: 1px solid #ecece6; }
+.academic-affiliation-timeline h3 { margin: 0 0 9px; color: #4a4b43; font-family: Georgia, 'Times New Roman', serif; font-size: 14px; font-weight: 500; }
+.academic-affiliation-timeline ul { display: grid; gap: 7px; margin: 0; padding: 0; list-style: none; }
+.academic-affiliation-timeline li { display: grid; gap: 5px; padding: 10px 11px; border: 1px solid #e9e9e2; border-radius: 8px; background: #fcfcf9; color: #686960; font-size: 9px; }
+.academic-affiliation-row-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.academic-affiliation-row-heading strong { color: #34352e; font-size: 10px; font-weight: 650; }
+.academic-affiliation-row-heading > span { flex: 0 0 auto; padding: 4px 6px; border-radius: 5px; background: #edf3ed; color: #4c6f55; font-size: 7px; font-weight: 700; }
+.academic-affiliation-row-heading > span.is-outside-current { background: #f4f1e6; color: #77662e; }
+.academic-affiliation-timeline li p, .academic-affiliation-timeline li small { margin: 0; color: #77786f; font-size: 8px; line-height: 1.5; }
+.academic-affiliation-timeline li small { color: #92938b; }
 
 .academic-site-tree { display: grid; gap: 8px; }
 .academic-site-node > ul { display: grid; gap: 6px; margin: 6px 0 0 21px; padding-left: 13px; border-left: 1px solid #dfe7e0; }
@@ -197,6 +207,7 @@
   .academic-create-entry-form { grid-template-columns: minmax(0, 1fr); }
   .academic-create-entry-reference, .academic-create-entry-actions { grid-column: auto; }
   .academic-program-node small { margin-left: 0; }
+  .academic-affiliation-row-heading { flex-wrap: wrap; }
 }
 
 @media (prefers-reduced-motion: reduce) {

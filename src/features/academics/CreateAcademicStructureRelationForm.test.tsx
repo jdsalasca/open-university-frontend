@@ -75,7 +75,7 @@ describe('CreateAcademicStructureRelationForm', () => {
         kind="unit"
         entries={units}
         client={client}
-        authorization={{ accessToken: 'institutional-access-token', canWrite: true }}
+        authorization={{ accessToken: 'institutional-access-token', canRead: true, canWrite: true }}
         onCreated={onCreated}
       />,
     )
@@ -115,7 +115,7 @@ describe('CreateAcademicStructureRelationForm', () => {
         kind="site"
         entries={sites}
         client={client}
-        authorization={{ accessToken: 'institutional-access-token', canWrite: true }}
+        authorization={{ accessToken: 'institutional-access-token', canRead: true, canWrite: true }}
         onCreated={onCreated}
       />,
     )
@@ -156,7 +156,7 @@ describe('CreateAcademicStructureRelationForm', () => {
         kind="site"
         entries={sites}
         client={client}
-        authorization={{ accessToken: 'institutional-access-token', canWrite: true }}
+        authorization={{ accessToken: 'institutional-access-token', canRead: true, canWrite: true }}
         onCreated={vi.fn()}
       />,
     )
@@ -186,7 +186,7 @@ describe('CreateAcademicStructureRelationForm', () => {
         kind="site"
         entries={sites}
         client={client}
-        authorization={{ accessToken: 'institutional-access-token', canWrite: true }}
+        authorization={{ accessToken: 'institutional-access-token', canRead: true, canWrite: true }}
         onCreated={onCreated}
       />,
     )

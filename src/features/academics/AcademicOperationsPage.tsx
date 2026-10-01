@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
 import { academicCatalogClient } from './academicCatalogClient'
 import type { AcademicProgram } from './contracts'
@@ -19,11 +19,14 @@ import { AcademicOperationsApiError } from './academicOperationsClient'
 import { containsAsciiControlCharacters } from '../../shared/inputValidation'
 import { CreateFacultyForm, CreateSiteForm } from './CreateFacultyForm'
 import { CreateAcademicStructureRelationForm } from './CreateAcademicStructureRelationForm'
+import { CreateAcademicProgramAffiliationForm } from './CreateAcademicProgramAffiliationForm'
 import './AcademicOperationsPage.scss'
 
 type RequestState = 'loading' | 'ready' | 'error'
 type RequestData = {
   structure: AcademicStructureSnapshot
+  administrativeStructure: AcademicStructureSnapshot | null
+  structureSource: 'public' | 'admin'
   periods: AcademicPeriod[]
   periodSource: 'public' | 'admin'
   programs: AcademicProgram[]
@@ -59,7 +62,50 @@ export function AcademicOperationsPage({
   const [pendingPeriodId, setPendingPeriodId] = useState<string | null>(null)
   const [periodActionMessage, setPeriodActionMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [structureOrderMessage, setStructureOrderMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
-  const canChangeStructureOrder = structureAuthorization?.canWrite === true
+  const [rejectedStructureAccessToken, setRejectedStructureAccessToken] = useState<string | null>(null)
+  const structureAccessToken = structureAuthorization?.accessToken
+  const canReadStructure = structureAuthorization?.canRead === true
+    && structureAccessToken !== rejectedStructureAccessToken
+  const canManageStructure = canReadStructure && structureAuthorization?.canWrite === true
+  const structureLifecycleControllerRef = useRef<AbortController | null>(null)
+  const currentStructureAuthorizationRef = useRef({ accessToken: structureAccessToken, canRead: canReadStructure })
+
+  useLayoutEffect(() => {
+    currentStructureAuthorizationRef.current = { accessToken: structureAccessToken, canRead: canReadStructure }
+  }, [canReadStructure, structureAccessToken])
+
+  useEffect(() => {
+    const controller = new AbortController()
+    structureLifecycleControllerRef.current = controller
+    return () => {
+      controller.abort()
+      if (structureLifecycleControllerRef.current === controller) structureLifecycleControllerRef.current = null
+    }
+  }, [])
+
+  const loadStructure = useCallback(async (signal?: AbortSignal): Promise<{
+    current: AcademicStructureSnapshot
+    administrative: AcademicStructureSnapshot | null
+  }> => {
+    const requestSignal = signal ?? structureLifecycleControllerRef.current?.signal
+    const currentRequest = client.getStructure(requestSignal)
+    if (!canReadStructure || !structureAccessToken) {
+      return { current: await currentRequest, administrative: null }
+    }
+    const administrativeRequest = client.getAdminStructure(structureAccessToken, requestSignal).catch((error: unknown) => {
+      if (requestSignal?.aborted
+        || currentStructureAuthorizationRef.current.accessToken !== structureAccessToken
+        || !currentStructureAuthorizationRef.current.canRead) throw error
+      if (error instanceof AcademicOperationsApiError && (error.status === 401 || error.status === 403)) {
+        setRejectedStructureAccessToken(structureAccessToken)
+        void Promise.resolve(onAuthorizationRejected?.(structureAccessToken)).catch(() => undefined)
+        return null
+      }
+      throw error
+    })
+    const [current, administrative] = await Promise.all([currentRequest, administrativeRequest])
+    return { current, administrative }
+  }, [canReadStructure, client, onAuthorizationRejected, structureAccessToken])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -67,12 +113,19 @@ export function AcademicOperationsPage({
       ? client.getAdminPeriods(authorization.accessToken, controller.signal)
       : client.getOpenPeriods(controller.signal)
     Promise.all([
-      client.getStructure(controller.signal),
+      loadStructure(controller.signal),
       periodRequest,
       loadPrograms(controller.signal),
     ])
-      .then(([structure, periods, programs]) => {
-        setRequestData({ structure, periods, programs, periodSource: authorization?.canRead ? 'admin' : 'public' })
+      .then(([structures, periods, programs]) => {
+        setRequestData({
+          structure: structures.current,
+          administrativeStructure: structures.administrative,
+          structureSource: structures.administrative ? 'admin' : 'public',
+          periods,
+          programs,
+          periodSource: authorization?.canRead ? 'admin' : 'public',
+        })
         setRequestState('ready')
       })
       .catch(() => {
@@ -80,11 +133,14 @@ export function AcademicOperationsPage({
         setRequestState('error')
       })
     return () => controller.abort()
-  }, [authorization?.accessToken, authorization?.canRead, client, loadPrograms, retryNumber])
+  }, [authorization?.accessToken, authorization?.canRead, canReadStructure, client, loadPrograms, loadStructure, retryNumber])
 
   const administrativeDataExpired = requestData?.periodSource === 'admin' && authorization?.canRead !== true
-  const visibleRequestData = administrativeDataExpired ? null : requestData
-  const visibleRequestState = administrativeDataExpired && requestState === 'ready' ? 'loading' : requestState
+  const administrativeStructureExpired = requestData?.structureSource === 'admin' && !canReadStructure
+  const visibleRequestData = administrativeDataExpired || administrativeStructureExpired ? null : requestData
+  const visibleRequestState = (administrativeDataExpired || administrativeStructureExpired) && requestState === 'ready'
+    ? 'loading'
+    : requestState
 
   const sortedUnits = useMemo(() => visibleRequestData
     ? [...visibleRequestData.structure.units].filter((unit) => unit.status === 'ACTIVE').sort(compareUnits)
@@ -175,7 +231,9 @@ export function AcademicOperationsPage({
     displayOrder: number,
     sourceReference: string,
   ): Promise<void> {
-    if (!structureAuthorization?.canWrite) throw new Error('La escritura de estructura requiere autorización institucional.')
+    if (!canManageStructure || !structureAuthorization) {
+      throw new Error('La administración de estructura requiere permisos institucionales de lectura y escritura.')
+    }
     const command: AcademicDisplayOrderCommand = {
       expectedDisplayOrder: target.expectedDisplayOrder,
       displayOrder,
@@ -204,8 +262,13 @@ export function AcademicOperationsPage({
       }
       if (error instanceof AcademicOperationsApiError && error.status === 409) {
         try {
-          const refreshed = await client.getStructure()
-          setRequestData((current) => current ? { ...current, structure: refreshed } : current)
+          const refreshed = await loadStructure()
+          setRequestData((current) => current ? {
+            ...current,
+            structure: refreshed.current,
+            administrativeStructure: refreshed.administrative,
+            structureSource: refreshed.administrative ? 'admin' : 'public',
+          } : current)
           setStructureOrderMessage({
             type: 'error',
             text: 'La prioridad cambió mientras editabas. Actualicé la estructura; revisa el orden antes de volver a guardar.',
@@ -224,8 +287,13 @@ export function AcademicOperationsPage({
     }
 
     try {
-      const refreshed = await client.getStructure()
-      setRequestData((current) => current ? { ...current, structure: refreshed } : current)
+      const refreshed = await loadStructure()
+      setRequestData((current) => current ? {
+        ...current,
+        structure: refreshed.current,
+        administrativeStructure: refreshed.administrative,
+        structureSource: refreshed.administrative ? 'admin' : 'public',
+      } : current)
       setStructureOrderMessage({ type: 'success', text: 'Prioridad actualizada desde la estructura del servidor.' })
     } catch {
       setRequestState('error')
@@ -237,8 +305,13 @@ export function AcademicOperationsPage({
   }
 
   async function refreshStructureAfterEntryCreation(_entryId?: string): Promise<void> {
-    const refreshed = await client.getStructure()
-    setRequestData((current) => current ? { ...current, structure: refreshed } : current)
+    const refreshed = await loadStructure()
+    setRequestData((current) => current ? {
+      ...current,
+      structure: refreshed.current,
+      administrativeStructure: refreshed.administrative,
+      structureSource: refreshed.administrative ? 'admin' : 'public',
+    } : current)
   }
 
   return (
@@ -269,9 +342,11 @@ export function AcademicOperationsPage({
         <span aria-hidden="true">i</span>
         <p><strong>{authorization?.canWrite ? 'Control explícito del periodo.' : 'Vista de consulta.'}</strong> {authorization?.canWrite
           ? 'Abrir o cerrar solo cambia el estado del periodo; no publica oferta de asignaturas ni abre matrícula. El semestre de una malla curricular es distinto del periodo académico real.'
-          : 'Los cambios de estado requieren permiso institucional de escritura. El semestre de una malla curricular es distinto del periodo académico real.'} {structureAuthorization?.canWrite
-            ? 'La prioridad menor aparece primero; cada corrección requiere una referencia institucional y queda auditada.'
-            : 'La corrección del orden requiere permiso institucional de estructura.'}</p>
+          : 'Los cambios de estado requieren permiso institucional de escritura. El semestre de una malla curricular es distinto del periodo académico real.'} {canManageStructure
+            ? 'El árbol presenta la vigencia actual y la lista administrativa conserva afiliaciones futuras e históricas; la prioridad menor aparece primero y cada corrección requiere una referencia auditada.'
+            : canReadStructure
+              ? 'La consulta administrativa muestra la vigencia completa de las afiliaciones; el árbol sigue representando la estructura vigente. La escritura requiere permiso adicional.'
+              : 'La administración de la estructura requiere permisos institucionales de lectura y escritura. Sin lectura administrativa se muestra solo el árbol público vigente.'}</p>
       </div>
 
       {structureOrderMessage && (
@@ -312,10 +387,10 @@ export function AcademicOperationsPage({
                     affiliations={visibleRequestData.structure.programAffiliations}
                     programs={programById}
                     sites={sortedSites}
-                    canChangeOrder={canChangeStructureOrder}
+                    canChangeOrder={canManageStructure}
                     onSaveOrder={saveStructureOrder}
                   />}
-              {canChangeStructureOrder && structureAuthorization && (
+              {canManageStructure && structureAuthorization && (
                 <CreateFacultyForm
                   client={client}
                   authorization={structureAuthorization}
@@ -323,7 +398,7 @@ export function AcademicOperationsPage({
                   onAuthorizationRejected={onAuthorizationRejected}
                 />
               )}
-              {canChangeStructureOrder && structureAuthorization && (
+              {canManageStructure && structureAuthorization && (
                 <CreateAcademicStructureRelationForm
                   kind="unit"
                   entries={sortedUnits}
@@ -347,10 +422,10 @@ export function AcademicOperationsPage({
                 : <SiteTree
                     sites={sortedSites}
                     relations={visibleRequestData.structure.siteRelations}
-                    canChangeOrder={canChangeStructureOrder}
+                    canChangeOrder={canManageStructure}
                     onSaveOrder={saveStructureOrder}
                   />}
-              {canChangeStructureOrder && structureAuthorization && (
+              {canManageStructure && structureAuthorization && (
                 <CreateSiteForm
                   client={client}
                   authorization={structureAuthorization}
@@ -358,7 +433,7 @@ export function AcademicOperationsPage({
                   onAuthorizationRejected={onAuthorizationRejected}
                 />
               )}
-              {canChangeStructureOrder && structureAuthorization && (
+              {canManageStructure && structureAuthorization && (
                 <CreateAcademicStructureRelationForm
                   kind="site"
                   entries={sortedSites}
@@ -371,6 +446,33 @@ export function AcademicOperationsPage({
               <p className="academic-panel-footnote">Las sedes se administran aparte de las facultades.</p>
             </section>
           </div>
+
+          {canReadStructure && visibleRequestData.administrativeStructure && (
+            <section className="academic-panel academic-affiliation-panel" aria-labelledby="academic-affiliations-title">
+              <header className="academic-panel-heading">
+                <span className="academic-panel-icon academic-icon-units" aria-hidden="true">↗</span>
+                <div><p className="academic-panel-kicker">ADSCRIPCIÓN INSTITUCIONAL</p><h2 id="academic-affiliations-title">Programas, unidades y lugares</h2></div>
+                <span className="academic-panel-count">{visibleRequestData.administrativeStructure.programAffiliations.length.toString().padStart(2, '0')}</span>
+              </header>
+              {canManageStructure && structureAuthorization && (
+                <CreateAcademicProgramAffiliationForm
+                  programs={visibleRequestData.programs}
+                  units={sortedUnits}
+                  sites={sortedSites}
+                  client={client}
+                  authorization={structureAuthorization}
+                  onCreated={refreshStructureAfterEntryCreation}
+                  onAuthorizationRejected={onAuthorizationRejected}
+                />
+              )}
+              <ProgramAffiliationTimeline
+                snapshot={visibleRequestData.administrativeStructure}
+                currentAffiliationIds={new Set(visibleRequestData.structure.programAffiliations.map(({ id }) => id))}
+                programs={programById}
+              />
+              <p className="academic-panel-footnote">El árbol usa la vigencia actual; esta lista registra todas las afiliaciones con su intervalo y procedencia. Los nombres históricos del catálogo no se convierten en relaciones.</p>
+            </section>
+          )}
 
           <section className="academic-panel academic-periods-panel" aria-labelledby="academic-periods-title">
             <header className="academic-panel-heading">
@@ -553,6 +655,59 @@ function ProgramNode({
         </>
       )}
     </li>
+  )
+}
+
+function ProgramAffiliationTimeline({
+  snapshot,
+  currentAffiliationIds,
+  programs,
+}: {
+  snapshot: AcademicStructureSnapshot
+  currentAffiliationIds: ReadonlySet<string>
+  programs: Map<string, AcademicProgram>
+}) {
+  const unitById = new Map(snapshot.units.map((unit) => [unit.id, unit]))
+  const siteById = new Map(snapshot.sites.map((site) => [site.id, site]))
+  const affiliations = [...snapshot.programAffiliations].sort((first, second) => {
+    const firstProgram = programs.get(first.programId)?.programCode ?? first.programId
+    const secondProgram = programs.get(second.programId)?.programCode ?? second.programId
+    return firstProgram.localeCompare(secondProgram) || first.validFrom.localeCompare(second.validFrom)
+      || first.id.localeCompare(second.id)
+  })
+
+  return (
+    <div className="academic-affiliation-timeline">
+      <h3 id="academic-affiliation-timeline-title">Vigencias de adscripción</h3>
+      {affiliations.length === 0
+        ? <p className="academic-empty-state">No hay adscripciones registradas.</p>
+        : <ul aria-labelledby="academic-affiliation-timeline-title">
+            {affiliations.map((affiliation) => {
+              const program = programs.get(affiliation.programId)
+              const unit = unitById.get(affiliation.organizationUnitId)
+              const site = siteById.get(affiliation.siteId)
+              const current = currentAffiliationIds.has(affiliation.id)
+              return (
+                <li key={affiliation.id}>
+                  <div className="academic-affiliation-row-heading">
+                    <strong>{program?.programName ?? `Programa ${affiliation.programId}`}</strong>
+                    <span className={current ? 'is-current' : 'is-outside-current'}>
+                      {current ? 'Vigente en la consulta pública' : 'Fuera de vigencia en la consulta pública'}
+                    </span>
+                  </div>
+                  <p>{unit?.displayName ?? `Unidad ${affiliation.organizationUnitId}`}
+                    <span aria-hidden="true"> · </span>
+                    {site?.displayName ?? `Lugar ${affiliation.siteId}`}</p>
+                  <p>Vigencia: <time dateTime={affiliation.validFrom}>{affiliation.validFrom}</time>
+                    {' — '}{affiliation.validThrough
+                      ? <time dateTime={affiliation.validThrough}>{affiliation.validThrough}</time>
+                      : 'sin fecha de cierre'}</p>
+                  <small>Prioridad {affiliation.displayOrder} · {affiliation.sourceReference}</small>
+                </li>
+              )
+            })}
+          </ul>}
+    </div>
   )
 }
 

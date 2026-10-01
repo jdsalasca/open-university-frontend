@@ -1,4 +1,4 @@
-import { Component, lazy, Suspense, useEffect, useState } from 'react'
+import { Component, lazy, Suspense, useCallback, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { academicCatalogClient } from './features/academics/academicCatalogClient'
 import type { AcademicCatalogClient, AcademicCatalogPermission } from './features/academics/contracts'
@@ -114,14 +114,16 @@ function ApplicationShell({
   const structureAuthorization: AcademicStructureAuthorization | null = authenticatedIdentity
     ? {
       accessToken: authenticatedIdentity.accessToken,
+      canRead: authenticatedIdentity.permissions.includes('academic:structure:read')
+        && authenticatedIdentity.accessToken !== rejectedStructureAccessToken,
       canWrite: authenticatedIdentity.permissions.includes('academic:structure:write')
         && authenticatedIdentity.accessToken !== rejectedStructureAccessToken,
     }
     : null
-  async function revalidateRejectedStructureAccess(accessToken: string): Promise<void> {
+  const revalidateRejectedStructureAccess = useCallback(async (accessToken: string): Promise<void> => {
     setRejectedStructureAccessToken(accessToken)
     await retry()
-  }
+  }, [retry])
   const sessionLabel = identity.status === 'authenticated' ? 'Sesión institucional activa'
     : identity.status === 'loading' ? 'Verificando sesión…'
       : identity.status === 'unconfigured' ? 'Acceso institucional pendiente de configuración'

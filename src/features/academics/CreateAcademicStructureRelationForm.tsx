@@ -6,6 +6,7 @@ import type {
   AcademicStructureRelationCreateCommand,
 } from './academicOperationsContracts'
 import { AcademicOperationsApiError } from './academicOperationsClient'
+import { localDateInputValue } from '../../shared/localDateInput'
 
 interface RelationFormSharedProps {
   entries: Array<{ id: string; code: string; displayName: string }>
@@ -37,18 +38,12 @@ interface RelationDraft {
 
 type Feedback = { type: 'success' | 'error' | 'warning'; text: string }
 
-function localDate(): string {
-  const now = new Date()
-  const local = new Date(now.getTime() - now.getTimezoneOffset() * 60_000)
-  return local.toISOString().slice(0, 10)
-}
-
 function emptyRelationDraft(): RelationDraft {
   return {
     parentId: '',
     childId: '',
     displayOrder: '0',
-    validFrom: localDate(),
+    validFrom: localDateInputValue(),
     validThrough: '',
     sourceReference: '',
   }

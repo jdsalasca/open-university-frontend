@@ -6,6 +6,7 @@ import type {
   AcademicStructureAuthorization,
 } from './academicOperationsContracts'
 import { AcademicOperationsApiError } from './academicOperationsClient'
+import { localDateInputValue } from '../../shared/localDateInput'
 
 interface SharedCreateEntryProps {
   authorization: AcademicStructureAuthorization
@@ -42,19 +43,13 @@ const siteTypeOptions: Array<{ value: AcademicSiteType; label: string }> = [
   { value: 'OTHER', label: 'Otro lugar' },
 ]
 
-function localDate(): string {
-  const now = new Date()
-  const local = new Date(now.getTime() - now.getTimezoneOffset() * 60_000)
-  return local.toISOString().slice(0, 10)
-}
-
 function emptyEntryDraft(): EntryDraft {
   return {
     code: '',
     siteType: '',
     displayName: '',
     displayOrder: '0',
-    validFrom: localDate(),
+    validFrom: localDateInputValue(),
     validThrough: '',
     sourceReference: '',
   }
@@ -135,7 +130,7 @@ function AcademicStructureEntryForm({
     }
 
     setDraft(emptyEntryDraft())
-    const futureEffectiveDate = command.validFrom > localDate()
+    const futureEffectiveDate = command.validFrom > localDateInputValue()
     const registeredEntity = isFaculty ? 'Facultad' : 'Lugar'
     setFeedback({
       type: 'success',
