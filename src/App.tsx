@@ -4,7 +4,11 @@ import { academicCatalogClient } from './features/academics/academicCatalogClien
 import type { AcademicCatalogClient, AcademicCatalogPermission } from './features/academics/contracts'
 import { AcademicOperationsPage } from './features/academics/AcademicOperationsPage'
 import { academicOperationsClient } from './features/academics/academicOperationsClient'
-import type { AcademicOperationsClient, AcademicPeriodAuthorization } from './features/academics/academicOperationsContracts'
+import type {
+  AcademicOperationsClient,
+  AcademicPeriodAuthorization,
+  AcademicStructureAuthorization,
+} from './features/academics/academicOperationsContracts'
 import { useBranding } from './features/branding/useBranding'
 import { VisualIdentityCenter } from './features/branding/VisualIdentityCenter'
 import { IdentityProvider } from './features/identity/IdentityProvider'
@@ -93,6 +97,12 @@ function ApplicationShell({
       accessToken: authenticatedIdentity.accessToken,
       canRead: authenticatedIdentity.permissions.includes('academic:period:read'),
       canWrite: authenticatedIdentity.permissions.includes('academic:period:write'),
+    }
+    : null
+  const structureAuthorization: AcademicStructureAuthorization | null = authenticatedIdentity
+    ? {
+      accessToken: authenticatedIdentity.accessToken,
+      canWrite: authenticatedIdentity.permissions.includes('academic:structure:write'),
     }
     : null
   const sessionLabel = identity.status === 'authenticated' ? 'Sesión institucional activa'
@@ -215,6 +225,7 @@ function ApplicationShell({
                 client={operationsClient}
                 loadPrograms={catalogClient.listPrograms}
                 authorization={periodAuthorization}
+                structureAuthorization={structureAuthorization}
               />
               : <VisualIdentityCenter
                 key={identityCenterKey}

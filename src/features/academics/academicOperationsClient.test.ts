@@ -244,6 +244,75 @@ describe('academic operations client', () => {
     })
   })
 
+  it('changes all five structure order targets through audited conditional PATCH requests', async () => {
+    // Arrange
+    const { createAcademicOperationsClient } = await loadClient()
+    const unitId = structure.units[0]!.id
+    const childUnitId = structure.units[1]!.id
+    const siteId = structure.sites[0]!.id
+    const programId = structure.programAffiliations[0]!.programId
+    const affiliationId = structure.programAffiliations[0]!.id
+    const command = { expectedDisplayOrder: 3, displayOrder: 9, sourceReference: 'Resolución institucional 123' }
+    const fetcher = vi.fn().mockResolvedValue(new Response(null, { status: 204 }))
+    const client = createAcademicOperationsClient(fetcher)
+    const signal = new AbortController().signal
+
+    // Act
+    await client.changeOrganizationUnitOrder(unitId, command, 'synthetic-access-token', signal)
+    await client.changeSiteOrder(siteId, command, 'synthetic-access-token', signal)
+    await client.changeOrganizationRelationOrder(unitId, childUnitId, command, 'synthetic-access-token', signal)
+    await client.changeSiteRelationOrder(siteId, 'bb783bf7-0fbb-48d5-9c49-17240492ef6e', command,
+      'synthetic-access-token', signal)
+    await client.changeProgramAffiliationOrder(programId, affiliationId, command, 'synthetic-access-token', signal)
+
+    // Assert
+    const expectedPaths = [
+      `/api/v1/admin/academic-structure/units/${unitId}/order`,
+      `/api/v1/admin/academic-structure/sites/${siteId}/order`,
+      `/api/v1/admin/academic-structure/units/${unitId}/children/${childUnitId}/order`,
+      `/api/v1/admin/academic-structure/sites/${siteId}/children/bb783bf7-0fbb-48d5-9c49-17240492ef6e/order`,
+      `/api/v1/admin/academic-structure/programs/${programId}/affiliations/${affiliationId}/order`,
+    ]
+    expect(fetcher).toHaveBeenCalledTimes(expectedPaths.length)
+    expectedPaths.forEach((path, index) => {
+      expect(fetcher).toHaveBeenNthCalledWith(index + 1, path, {
+        credentials: 'omit',
+        method: 'PATCH',
+        headers: {
+          Accept: 'application/json',
+          Authorization: 'Bearer synthetic-access-token',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(command),
+        signal,
+      })
+    })
+  })
+
+  it('rejects invalid order commands locally and exposes a concurrent edit as a conflict', async () => {
+    // Arrange
+    const { AcademicOperationsApiError, createAcademicOperationsClient } = await loadClient()
+    const fetcher = vi.fn().mockResolvedValue(jsonResponse({ message: 'Order changed since it was read.' }, 409))
+    const client = createAcademicOperationsClient(fetcher)
+    const validCommand = { expectedDisplayOrder: 3, displayOrder: 9, sourceReference: 'Acto institucional 123' }
+
+    // Act + Assert: invalid paths, values and references fail before a request is sent.
+    await expect(client.changeSiteOrder('invalid-id', validCommand, 'synthetic-access-token')).rejects.toThrow(/malformed/i)
+    await expect(client.changeSiteOrder(structure.sites[0]!.id, { ...validCommand, displayOrder: 100_001 },
+      'synthetic-access-token')).rejects.toThrow(/order/i)
+    await expect(client.changeSiteOrder(structure.sites[0]!.id, { ...validCommand, sourceReference: '  ' },
+      'synthetic-access-token')).rejects.toThrow(/reference/i)
+    expect(fetcher).not.toHaveBeenCalled()
+
+    // Act: a stale expected value is rejected by the server.
+    const action = client.changeSiteOrder(structure.sites[0]!.id, validCommand, 'synthetic-access-token')
+
+    // Assert
+    await expect(action).rejects.toBeInstanceOf(AcademicOperationsApiError)
+    await expect(action).rejects.toMatchObject({ status: 409 })
+    expect(fetcher).toHaveBeenCalledOnce()
+  })
+
   it('rejects blank credentials and a transition response with the wrong status', async () => {
     // Arrange
     const { createAcademicOperationsClient } = await loadClient()

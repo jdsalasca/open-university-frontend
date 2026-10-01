@@ -66,6 +66,11 @@ function emptyAcademicOperationsClient(): AcademicOperationsClient {
     getAdminPeriods: async () => [],
     openPeriod: async () => { throw new Error('Unexpected period opening') },
     closePeriod: async () => { throw new Error('Unexpected period closing') },
+    changeOrganizationUnitOrder: async () => { throw new Error('Unexpected unit order change') },
+    changeSiteOrder: async () => { throw new Error('Unexpected site order change') },
+    changeOrganizationRelationOrder: async () => { throw new Error('Unexpected organization relation order change') },
+    changeSiteRelationOrder: async () => { throw new Error('Unexpected site relation order change') },
+    changeProgramAffiliationOrder: async () => { throw new Error('Unexpected program affiliation order change') },
   }
 }
 
@@ -295,5 +300,57 @@ describe('App', () => {
     // Assert
     expect(getAdminPeriods).toHaveBeenCalledWith('synthetic-access-token', expect.any(AbortSignal))
     expect(openPeriod).toHaveBeenCalledWith(period.id, 'synthetic-access-token')
+  })
+
+  it('passes only academic structure write permission to the audited order editor', async () => {
+    // Arrange
+    const user = userEvent.setup()
+    const unitId = 'fae06170-9acf-4718-854e-92e945a7db17'
+    const operations = emptyAcademicOperationsClient()
+    operations.getStructure = vi.fn().mockResolvedValue({
+      units: [{
+        id: unitId,
+        code: 'FAC-CIENCIAS',
+        type: 'FACULTY',
+        displayName: 'Facultad de Ciencias',
+        displayOrder: 2,
+        status: 'ACTIVE',
+        validFrom: '2026-01-01',
+        validThrough: null,
+      }],
+      organizationRelations: [],
+      sites: [],
+      siteRelations: [],
+      programAffiliations: [],
+    })
+    const changeOrganizationUnitOrder = vi.fn().mockResolvedValue(undefined)
+    operations.changeOrganizationUnitOrder = changeOrganizationUnitOrder
+    window.history.replaceState(null, '', '#academia')
+    render(
+      <BrandingProvider loader={async () => DEFAULT_BRANDING}>
+        <App
+          catalogClient={emptyAcademicCatalogClient()}
+          academicOperationsClient={operations}
+          oidcConfiguration={oidcConfiguration}
+          identityManager={authenticatedSessionManager()}
+          currentIdentityClient={identityClientWithPermissions(['academic:structure:write'])}
+        />
+      </BrandingProvider>,
+    )
+
+    // Act: open the only action authorized by the structure permission.
+    await user.click(await screen.findByRole('button', { name: 'Cambiar orden de Facultad de Ciencias' }))
+    await user.clear(screen.getByLabelText('Nuevo orden de Facultad de Ciencias'))
+    await user.type(screen.getByLabelText('Nuevo orden de Facultad de Ciencias'), '6')
+    await user.type(screen.getByLabelText('Referencia institucional de Facultad de Ciencias'), 'Resolución 456')
+    await user.click(screen.getByRole('button', { name: 'Guardar orden de Facultad de Ciencias' }))
+
+    // Assert: structure ordering receives the resolved bearer within its own permission scope.
+    expect(changeOrganizationUnitOrder).toHaveBeenCalledWith(
+      unitId,
+      { expectedDisplayOrder: 2, displayOrder: 6, sourceReference: 'Resolución 456' },
+      'synthetic-access-token',
+    )
+    expect(screen.queryByRole('button', { name: /abrir periodo|cerrar periodo/i })).not.toBeInTheDocument()
   })
 })

@@ -91,6 +91,20 @@
 .academic-site-pin { display: grid; flex: 0 0 28px; width: 28px; height: 28px; place-items: center; border-radius: 7px; background: #eef4ef; color: #57725e; font-size: 14px; }
 .academic-site-row > div { display: grid; min-width: 0; gap: 4px; }
 
+.academic-order-editor { flex: 0 1 auto; min-width: 0; }
+.academic-order-edit-button { min-height: 29px; padding: 0 9px; border: 1px solid #d9dfd6; border-radius: 6px; background: #f7f9f6; color: #435c48; font: inherit; font-size: 8px; font-weight: 700; cursor: pointer; }
+.academic-order-edit-button:hover { border-color: #9db3a0; background: #eef4ee; }
+.academic-order-form { display: grid; gap: 6px; width: min(100%, 260px); min-width: 0; padding: 10px; border: 1px solid #dce4d9; border-radius: 8px; background: #fbfcfa; box-shadow: 0 5px 16px #20211d0a; }
+.academic-order-form label { color: #52574d; font-size: 8px; font-weight: 700; line-height: 1.4; }
+.academic-order-form input { box-sizing: border-box; width: 100%; min-width: 0; min-height: 32px; padding: 6px 8px; border: 1px solid #d9ddd5; border-radius: 5px; background: #fff; color: tokens.$identity-ink; font: inherit; font-size: 10px; }
+.academic-order-form input:disabled { background: #f1f2ee; color: #77786f; }
+.academic-order-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 3px; }
+.academic-order-actions button { min-height: 29px; padding: 0 9px; border: 1px solid #465947; border-radius: 5px; background: #465947; color: #fff; font: inherit; font-size: 8px; font-weight: 700; cursor: pointer; }
+.academic-order-actions button.secondary { border-color: #d3d7ce; background: #fff; color: #55564e; }
+.academic-order-edit-button:focus-visible, .academic-order-form input:focus-visible, .academic-order-actions button:focus-visible { @include tokens.focus-ring; }
+.academic-order-edit-button:disabled, .academic-order-actions button:disabled { opacity: .55; cursor: wait; }
+.academic-order-form [role='alert'] { margin: 2px 0 0; color: #965347; font-size: 8px; line-height: 1.5; }
+
 .academic-periods-panel { margin-top: 14px; }
 .academic-open-badge { display: inline-flex; align-items: center; gap: 7px; margin-left: auto; padding: 6px 8px; border: 1px solid #dbe8dd; border-radius: 6px; color: #597861; font-size: 8px; white-space: nowrap; }
 .academic-open-badge > span { width: 5px; height: 5px; border-radius: 50%; background: #78b184; }
@@ -157,6 +171,10 @@
   .academic-open-badge { padding: 5px 6px; font-size: 7px; }
   .academic-load-error { align-items: stretch; flex-direction: column; }
   .academic-load-error button { width: 100%; }
+  .academic-unit-row, .academic-site-row, .academic-program-node { flex-wrap: wrap; }
+  .academic-order-editor { max-width: 100%; }
+  .academic-order-form { width: min(100%, 260px); }
+  .academic-program-node small { margin-left: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {

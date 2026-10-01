@@ -1,5 +1,6 @@
 import type {
   AcademicEntityStatus,
+  AcademicDisplayOrderCommand,
   AcademicOperationsClient,
   AcademicOrganizationRelation,
   AcademicOrganizationUnit,
@@ -56,6 +57,41 @@ export function createAcademicOperationsClient(fetcher: typeof fetch = fetch): A
     async closePeriod(periodId, accessToken, signal) {
       const response = await fetcher(periodActionPath(periodId, 'close'), postRequestOptions(accessToken, signal))
       return parseTransitionResponse(await responseBody(response), 'CLOSED')
+    },
+
+    async changeOrganizationUnitOrder(unitId, command, accessToken, signal) {
+      await noContentResponse(await fetcher(
+        structureOrderPath('unit', unitId),
+        orderRequestOptions(command, accessToken, signal),
+      ))
+    },
+
+    async changeSiteOrder(siteId, command, accessToken, signal) {
+      await noContentResponse(await fetcher(
+        structureOrderPath('site', siteId),
+        orderRequestOptions(command, accessToken, signal),
+      ))
+    },
+
+    async changeOrganizationRelationOrder(parentUnitId, childUnitId, command, accessToken, signal) {
+      await noContentResponse(await fetcher(
+        structureOrderPath('organization-relation', parentUnitId, childUnitId),
+        orderRequestOptions(command, accessToken, signal),
+      ))
+    },
+
+    async changeSiteRelationOrder(parentSiteId, childSiteId, command, accessToken, signal) {
+      await noContentResponse(await fetcher(
+        structureOrderPath('site-relation', parentSiteId, childSiteId),
+        orderRequestOptions(command, accessToken, signal),
+      ))
+    },
+
+    async changeProgramAffiliationOrder(programId, affiliationId, command, accessToken, signal) {
+      await noContentResponse(await fetcher(
+        structureOrderPath('program-affiliation', programId, affiliationId),
+        orderRequestOptions(command, accessToken, signal),
+      ))
     },
   }
 }
@@ -249,6 +285,69 @@ function authorizedRequestOptions(accessToken: string, signal?: AbortSignal): Re
 
 function postRequestOptions(accessToken: string, signal?: AbortSignal): RequestInit {
   return { ...authorizedRequestOptions(accessToken, signal), method: 'POST' }
+}
+
+function orderRequestOptions(
+  command: AcademicDisplayOrderCommand,
+  accessToken: string,
+  signal?: AbortSignal,
+): RequestInit {
+  const normalizedCommand = normalizeOrderCommand(command)
+  return {
+    credentials: 'omit',
+    method: 'PATCH',
+    headers: {
+      Accept: 'application/json',
+      Authorization: `Bearer ${requireAccessToken(accessToken)}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(normalizedCommand),
+    ...(signal ? { signal } : {}),
+  }
+}
+
+function normalizeOrderCommand(command: AcademicDisplayOrderCommand): AcademicDisplayOrderCommand {
+  if (!isRecord(command)
+    || !isNonNegativeInteger(command.expectedDisplayOrder)
+    || !isNonNegativeInteger(command.displayOrder)
+    || Number(command.displayOrder) > 100_000) {
+    throw new Error('The academic structure order request is invalid.')
+  }
+  if (typeof command.sourceReference !== 'string'
+    || command.sourceReference.trim().length === 0
+    || command.sourceReference.trim().length > 240
+    || containsAsciiControlCharacters(command.sourceReference.trim())) {
+    throw new Error('An institutional source reference is required and must be valid.')
+  }
+  return {
+    expectedDisplayOrder: command.expectedDisplayOrder,
+    displayOrder: command.displayOrder,
+    sourceReference: command.sourceReference.trim(),
+  }
+}
+
+async function noContentResponse(response: Response): Promise<void> {
+  if (response.status === 204) return
+  await responseBody(response)
+  throw malformedResponse()
+}
+
+function structureOrderPath(kind: 'unit' | 'site' | 'organization-relation' | 'site-relation' | 'program-affiliation',
+  primaryId: string, secondaryId?: string): string {
+  if (!isUuid(primaryId) || (secondaryId !== undefined && !isUuid(secondaryId))) throw malformedResponse()
+  switch (kind) {
+    case 'unit': return `/api/v1/admin/academic-structure/units/${primaryId}/order`
+    case 'site': return `/api/v1/admin/academic-structure/sites/${primaryId}/order`
+    case 'organization-relation':
+      if (!secondaryId) throw malformedResponse()
+      return `/api/v1/admin/academic-structure/units/${primaryId}/children/${secondaryId}/order`
+    case 'site-relation':
+      if (!secondaryId) throw malformedResponse()
+      return `/api/v1/admin/academic-structure/sites/${primaryId}/children/${secondaryId}/order`
+    case 'program-affiliation':
+      if (!secondaryId) throw malformedResponse()
+      return `/api/v1/admin/academic-structure/programs/${primaryId}/affiliations/${secondaryId}/order`
+  }
 }
 
 function periodActionPath(periodId: string, action: 'open' | 'close'): string {

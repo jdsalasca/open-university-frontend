@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
-import type { ReactNode } from 'react'
+import type { FormEvent, ReactNode } from 'react'
 import { academicCatalogClient } from './academicCatalogClient'
 import type { AcademicProgram } from './contracts'
 import { academicOperationsClient } from './academicOperationsClient'
 import type {
+  AcademicDisplayOrderCommand,
   AcademicOperationsClient,
   AcademicOrganizationUnit,
   AcademicPeriod,
@@ -11,8 +12,11 @@ import type {
   AcademicPeriodStatus,
   AcademicProgramAffiliation,
   AcademicSite,
+  AcademicStructureAuthorization,
   AcademicStructureSnapshot,
 } from './academicOperationsContracts'
+import { AcademicOperationsApiError } from './academicOperationsClient'
+import { containsAsciiControlCharacters } from '../../shared/inputValidation'
 import './AcademicOperationsPage.scss'
 
 type RequestState = 'loading' | 'ready' | 'error'
@@ -22,11 +26,18 @@ type RequestData = {
   periodSource: 'public' | 'admin'
   programs: AcademicProgram[]
 }
+type StructureOrderTarget =
+  | { kind: 'unit'; unitId: string; expectedDisplayOrder: number }
+  | { kind: 'site'; siteId: string; expectedDisplayOrder: number }
+  | { kind: 'organization-relation'; parentUnitId: string; childUnitId: string; expectedDisplayOrder: number }
+  | { kind: 'site-relation'; parentSiteId: string; childSiteId: string; expectedDisplayOrder: number }
+  | { kind: 'program-affiliation'; programId: string; affiliationId: string; expectedDisplayOrder: number }
 
 interface AcademicOperationsPageProps {
   client?: AcademicOperationsClient
   loadPrograms?: (signal?: AbortSignal) => Promise<AcademicProgram[]>
   authorization?: AcademicPeriodAuthorization | null
+  structureAuthorization?: AcademicStructureAuthorization | null
 }
 
 const defaultLoadPrograms = (signal?: AbortSignal) => academicCatalogClient.listPrograms(signal)
@@ -35,6 +46,7 @@ export function AcademicOperationsPage({
   client = academicOperationsClient,
   loadPrograms = defaultLoadPrograms,
   authorization = null,
+  structureAuthorization = null,
 }: AcademicOperationsPageProps) {
   const [requestState, setRequestState] = useState<RequestState>('loading')
   const [requestData, setRequestData] = useState<RequestData | null>(null)
@@ -42,6 +54,7 @@ export function AcademicOperationsPage({
   const [periodConfirmation, setPeriodConfirmation] = useState<{ id: string; action: 'open' | 'close' } | null>(null)
   const [pendingPeriodId, setPendingPeriodId] = useState<string | null>(null)
   const [periodActionMessage, setPeriodActionMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [structureOrderMessage, setStructureOrderMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -114,6 +127,55 @@ export function AcademicOperationsPage({
     }
   }
 
+  async function saveStructureOrder(
+    target: StructureOrderTarget,
+    displayOrder: number,
+    sourceReference: string,
+  ): Promise<void> {
+    if (!structureAuthorization?.canWrite) throw new Error('La escritura de estructura requiere autorización institucional.')
+    const command: AcademicDisplayOrderCommand = {
+      expectedDisplayOrder: target.expectedDisplayOrder,
+      displayOrder,
+      sourceReference,
+    }
+    setStructureOrderMessage(null)
+    try {
+      await submitStructureOrder(client, target, command, structureAuthorization.accessToken)
+    } catch (error) {
+      if (error instanceof AcademicOperationsApiError && error.status === 409) {
+        try {
+          const refreshed = await client.getStructure()
+          setRequestData((current) => current ? { ...current, structure: refreshed } : current)
+          setStructureOrderMessage({
+            type: 'error',
+            text: 'La prioridad cambió mientras editabas. Actualicé la estructura; revisa el orden antes de volver a guardar.',
+          })
+          return
+        } catch {
+          setRequestState('error')
+          setStructureOrderMessage({
+            type: 'error',
+            text: 'La prioridad cambió y no fue posible actualizar la estructura. Vuelve a cargar la vista antes de continuar.',
+          })
+          return
+        }
+      }
+      throw error
+    }
+
+    try {
+      const refreshed = await client.getStructure()
+      setRequestData((current) => current ? { ...current, structure: refreshed } : current)
+      setStructureOrderMessage({ type: 'success', text: 'Prioridad actualizada desde la estructura del servidor.' })
+    } catch {
+      setRequestState('error')
+      setStructureOrderMessage({
+        type: 'error',
+        text: 'El servidor aceptó el cambio, pero no pude actualizar la vista. Recarga para confirmar el orden antes de seguir.',
+      })
+    }
+  }
+
   return (
     <div className="academic-operations">
       <section className="academic-operations-hero" aria-labelledby="academic-operations-title">
@@ -142,8 +204,17 @@ export function AcademicOperationsPage({
         <span aria-hidden="true">i</span>
         <p><strong>{authorization?.canWrite ? 'Control explícito del periodo.' : 'Vista de consulta.'}</strong> {authorization?.canWrite
           ? 'Abrir o cerrar solo cambia el estado del periodo; no publica oferta de asignaturas ni abre matrícula. El semestre de una malla curricular es distinto del periodo académico real.'
-          : 'Los cambios de estado requieren permiso institucional de escritura. El semestre de una malla curricular es distinto del periodo académico real.'}</p>
+          : 'Los cambios de estado requieren permiso institucional de escritura. El semestre de una malla curricular es distinto del periodo académico real.'} {structureAuthorization?.canWrite
+            ? 'La prioridad menor aparece primero; cada corrección requiere una referencia institucional y queda auditada.'
+            : 'La corrección del orden requiere permiso institucional de estructura.'}</p>
       </div>
+
+      {structureOrderMessage && (
+        <p className={`academic-period-action-message is-${structureOrderMessage.type}`}
+          role={structureOrderMessage.type === 'error' ? 'alert' : 'status'}>
+          {structureOrderMessage.text}
+        </p>
+      )}
 
       {visibleRequestState === 'loading' && (
         <div className="academic-loading" role="status">
@@ -176,6 +247,8 @@ export function AcademicOperationsPage({
                     affiliations={visibleRequestData.structure.programAffiliations}
                     programs={programById}
                     sites={sortedSites}
+                    canChangeOrder={structureAuthorization?.canWrite === true}
+                    onSaveOrder={saveStructureOrder}
                   />}
               <p className="academic-panel-footnote">La jerarquía y el orden vienen de relaciones institucionales fechadas.</p>
             </section>
@@ -188,7 +261,12 @@ export function AcademicOperationsPage({
               </header>
               {sortedSites.length === 0
                 ? <p className="academic-empty-state">No hay sedes cargadas en la estructura vigente.</p>
-                : <SiteTree sites={sortedSites} relations={visibleRequestData.structure.siteRelations} />}
+                : <SiteTree
+                    sites={sortedSites}
+                    relations={visibleRequestData.structure.siteRelations}
+                    canChangeOrder={structureAuthorization?.canWrite === true}
+                    onSaveOrder={saveStructureOrder}
+                  />}
               <p className="academic-panel-footnote">Las sedes se administran aparte de las facultades.</p>
             </section>
           </div>
@@ -230,12 +308,16 @@ function OrganizationTree({
   affiliations,
   programs,
   sites,
+  canChangeOrder,
+  onSaveOrder,
 }: {
   units: AcademicOrganizationUnit[]
   relations: AcademicStructureSnapshot['organizationRelations']
   affiliations: AcademicProgramAffiliation[]
   programs: Map<string, AcademicProgram>
   sites: AcademicSite[]
+  canChangeOrder: boolean
+  onSaveOrder(target: StructureOrderTarget, displayOrder: number, sourceReference: string): Promise<void>
 }) {
   const unitById = new Map(units.map((unit) => [unit.id, unit]))
   const siteById = new Map(sites.map((site) => [site.id, site]))
@@ -262,7 +344,7 @@ function OrganizationTree({
   function renderUnit(
     unit: AcademicOrganizationUnit,
     ancestors: ReadonlySet<string>,
-    displayOrder: number,
+    orderTarget: StructureOrderTarget,
   ): ReactNode {
     if (ancestors.has(unit.id)) return null
     const nextAncestors = new Set(ancestors).add(unit.id)
@@ -279,14 +361,34 @@ function OrganizationTree({
         <div className="academic-unit-row">
           <span className={'academic-unit-type academic-unit-type-' + unit.type.toLocaleLowerCase('en-US')}>{labelUnitType(unit.type)}</span>
           <div className="academic-unit-copy"><strong>{unit.displayName}</strong><small>{unit.code}</small></div>
-          <span className="academic-sort-order">{String(displayOrder).padStart(2, '0')}</span>
+          <span className="academic-sort-order">{String(orderTarget.expectedDisplayOrder).padStart(2, '0')}</span>
+          <OrderEditor
+            key={structureOrderTargetKey(orderTarget) + `:${orderTarget.expectedDisplayOrder}:${canChangeOrder}`}
+            label={unit.displayName}
+            displayOrder={orderTarget.expectedDisplayOrder}
+            canChangeOrder={canChangeOrder}
+            target={orderTarget}
+            onSave={onSaveOrder}
+          />
         </div>
         {(children.length > 0 || unitPrograms.length > 0) && (
           <ul className="academic-tree-children">
             {unitPrograms.map(({ affiliation, program }) => (
-              <ProgramNode key={affiliation.id} program={program} site={siteById.get(affiliation.siteId)} />
+              <ProgramNode
+                key={affiliation.id}
+                program={program}
+                site={siteById.get(affiliation.siteId)}
+                affiliation={affiliation}
+                canChangeOrder={canChangeOrder}
+                onSaveOrder={onSaveOrder}
+              />
             ))}
-            {children.map(({ relation, unit: child }) => renderUnit(child, nextAncestors, relation.displayOrder))}
+            {children.map(({ relation, unit: child }) => renderUnit(child, nextAncestors, {
+              kind: 'organization-relation',
+              parentUnitId: relation.parentUnitId,
+              childUnitId: relation.childUnitId,
+              expectedDisplayOrder: relation.displayOrder,
+            }))}
           </ul>
         )}
       </li>
@@ -296,7 +398,11 @@ function OrganizationTree({
   return (
     <div className="academic-tree-wrap">
       <ul className="academic-tree" aria-label="Jerarquía académica">
-        {roots.map((root) => renderUnit(root, new Set(), root.displayOrder))}
+        {roots.map((root) => renderUnit(root, new Set(), {
+          kind: 'unit',
+          unitId: root.id,
+          expectedDisplayOrder: root.displayOrder,
+        }))}
       </ul>
       {unattachedPrograms.length > 0 && (
         <div className="academic-unattached-programs">
@@ -308,13 +414,43 @@ function OrganizationTree({
   )
 }
 
-function ProgramNode({ program, site }: { program: AcademicProgram; site?: AcademicSite }) {
+function ProgramNode({
+  program,
+  site,
+  affiliation,
+  canChangeOrder = false,
+  onSaveOrder,
+}: {
+  program: AcademicProgram
+  site?: AcademicSite
+  affiliation?: AcademicProgramAffiliation
+  canChangeOrder?: boolean
+  onSaveOrder?: (target: StructureOrderTarget, displayOrder: number, sourceReference: string) => Promise<void>
+}) {
   return (
     <li className="academic-program-node">
       <span className="academic-program-mark" aria-hidden="true">↳</span>
       <span className="academic-program-code">{program.programCode}</span>
       <span>{program.programName}</span>
       <small>{site ? `${site.displayName} · ${site.code}` : 'Adscripción territorial pendiente'}</small>
+      {affiliation && (
+        <>
+          <span className="academic-sort-order">{String(affiliation.displayOrder).padStart(2, '0')}</span>
+          {onSaveOrder && <OrderEditor
+            key={`${affiliation.id}:${affiliation.displayOrder}:${canChangeOrder}`}
+            label={program.programName}
+            displayOrder={affiliation.displayOrder}
+            canChangeOrder={canChangeOrder}
+            target={{
+              kind: 'program-affiliation',
+              programId: affiliation.programId,
+              affiliationId: affiliation.id,
+              expectedDisplayOrder: affiliation.displayOrder,
+            }}
+            onSave={onSaveOrder}
+          />}
+        </>
+      )}
     </li>
   )
 }
@@ -322,9 +458,13 @@ function ProgramNode({ program, site }: { program: AcademicProgram; site?: Acade
 function SiteTree({
   sites,
   relations,
+  canChangeOrder,
+  onSaveOrder,
 }: {
   sites: AcademicSite[]
   relations: AcademicStructureSnapshot['siteRelations']
+  canChangeOrder: boolean
+  onSaveOrder(target: StructureOrderTarget, displayOrder: number, sourceReference: string): Promise<void>
 }) {
   const byId = new Map(sites.map((site) => [site.id, site]))
   const childrenByParent = new Map<string, { relation: AcademicStructureSnapshot['siteRelations'][number]; site: AcademicSite }[]>()
@@ -344,7 +484,7 @@ function SiteTree({
   function renderSite(
     site: AcademicSite,
     ancestors: ReadonlySet<string>,
-    displayOrder: number,
+    orderTarget: StructureOrderTarget,
   ): ReactNode {
     if (ancestors.has(site.id)) return null
     const nextAncestors = new Set(ancestors).add(site.id)
@@ -354,14 +494,129 @@ function SiteTree({
         <div className="academic-site-row">
           <span className="academic-site-pin" aria-hidden="true">⌖</span>
           <div><strong>{site.displayName}</strong><small>{site.code} · {labelSiteType(site.type)}</small></div>
-          <span className="academic-sort-order">{String(displayOrder).padStart(2, '0')}</span>
+          <span className="academic-sort-order">{String(orderTarget.expectedDisplayOrder).padStart(2, '0')}</span>
+          <OrderEditor
+            key={structureOrderTargetKey(orderTarget) + `:${orderTarget.expectedDisplayOrder}:${canChangeOrder}`}
+            label={site.displayName}
+            displayOrder={orderTarget.expectedDisplayOrder}
+            canChangeOrder={canChangeOrder}
+            target={orderTarget}
+            onSave={onSaveOrder}
+          />
         </div>
-        {children.length > 0 && <ul>{children.map(({ relation, site: child }) => renderSite(child, nextAncestors, relation.displayOrder))}</ul>}
+        {children.length > 0 && <ul>{children.map(({ relation, site: child }) => renderSite(child, nextAncestors, {
+          kind: 'site-relation',
+          parentSiteId: relation.parentSiteId,
+          childSiteId: relation.childSiteId,
+          expectedDisplayOrder: relation.displayOrder,
+        }))}</ul>}
       </li>
     )
   }
 
-  return <ul className="academic-site-tree" aria-label="Jerarquía de sedes">{roots.map((root) => renderSite(root, new Set(), root.displayOrder))}</ul>
+  return <ul className="academic-site-tree" aria-label="Jerarquía de sedes">{roots.map((root) => renderSite(root, new Set(), {
+    kind: 'site',
+    siteId: root.id,
+    expectedDisplayOrder: root.displayOrder,
+  }))}</ul>
+}
+
+function OrderEditor({
+  target,
+  label,
+  displayOrder,
+  canChangeOrder,
+  onSave,
+}: {
+  target: StructureOrderTarget
+  label: string
+  displayOrder: number
+  canChangeOrder: boolean
+  onSave(target: StructureOrderTarget, displayOrder: number, sourceReference: string): Promise<void>
+}) {
+  const [editing, setEditing] = useState(false)
+  const [nextOrder, setNextOrder] = useState(String(displayOrder))
+  const [sourceReference, setSourceReference] = useState('')
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [pending, setPending] = useState(false)
+  const targetKey = structureOrderTargetKey(target)
+  const orderInputId = `academic-order-${targetKey}`
+  const referenceInputId = `academic-order-reference-${targetKey}`
+
+  if (!canChangeOrder) return null
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (pending) return
+    const normalizedOrder = nextOrder.trim()
+    const orderValue = Number(normalizedOrder)
+    const reference = sourceReference.trim()
+    if (!/^\d+$/.test(normalizedOrder) || !Number.isSafeInteger(orderValue) || orderValue > 100_000) {
+      setErrorMessage('El orden debe ser un entero entre 0 y 100000.')
+      return
+    }
+    if (reference.length === 0 || reference.length > 240 || containsAsciiControlCharacters(reference)) {
+      setErrorMessage('Escribe una referencia institucional de hasta 240 caracteres.')
+      return
+    }
+
+    setPending(true)
+    setErrorMessage(null)
+    try {
+      await onSave(target, orderValue, reference)
+      setEditing(false)
+      setSourceReference('')
+    } catch (error) {
+      setErrorMessage(structureOrderErrorMessage(error))
+    } finally {
+      setPending(false)
+    }
+  }
+
+  return (
+    <div className="academic-order-editor">
+      {!editing
+        ? <button type="button" className="academic-order-edit-button"
+            aria-label={`Cambiar orden de ${label}`}
+            onClick={() => {
+              setNextOrder(String(displayOrder))
+              setSourceReference('')
+              setErrorMessage(null)
+              setEditing(true)
+            }}>
+            Cambiar orden
+          </button>
+        : <form className="academic-order-form" aria-label={`Editar orden de ${label}`} onSubmit={(event) => void submit(event)}>
+            <label htmlFor={orderInputId}>Nuevo orden de {label}</label>
+            <input
+              id={orderInputId}
+              type="number"
+              min={0}
+              max={100_000}
+              step={1}
+              required
+              value={nextOrder}
+              disabled={pending}
+              onChange={(event) => setNextOrder(event.currentTarget.value)}
+            />
+            <label htmlFor={referenceInputId}>Referencia institucional de {label}</label>
+            <input
+              id={referenceInputId}
+              type="text"
+              maxLength={240}
+              required
+              value={sourceReference}
+              disabled={pending}
+              onChange={(event) => setSourceReference(event.currentTarget.value)}
+            />
+            <div className="academic-order-actions">
+              <button type="submit" disabled={pending}>{pending ? 'Guardando…' : `Guardar orden de ${label}`}</button>
+              <button type="button" className="secondary" disabled={pending} onClick={() => setEditing(false)}>Cancelar</button>
+            </div>
+            {errorMessage && <p role="alert">{errorMessage}</p>}
+          </form>}
+    </div>
+  )
 }
 
 function PeriodCard({
@@ -432,6 +687,43 @@ function periodReferencesLabel(period: AcademicPeriod): string {
     period.approvalReference === null ? null : `Aprobación: ${period.approvalReference}`,
   ].filter((reference): reference is string => reference !== null)
   return references.length > 0 ? references.join(' · ') : 'Calendario pendiente de aprobación'
+}
+
+function submitStructureOrder(
+  client: AcademicOperationsClient,
+  target: StructureOrderTarget,
+  command: AcademicDisplayOrderCommand,
+  accessToken: string,
+): Promise<void> {
+  switch (target.kind) {
+    case 'unit':
+      return client.changeOrganizationUnitOrder(target.unitId, command, accessToken)
+    case 'site':
+      return client.changeSiteOrder(target.siteId, command, accessToken)
+    case 'organization-relation':
+      return client.changeOrganizationRelationOrder(target.parentUnitId, target.childUnitId, command, accessToken)
+    case 'site-relation':
+      return client.changeSiteRelationOrder(target.parentSiteId, target.childSiteId, command, accessToken)
+    case 'program-affiliation':
+      return client.changeProgramAffiliationOrder(target.programId, target.affiliationId, command, accessToken)
+  }
+}
+
+function structureOrderTargetKey(target: StructureOrderTarget): string {
+  switch (target.kind) {
+    case 'unit': return `unit-${target.unitId}`
+    case 'site': return `site-${target.siteId}`
+    case 'organization-relation': return `organization-relation-${target.parentUnitId}-${target.childUnitId}`
+    case 'site-relation': return `site-relation-${target.parentSiteId}-${target.childSiteId}`
+    case 'program-affiliation': return `program-affiliation-${target.programId}-${target.affiliationId}`
+  }
+}
+
+function structureOrderErrorMessage(error: unknown): string {
+  if (error instanceof AcademicOperationsApiError && (error.status === 401 || error.status === 403)) {
+    return 'La sesión no tiene permiso para cambiar el orden de la estructura.'
+  }
+  return 'No fue posible guardar esta prioridad. La estructura no se modificó; verifica tu conexión e inténtalo de nuevo.'
 }
 
 function compareUnits(first: AcademicOrganizationUnit, second: AcademicOrganizationUnit) {

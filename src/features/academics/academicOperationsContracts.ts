@@ -77,16 +77,37 @@ export interface AcademicPeriod {
   createdAt: string
 }
 
+export interface AcademicDisplayOrderCommand {
+  expectedDisplayOrder: number
+  displayOrder: number
+  sourceReference: string
+}
+
 export interface AcademicOperationsClient {
   getStructure(signal?: AbortSignal): Promise<AcademicStructureSnapshot>
   getOpenPeriods(signal?: AbortSignal): Promise<AcademicPeriod[]>
   getAdminPeriods(accessToken: string, signal?: AbortSignal): Promise<AcademicPeriod[]>
   openPeriod(periodId: string, accessToken: string, signal?: AbortSignal): Promise<AcademicPeriod>
   closePeriod(periodId: string, accessToken: string, signal?: AbortSignal): Promise<AcademicPeriod>
+  changeOrganizationUnitOrder(unitId: string, command: AcademicDisplayOrderCommand,
+    accessToken: string, signal?: AbortSignal): Promise<void>
+  changeSiteOrder(siteId: string, command: AcademicDisplayOrderCommand,
+    accessToken: string, signal?: AbortSignal): Promise<void>
+  changeOrganizationRelationOrder(parentUnitId: string, childUnitId: string,
+    command: AcademicDisplayOrderCommand, accessToken: string, signal?: AbortSignal): Promise<void>
+  changeSiteRelationOrder(parentSiteId: string, childSiteId: string,
+    command: AcademicDisplayOrderCommand, accessToken: string, signal?: AbortSignal): Promise<void>
+  changeProgramAffiliationOrder(programId: string, affiliationId: string,
+    command: AcademicDisplayOrderCommand, accessToken: string, signal?: AbortSignal): Promise<void>
 }
 
 export interface AcademicPeriodAuthorization {
   accessToken: string
   canRead: boolean
+  canWrite: boolean
+}
+
+export interface AcademicStructureAuthorization {
+  accessToken: string
   canWrite: boolean
 }

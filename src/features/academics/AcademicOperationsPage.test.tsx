@@ -1,8 +1,9 @@
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { AcademicProgram } from './contracts'
 import type { AcademicOperationsClient, AcademicPeriod, AcademicStructureSnapshot } from './academicOperationsContracts'
+import { AcademicOperationsApiError } from './academicOperationsClient'
 
 const pageModules = import.meta.glob<typeof import('./AcademicOperationsPage')>('./AcademicOperationsPage.tsx')
 
@@ -126,6 +127,30 @@ const structureWithOrderedPrograms: AcademicStructureSnapshot = {
   ],
 }
 
+const structureWithAllOrderTargets: AcademicStructureSnapshot = {
+  ...structure,
+  sites: [
+    ...structure.sites,
+    {
+      id: 'bb783bf7-0fbb-48d5-9c49-17240492ef6e',
+      code: 'SECCIONAL-CHIQUINQUIRA',
+      type: 'SECCIONAL',
+      displayName: 'Seccional Chiquinquirá',
+      displayOrder: 4,
+      status: 'ACTIVE',
+      validFrom: '2026-01-01',
+      validThrough: null,
+    },
+  ],
+  siteRelations: [{
+    parentSiteId: 'b16116a1-10ba-4d79-839b-4195e4851d73',
+    childSiteId: 'bb783bf7-0fbb-48d5-9c49-17240492ef6e',
+    displayOrder: 4,
+    validFrom: '2026-01-01',
+    validThrough: null,
+  }],
+}
+
 function createClient(overrides: Partial<AcademicOperationsClient> = {}): AcademicOperationsClient {
   return {
     getStructure: vi.fn().mockResolvedValue(structure),
@@ -139,6 +164,11 @@ function createClient(overrides: Partial<AcademicOperationsClient> = {}): Academ
       ...regularPeriod,
       status: 'CLOSED',
     })),
+    changeOrganizationUnitOrder: vi.fn().mockResolvedValue(undefined),
+    changeSiteOrder: vi.fn().mockResolvedValue(undefined),
+    changeOrganizationRelationOrder: vi.fn().mockResolvedValue(undefined),
+    changeSiteRelationOrder: vi.fn().mockResolvedValue(undefined),
+    changeProgramAffiliationOrder: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   }
 }
@@ -321,6 +351,132 @@ describe('AcademicOperationsPage', () => {
     expect(siteChildren.children[1]?.querySelector('.academic-sort-order')).toHaveTextContent('05')
     expect(siteChildren.children[2]?.querySelector('.academic-sort-order')).toHaveTextContent('05')
     expect(siteChildren.children[3]?.querySelector('.academic-sort-order')).toHaveTextContent('08')
+  })
+
+  it('shows audited order controls for every active structure relationship only to writers', async () => {
+    // Arrange
+    const { AcademicOperationsPage } = await loadPage()
+    const client = createClient({ getStructure: vi.fn().mockResolvedValue(structureWithAllOrderTargets) })
+    const { rerender } = render(<AcademicOperationsPage client={client} loadPrograms={async () => programs} />)
+
+    // Act + Assert: public readers continue to see persisted order without write controls.
+    expect(await screen.findByText('Seccional Chiquinquirá')).toBeVisible()
+    expect(screen.queryByRole('button', { name: /cambiar orden de/i })).not.toBeInTheDocument()
+
+    // Act: server-resolved structure write permission enables the five supported order targets.
+    rerender(<AcademicOperationsPage
+      client={client}
+      loadPrograms={async () => programs}
+      structureAuthorization={{ accessToken: 'synthetic-structure-token', canWrite: true }}
+    />)
+
+    // Assert
+    for (const name of [
+      'Facultad de Ciencias',
+      'Escuela de Sistemas',
+      'Sede Central Tunja',
+      'Seccional Chiquinquirá',
+      'Ingeniería de Sistemas',
+    ]) {
+      expect(await screen.findByRole('button', { name: `Cambiar orden de ${name}` })).toBeVisible()
+    }
+  })
+
+  it('saves a unit priority with its expected value and source reference, then refreshes from the server', async () => {
+    // Arrange
+    const user = userEvent.setup()
+    const { AcademicOperationsPage } = await loadPage()
+    const updatedStructure: AcademicStructureSnapshot = {
+      ...structureWithAllOrderTargets,
+      units: structureWithAllOrderTargets.units.map((unit) => unit.id === structure.units[0]!.id
+        ? { ...unit, displayOrder: 7 }
+        : unit),
+    }
+    const getStructure = vi.fn()
+      .mockResolvedValueOnce(structureWithAllOrderTargets)
+      .mockResolvedValueOnce(updatedStructure)
+    const changeOrganizationUnitOrder = vi.fn().mockResolvedValue(undefined)
+    const client = createClient({ getStructure, changeOrganizationUnitOrder })
+    render(<AcademicOperationsPage
+      client={client}
+      loadPrograms={async () => programs}
+      structureAuthorization={{ accessToken: 'synthetic-structure-token', canWrite: true }}
+    />)
+
+    // Act
+    await user.click(await screen.findByRole('button', { name: 'Cambiar orden de Facultad de Ciencias' }))
+    await user.clear(screen.getByLabelText('Nuevo orden de Facultad de Ciencias'))
+    await user.type(screen.getByLabelText('Nuevo orden de Facultad de Ciencias'), '7')
+    await user.type(screen.getByLabelText('Referencia institucional de Facultad de Ciencias'), 'Resolución 123 de 2026')
+    await user.click(screen.getByRole('button', { name: 'Guardar orden de Facultad de Ciencias' }))
+
+    // Assert
+    expect(changeOrganizationUnitOrder).toHaveBeenCalledWith(
+      structure.units[0]!.id,
+      { expectedDisplayOrder: 2, displayOrder: 7, sourceReference: 'Resolución 123 de 2026' },
+      'synthetic-structure-token',
+    )
+    expect(getStructure).toHaveBeenCalledTimes(2)
+    expect(await screen.findByText('07')).toBeVisible()
+    expect(screen.getByRole('status')).toHaveTextContent(/prioridad actualizada/i)
+  })
+
+  it('refreshes the displayed structure and reports a concurrent order conflict', async () => {
+    // Arrange
+    const user = userEvent.setup()
+    const { AcademicOperationsPage } = await loadPage()
+    const concurrentStructure: AcademicStructureSnapshot = {
+      ...structureWithAllOrderTargets,
+      sites: structureWithAllOrderTargets.sites.map((site) => site.id === structure.sites[0]!.id
+        ? { ...site, displayOrder: 8 }
+        : site),
+    }
+    const getStructure = vi.fn()
+      .mockResolvedValueOnce(structureWithAllOrderTargets)
+      .mockResolvedValueOnce(concurrentStructure)
+    const changeSiteOrder = vi.fn().mockRejectedValue(new AcademicOperationsApiError(409, 'Conflict'))
+    const client = createClient({ getStructure, changeSiteOrder })
+    render(<AcademicOperationsPage
+      client={client}
+      loadPrograms={async () => programs}
+      structureAuthorization={{ accessToken: 'synthetic-structure-token', canWrite: true }}
+    />)
+
+    // Act
+    await user.click(await screen.findByRole('button', { name: 'Cambiar orden de Sede Central Tunja' }))
+    await user.clear(screen.getByLabelText('Nuevo orden de Sede Central Tunja'))
+    await user.type(screen.getByLabelText('Nuevo orden de Sede Central Tunja'), '5')
+    await user.type(screen.getByLabelText('Referencia institucional de Sede Central Tunja'), 'Acta de organización 8')
+    await user.click(screen.getByRole('button', { name: 'Guardar orden de Sede Central Tunja' }))
+
+    // Assert
+    expect(await screen.findByRole('alert')).toHaveTextContent(/estructura cambió|prioridad cambió/i)
+    expect(getStructure).toHaveBeenCalledTimes(2)
+    expect(await screen.findByText('08')).toBeVisible()
+    expect(changeSiteOrder).toHaveBeenCalledOnce()
+  })
+
+  it('rejects a negative order before sending a structure mutation', async () => {
+    // Arrange
+    const user = userEvent.setup()
+    const { AcademicOperationsPage } = await loadPage()
+    const changeOrganizationUnitOrder = vi.fn().mockResolvedValue(undefined)
+    const client = createClient({ changeOrganizationUnitOrder })
+    render(<AcademicOperationsPage
+      client={client}
+      loadPrograms={async () => programs}
+      structureAuthorization={{ accessToken: 'synthetic-structure-token', canWrite: true }}
+    />)
+
+    // Act
+    await user.click(await screen.findByRole('button', { name: 'Cambiar orden de Facultad de Ciencias' }))
+    await user.clear(screen.getByLabelText('Nuevo orden de Facultad de Ciencias'))
+    await user.type(screen.getByLabelText('Nuevo orden de Facultad de Ciencias'), '-1')
+    fireEvent.submit(screen.getByRole('form', { name: 'Editar orden de Facultad de Ciencias' }))
+
+    // Assert
+    expect(await screen.findByRole('alert')).toHaveTextContent(/entero entre 0 y 100000/i)
+    expect(changeOrganizationUnitOrder).not.toHaveBeenCalled()
   })
 
   it('orders the hierarchy and uses normalized affiliations while distinguishing regular and intersemester periods', async () => {
