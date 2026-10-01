@@ -887,6 +887,85 @@ describe('academic operations client', () => {
     })
   })
 
+  it('loads an administrative period history with the read bearer token and validates the response', async () => {
+    // Arrange
+    const { createAcademicOperationsClient } = await loadClient()
+    const revisionId = 'c2d11854-487b-4d55-b825-0b321fb1f414'
+    const history = {
+      period,
+      calendarRevisions: [{
+        id: revisionId,
+        periodId: period.id,
+        version: 1,
+        officialReference: 'Calendario institucional de prueba',
+        status: 'PUBLISHED',
+        activities: [{
+          key: 'REGISTRATION',
+          label: 'Inscripción',
+          startsAt: '2026-06-22T08:00:00',
+          endsAt: '2026-06-28T16:00:00',
+          organizationUnitId: null,
+          siteId: null,
+        }],
+      }],
+      auditEvents: [{
+        id: 1,
+        actionKey: 'PERIOD_OPENED',
+        actorSub: 'synthetic-period-operator',
+        occurredAt: '2026-08-10T13:00:00Z',
+        reference: 'Resolución institucional de prueba',
+        summary: 'Academic period state changed to OPEN.',
+      }],
+    }
+    const fetcher = vi.fn().mockResolvedValue(jsonResponse(history))
+    const client = createAcademicOperationsClient(fetcher)
+    const signal = new AbortController().signal
+    const getPeriodHistory = (client as unknown as {
+      getPeriodHistory: (periodId: string, accessToken: string, signal?: AbortSignal) => Promise<typeof history>
+    }).getPeriodHistory
+
+    // Act
+    const result = await getPeriodHistory.call(client, period.id, 'synthetic-read-token', signal)
+
+    // Assert
+    expect(result.calendarRevisions[0]?.activities[0]?.label).toBe('Inscripción')
+    expect(result.auditEvents[0]?.actionKey).toBe('PERIOD_OPENED')
+    expect(fetcher).toHaveBeenCalledWith(`/api/v1/admin/academic-periods/${period.id}/history`, {
+      credentials: 'omit',
+      headers: { Accept: 'application/json', Authorization: 'Bearer synthetic-read-token' },
+      signal,
+    })
+  })
+
+  it('rejects mismatched period histories and audit actions outside the known lifecycle', async () => {
+    // Arrange
+    const { createAcademicOperationsClient } = await loadClient()
+    const history = {
+      period,
+      calendarRevisions: [],
+      auditEvents: [{
+        id: 1,
+        actionKey: 'PERIOD_OPENED',
+        actorSub: 'synthetic-period-operator',
+        occurredAt: '2026-08-10T13:00:00Z',
+        reference: null,
+        summary: 'Academic period state changed to OPEN.',
+      }],
+    }
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({ ...history, period: { ...period, id: '0326036b-58de-4897-bc5b-1e54d498ec4d' } }))
+      .mockResolvedValueOnce(jsonResponse({
+        ...history,
+        auditEvents: [{ ...history.auditEvents[0], actionKey: 'UNRECOGNIZED_ACTION' }],
+      }))
+    const client = createAcademicOperationsClient(fetcher)
+
+    // Act + Assert
+    await expect(client.getPeriodHistory(period.id, 'synthetic-read-token')).rejects.toThrow(/malformed/i)
+    await expect(client.getPeriodHistory(period.id, 'synthetic-read-token')).rejects.toThrow(/malformed/i)
+    expect(fetcher).toHaveBeenCalledTimes(2)
+  })
+
   it('changes all five structure order targets through audited conditional PATCH requests', async () => {
     // Arrange
     const { createAcademicOperationsClient } = await loadClient()

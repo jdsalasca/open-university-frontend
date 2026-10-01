@@ -157,6 +157,7 @@ function createClient(overrides: Partial<AcademicOperationsClient> = {}): Academ
     getAdminStructure: vi.fn().mockResolvedValue(structure),
     getOpenPeriods: vi.fn().mockResolvedValue([regularPeriod, intersemester]),
     getAdminPeriods: vi.fn().mockResolvedValue([regularPeriod, intersemester]),
+    getPeriodHistory: vi.fn().mockResolvedValue({ period: regularPeriod, calendarRevisions: [], auditEvents: [] }),
     createOrganizationUnit: vi.fn().mockResolvedValue('34a06170-9acf-4718-854e-92e945a7db17'),
     createChildUnit: vi.fn().mockResolvedValue('94a06170-9acf-4718-854e-92e945a7db17'),
     closeOrganizationRelation: vi.fn().mockResolvedValue(undefined),
@@ -602,6 +603,123 @@ describe('AcademicOperationsPage', () => {
     expect(client.getOpenPeriods).toHaveBeenCalledOnce()
     expect(client.getAdminPeriods).not.toHaveBeenCalled()
     expect(screen.queryByRole('button', { name: /abrir periodo|cerrar periodo/i })).not.toBeInTheDocument()
+  })
+
+  it('shows the audited calendar history on demand to period readers without granting write actions', async () => {
+    // Arrange
+    const user = userEvent.setup()
+    const { AcademicOperationsPage } = await loadPage()
+    const getPeriodHistory = vi.fn().mockResolvedValue({
+      period: regularPeriod,
+      calendarRevisions: [{
+        id: 'c2d11854-487b-4d55-b825-0b321fb1f414',
+        periodId: regularPeriod.id,
+        version: 1,
+        officialReference: 'Calendario institucional de prueba',
+        status: 'PUBLISHED',
+        activities: [{
+          key: 'REGISTRATION',
+          label: 'Inscripción',
+          startsAt: '2026-06-22T08:00:00',
+          endsAt: '2026-06-28T16:00:00',
+          organizationUnitId: null,
+          siteId: null,
+        }],
+      }],
+      auditEvents: [{
+        id: 1,
+        actionKey: 'PERIOD_OPENED',
+        actorSub: 'synthetic-period-operator',
+        occurredAt: '2026-08-10T13:00:00Z',
+        reference: 'Resolución institucional de prueba',
+        summary: 'Academic period state changed to OPEN.',
+      }],
+    })
+    const client = { ...createClient(), getPeriodHistory } as unknown as AcademicOperationsClient
+    render(<AcademicOperationsPage
+      client={client}
+      loadPrograms={async () => programs}
+      authorization={{ accessToken: 'synthetic-read-token', canRead: true, canWrite: false }}
+    />)
+
+    // Act
+    await user.click(await screen.findByRole('button', { name: 'Ver historial de 2026-2' }))
+
+    // Assert
+    expect(await screen.findByText('Periodo abierto')).toBeVisible()
+    expect(screen.getByText('Calendario institucional de prueba')).toBeVisible()
+    expect(screen.getByText('Inscripción')).toBeVisible()
+    expect(screen.getByText(/Actor: synthetic-period-operator/)).toBeVisible()
+    expect(screen.queryByRole('button', { name: /abrir periodo|cerrar periodo/i })).not.toBeInTheDocument()
+    expect(getPeriodHistory).toHaveBeenCalledWith(regularPeriod.id, 'synthetic-read-token', expect.any(AbortSignal))
+  })
+
+  it('does not expose administrative period history to a write-only user', async () => {
+    // Arrange
+    const { AcademicOperationsPage } = await loadPage()
+    const getPeriodHistory = vi.fn()
+    const client = { ...createClient(), getPeriodHistory } as unknown as AcademicOperationsClient
+    render(<AcademicOperationsPage
+      client={client}
+      loadPrograms={async () => programs}
+      authorization={{ accessToken: 'synthetic-write-token', canRead: false, canWrite: true }}
+    />)
+
+    // Act
+    await screen.findByRole('button', { name: 'Cerrar periodo 2026-2' })
+
+    // Assert
+    expect(screen.queryByRole('button', { name: /ver historial/i })).not.toBeInTheDocument()
+    expect(getPeriodHistory).not.toHaveBeenCalled()
+  })
+
+  it('aborts a pending period history request when the reader closes its panel', async () => {
+    // Arrange
+    const user = userEvent.setup()
+    const { AcademicOperationsPage } = await loadPage()
+    let requestSignal: AbortSignal | undefined
+    const getPeriodHistory = vi.fn().mockImplementation((_periodId: string, _token: string, signal: AbortSignal) => {
+      requestSignal = signal
+      return new Promise(() => {})
+    })
+    const client = { ...createClient(), getPeriodHistory } as unknown as AcademicOperationsClient
+    render(<AcademicOperationsPage
+      client={client}
+      loadPrograms={async () => programs}
+      authorization={{ accessToken: 'synthetic-read-token', canRead: true, canWrite: false }}
+    />)
+
+    // Act
+    await user.click(await screen.findByRole('button', { name: 'Ver historial de 2026-2' }))
+    await waitFor(() => expect(getPeriodHistory).toHaveBeenCalledOnce())
+    await user.click(screen.getByRole('button', { name: 'Ocultar historial' }))
+
+    // Assert
+    expect(requestSignal?.aborted).toBe(true)
+    expect(screen.queryByRole('region', { name: 'Historial de 2026-2' })).not.toBeInTheDocument()
+  })
+
+  it.each([401, 403])('revalidates the session when an administrative period history read returns %i', async (status) => {
+    // Arrange
+    const user = userEvent.setup()
+    const { AcademicOperationsPage } = await loadPage()
+    const accessToken = 'synthetic-expired-read-token'
+    const onAuthorizationRejected = vi.fn().mockResolvedValue(undefined)
+    const getPeriodHistory = vi.fn().mockRejectedValue(new AcademicOperationsApiError(status, 'Rejected'))
+    const client = { ...createClient(), getPeriodHistory } as unknown as AcademicOperationsClient
+    render(<AcademicOperationsPage
+      client={client}
+      loadPrograms={async () => programs}
+      authorization={{ accessToken, canRead: true, canWrite: false }}
+      onAuthorizationRejected={onAuthorizationRejected}
+    />)
+
+    // Act
+    await user.click(await screen.findByRole('button', { name: 'Ver historial de 2026-2' }))
+
+    // Assert
+    expect(await screen.findByRole('alert')).toHaveTextContent(/no fue posible consultar el historial/i)
+    await waitFor(() => expect(onAuthorizationRejected).toHaveBeenCalledWith(accessToken))
   })
 
   it('requires an explicit confirmation and period write permission to open a period', async () => {

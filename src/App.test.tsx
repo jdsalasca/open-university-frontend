@@ -80,6 +80,7 @@ function emptyAcademicOperationsClient(): AcademicOperationsClient {
     closeProgramAffiliation: async () => { throw new Error('Unexpected program affiliation closure') },
     getOpenPeriods: async () => [],
     getAdminPeriods: async () => [],
+    getPeriodHistory: async () => { throw new Error('Unexpected period history read') },
     openPeriod: async () => { throw new Error('Unexpected period opening') },
     closePeriod: async () => { throw new Error('Unexpected period closing') },
     changeOrganizationUnitOrder: async () => { throw new Error('Unexpected unit order change') },

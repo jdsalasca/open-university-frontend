@@ -22,6 +22,7 @@ import { CreateAcademicChildUnitForm } from './CreateAcademicChildUnitForm'
 import { CreateAcademicStructureRelationForm } from './CreateAcademicStructureRelationForm'
 import { CloseAcademicStructureRelationForm } from './CloseAcademicStructureRelationForm'
 import { CreateAcademicProgramAffiliationForm } from './CreateAcademicProgramAffiliationForm'
+import { AcademicPeriodHistoryPanel } from './AcademicPeriodHistoryPanel'
 import './AcademicOperationsPage.scss'
 
 type RequestState = 'loading' | 'ready' | 'error'
@@ -532,9 +533,13 @@ export function AcademicOperationsPage({
               ? <p className="academic-empty-state">{visibleRequestData.periodSource === 'admin' ? 'No hay periodos académicos registrados.' : 'No hay periodos académicos abiertos para consulta.'}</p>
               : <ul className="academic-period-list">
                   {sortedPeriods.map((period) => <PeriodCard
-                    key={period.id}
+                    key={`${period.id}:${authorization?.canRead === true ? authorization.accessToken : 'public'}`}
                     period={period}
                     canWrite={authorization?.canWrite === true}
+                    canReadHistory={visibleRequestData.periodSource === 'admin' && authorization?.canRead === true}
+                    accessToken={authorization?.accessToken ?? ''}
+                    client={client}
+                    onAuthorizationRejected={onAuthorizationRejected}
                     confirmation={periodConfirmation?.id === period.id ? periodConfirmation.action : null}
                     pending={pendingPeriodId === period.id}
                     onRequestTransition={(action) => {
@@ -925,6 +930,10 @@ function OrderEditor({
 function PeriodCard({
   period,
   canWrite,
+  canReadHistory,
+  accessToken,
+  client,
+  onAuthorizationRejected,
   confirmation,
   pending,
   onRequestTransition,
@@ -933,6 +942,10 @@ function PeriodCard({
 }: {
   period: AcademicPeriod
   canWrite: boolean
+  canReadHistory: boolean
+  accessToken: string
+  client: AcademicOperationsClient
+  onAuthorizationRejected?: (accessToken: string) => Promise<void>
   confirmation: 'open' | 'close' | null
   pending: boolean
   onRequestTransition(action: 'open' | 'close'): void
@@ -970,6 +983,13 @@ function PeriodCard({
             </div>
           </div>
         )}
+        {canReadHistory && <AcademicPeriodHistoryPanel
+          key={accessToken}
+          period={period}
+          accessToken={accessToken}
+          client={client}
+          onAuthorizationRejected={onAuthorizationRejected}
+        />}
       </div>
     </li>
   )

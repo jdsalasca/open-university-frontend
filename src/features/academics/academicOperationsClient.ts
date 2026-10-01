@@ -12,7 +12,12 @@ import type {
   AcademicProgramAffiliationCreateCommand,
   AcademicStructureRelationCreateCommand,
   AcademicPeriod,
+  AcademicPeriodAuditAction,
+  AcademicPeriodHistory,
   AcademicPeriodKind,
+  AcademicCalendarRevision,
+  AcademicCalendarRevisionStatus,
+  AcademicCalendarActivity,
   AcademicProgramAffiliation,
   AcademicSite,
   AcademicSiteRelation,
@@ -27,6 +32,11 @@ const SITE_TYPES = new Set<AcademicSiteType>(['CENTRAL', 'SECCIONAL', 'REGIONAL'
 const ENTITY_STATUSES = new Set<AcademicEntityStatus>(['ACTIVE', 'INACTIVE'])
 const PERIOD_KINDS = new Set<AcademicPeriodKind>(['REGULAR', 'INTERSEMESTRAL'])
 const PERIOD_STATUSES = new Set<AcademicPeriod['status']>(['DRAFT', 'APPROVED', 'OPEN', 'CLOSED', 'CANCELLED'])
+const CALENDAR_REVISION_STATUSES = new Set<AcademicCalendarRevisionStatus>(['DRAFT', 'PUBLISHED'])
+const PERIOD_AUDIT_ACTIONS = new Set<AcademicPeriodAuditAction>([
+  'PERIOD_CREATED', 'CALENDAR_CREATED', 'CALENDAR_PUBLISHED', 'PERIOD_APPROVED',
+  'PERIOD_OPENED', 'PERIOD_CLOSED', 'PERIOD_CANCELLED', 'PERIOD_CALENDAR_AMENDED',
+])
 
 export class AcademicOperationsApiError extends Error {
   readonly status: number
@@ -120,6 +130,11 @@ export function createAcademicOperationsClient(fetcher: typeof fetch = fetch): A
     async getAdminPeriods(accessToken, signal) {
       const response = await fetcher('/api/v1/admin/academic-periods', authorizedRequestOptions(accessToken, signal))
       return parseAdminAcademicPeriods(await responseBody(response))
+    },
+
+    async getPeriodHistory(periodId, accessToken, signal) {
+      const response = await fetcher(periodHistoryPath(periodId), authorizedRequestOptions(accessToken, signal))
+      return parseAcademicPeriodHistory(await responseBody(response), periodId)
     },
 
     async openPeriod(periodId, accessToken, signal) {
@@ -230,6 +245,63 @@ export function parseAdminAcademicPeriods(input: unknown): AcademicPeriod[] {
   assertUnique(periods.map((period) => period.id))
   assertUnique(periods.map((period) => period.code))
   return periods
+}
+
+function parseAcademicPeriodHistory(input: unknown, expectedPeriodId: string): AcademicPeriodHistory {
+  if (!isUuid(expectedPeriodId)
+    || !isRecord(input)
+    || !Array.isArray(input.calendarRevisions)
+    || !Array.isArray(input.auditEvents)) throw malformedResponse()
+
+  const period = parseAcademicPeriod(input.period)
+  if (period.id.toLowerCase() !== expectedPeriodId.toLowerCase()) throw malformedResponse()
+  const calendarRevisions = input.calendarRevisions.map(parseCalendarRevision)
+  if (calendarRevisions.some((revision) => revision.periodId.toLowerCase() !== expectedPeriodId.toLowerCase())) {
+    throw malformedResponse()
+  }
+  assertUnique(calendarRevisions.map(({ id }) => id.toLowerCase()))
+  if (new Set(calendarRevisions.map(({ version }) => version)).size !== calendarRevisions.length) {
+    throw malformedResponse()
+  }
+  const auditEvents = input.auditEvents.map(parsePeriodAuditEvent)
+  assertUnique(auditEvents.map(({ id }) => String(id)))
+  return { period, calendarRevisions, auditEvents }
+}
+
+function parseCalendarRevision(input: unknown): AcademicCalendarRevision {
+  if (!isRecord(input)
+    || !isUuid(input.id)
+    || !isUuid(input.periodId)
+    || !isPositiveInteger(input.version)
+    || !(input.officialReference === null || isBoundedText(input.officialReference, 240))
+    || !isOneOf(CALENDAR_REVISION_STATUSES, input.status)
+    || !Array.isArray(input.activities)
+    || input.activities.length > 200) throw malformedResponse()
+  return { ...input, activities: input.activities.map(parseCalendarActivity) } as AcademicCalendarRevision
+}
+
+function parseCalendarActivity(input: unknown): AcademicCalendarActivity {
+  if (!isRecord(input)
+    || typeof input.key !== 'string'
+    || !/^[A-Z][A-Z0-9_]{0,63}$/.test(input.key)
+    || !isBoundedText(input.label, 160)
+    || !isLocalDateTime(input.startsAt)
+    || !isLocalDateTime(input.endsAt)
+    || input.endsAt < input.startsAt
+    || !(input.organizationUnitId === null || isUuid(input.organizationUnitId))
+    || !(input.siteId === null || isUuid(input.siteId))) throw malformedResponse()
+  return input as unknown as AcademicCalendarActivity
+}
+
+function parsePeriodAuditEvent(input: unknown): AcademicPeriodHistory['auditEvents'][number] {
+  if (!isRecord(input)
+    || !isPositiveInteger(input.id)
+    || !isOneOf(PERIOD_AUDIT_ACTIONS, input.actionKey)
+    || !isBoundedText(input.actorSub, 180)
+    || !isIsoInstant(input.occurredAt)
+    || !(input.reference === null || isBoundedText(input.reference, 240))
+    || !isBoundedText(input.summary, 240)) throw malformedResponse()
+  return input as unknown as AcademicPeriodHistory['auditEvents'][number]
 }
 
 function parseOrganizationUnit(input: unknown): AcademicOrganizationUnit {
@@ -585,6 +657,11 @@ function periodActionPath(periodId: string, action: 'open' | 'close'): string {
   return `/api/v1/admin/academic-periods/${periodId}/${action}`
 }
 
+function periodHistoryPath(periodId: string): string {
+  if (!isUuid(periodId)) throw malformedResponse()
+  return `/api/v1/admin/academic-periods/${periodId}/history`
+}
+
 function requireAccessToken(accessToken: string): string {
   if (accessToken.trim() !== accessToken || accessToken.length === 0 || containsAsciiControlCharacters(accessToken)) {
     throw new Error('A valid institutional access token is required.')
@@ -629,6 +706,12 @@ function isDate(input: unknown): input is string {
 
 function isIsoInstant(input: unknown): input is string {
   return typeof input === 'string' && /^\d{4}-\d\d-\d\dT/.test(input) && Number.isFinite(Date.parse(input))
+}
+
+function isLocalDateTime(input: unknown): input is string {
+  return typeof input === 'string'
+    && /^\d{4}-\d\d-\d\dT(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d{1,9})?)?$/.test(input)
+    && isDate(input.slice(0, 10))
 }
 
 function isOneOf<T extends string>(values: ReadonlySet<T>, input: unknown): input is T {

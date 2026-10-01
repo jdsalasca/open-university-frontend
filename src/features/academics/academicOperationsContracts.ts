@@ -3,6 +3,16 @@ export type AcademicSiteType = 'CENTRAL' | 'SECCIONAL' | 'REGIONAL' | 'CREAD' | 
 export type AcademicEntityStatus = 'ACTIVE' | 'INACTIVE'
 export type AcademicPeriodKind = 'REGULAR' | 'INTERSEMESTRAL'
 export type AcademicPeriodStatus = 'DRAFT' | 'APPROVED' | 'OPEN' | 'CLOSED' | 'CANCELLED'
+export type AcademicCalendarRevisionStatus = 'DRAFT' | 'PUBLISHED'
+export type AcademicPeriodAuditAction =
+  | 'PERIOD_CREATED'
+  | 'CALENDAR_CREATED'
+  | 'CALENDAR_PUBLISHED'
+  | 'PERIOD_APPROVED'
+  | 'PERIOD_OPENED'
+  | 'PERIOD_CLOSED'
+  | 'PERIOD_CANCELLED'
+  | 'PERIOD_CALENDAR_AMENDED'
 
 export interface AcademicOrganizationUnit {
   id: string
@@ -77,6 +87,39 @@ export interface AcademicPeriod {
   createdAt: string
 }
 
+export interface AcademicCalendarActivity {
+  key: string
+  label: string
+  startsAt: string
+  endsAt: string
+  organizationUnitId: string | null
+  siteId: string | null
+}
+
+export interface AcademicCalendarRevision {
+  id: string
+  periodId: string
+  version: number
+  officialReference: string | null
+  status: AcademicCalendarRevisionStatus
+  activities: AcademicCalendarActivity[]
+}
+
+export interface AcademicPeriodAuditEvent {
+  id: number
+  actionKey: AcademicPeriodAuditAction
+  actorSub: string
+  occurredAt: string
+  reference: string | null
+  summary: string
+}
+
+export interface AcademicPeriodHistory {
+  period: AcademicPeriod
+  calendarRevisions: AcademicCalendarRevision[]
+  auditEvents: AcademicPeriodAuditEvent[]
+}
+
 export interface AcademicDisplayOrderCommand {
   expectedDisplayOrder: number
   displayOrder: number
@@ -136,6 +179,7 @@ export interface AcademicOperationsClient {
     command: AcademicStructureRelationCloseCommand, accessToken: string, signal?: AbortSignal): Promise<void>
   getOpenPeriods(signal?: AbortSignal): Promise<AcademicPeriod[]>
   getAdminPeriods(accessToken: string, signal?: AbortSignal): Promise<AcademicPeriod[]>
+  getPeriodHistory(periodId: string, accessToken: string, signal?: AbortSignal): Promise<AcademicPeriodHistory>
   openPeriod(periodId: string, accessToken: string, signal?: AbortSignal): Promise<AcademicPeriod>
   closePeriod(periodId: string, accessToken: string, signal?: AbortSignal): Promise<AcademicPeriod>
   changeOrganizationUnitOrder(unitId: string, command: AcademicDisplayOrderCommand,
