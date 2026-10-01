@@ -1,43 +1,64 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import type { FormEvent } from 'react'
 import type {
   AcademicOperationsClient,
   AcademicOrganizationRelation,
-  AcademicOrganizationRelationCloseCommand,
   AcademicOrganizationUnit,
+  AcademicSite,
+  AcademicSiteRelation,
   AcademicStructureAuthorization,
+  AcademicStructureRelationCloseCommand,
 } from './academicOperationsContracts'
 import { AcademicOperationsApiError } from './academicOperationsClient'
 import { containsAsciiControlCharacters } from '../../shared/inputValidation'
 import { localDateInputValue } from '../../shared/localDateInput'
 
-interface CloseAcademicOrganizationRelationFormProps {
-  units: AcademicOrganizationUnit[]
-  relations: AcademicOrganizationRelation[]
-  client: Pick<AcademicOperationsClient, 'closeOrganizationRelation'>
+type CommonProps = {
   authorization: AcademicStructureAuthorization
   onClosed(): Promise<void>
   onAuthorizationRejected?: (accessToken: string) => Promise<void>
 }
 
-interface RelationDraft {
+type CloseAcademicStructureRelationFormProps = CommonProps & (
+  | {
+    kind: 'unit'
+    entries: AcademicOrganizationUnit[]
+    relations: AcademicOrganizationRelation[]
+    client: Pick<AcademicOperationsClient, 'closeOrganizationRelation'>
+  }
+  | {
+    kind: 'site'
+    entries: AcademicSite[]
+    relations: AcademicSiteRelation[]
+    client: Pick<AcademicOperationsClient, 'closeSiteRelation'>
+  }
+)
+
+type RelationDraft = {
   relationKey: string
   effectiveThrough: string
   sourceReference: string
 }
 
-interface CloseConfirmation {
-  parentUnitId: string
-  childUnitId: string
+type RelationOption = {
+  parentId: string
+  childId: string
+  validFrom: string
+  validThrough: string | null
+}
+
+type CloseConfirmation = {
+  parentId: string
+  childId: string
   parentName: string
   childName: string
-  command: AcademicOrganizationRelationCloseCommand
+  command: AcademicStructureRelationCloseCommand
 }
 
 type Feedback = { type: 'success' | 'warning' | 'error'; text: string }
 
-function relationKey(relation: AcademicOrganizationRelation): string {
-  return `${relation.parentUnitId}|${relation.childUnitId}|${relation.validFrom}`
+function relationKey(relation: RelationOption): string {
+  return `${relation.parentId}|${relation.childId}|${relation.validFrom}`
 }
 
 function previousCalendarDay(date: string): string {
@@ -45,32 +66,40 @@ function previousCalendarDay(date: string): string {
   return new Date(Date.UTC(year!, month! - 1, day! - 1)).toISOString().slice(0, 10)
 }
 
-export function CloseAcademicOrganizationRelationForm({
-  units,
-  relations,
-  client,
-  authorization,
-  onClosed,
-  onAuthorizationRejected,
-}: CloseAcademicOrganizationRelationFormProps) {
+export function CloseAcademicStructureRelationForm(props: CloseAcademicStructureRelationFormProps) {
   const [draft, setDraft] = useState<RelationDraft>({ relationKey: '', effectiveThrough: '', sourceReference: '' })
   const [confirmation, setConfirmation] = useState<CloseConfirmation | null>(null)
   const [pending, setPending] = useState(false)
   const [feedback, setFeedback] = useState<Feedback | null>(null)
   const today = localDateInputValue()
-  const unitById = useMemo(() => new Map(units.map((unit) => [unit.id, unit])), [units])
-  const closeableRelations = useMemo(() => relations
+  const entriesById = new Map(props.entries.map((entry) => [entry.id, entry]))
+  const relationOptions: RelationOption[] = props.kind === 'unit'
+    ? props.relations.map((relation) => ({
+      parentId: relation.parentUnitId,
+      childId: relation.childUnitId,
+      validFrom: relation.validFrom,
+      validThrough: relation.validThrough,
+    }))
+    : props.relations.map((relation) => ({
+      parentId: relation.parentSiteId,
+      childId: relation.childSiteId,
+      validFrom: relation.validFrom,
+      validThrough: relation.validThrough,
+    }))
+  const closeableRelations = relationOptions
     .filter((relation) => {
-      const endpointsExist = unitById.has(relation.parentUnitId) && unitById.has(relation.childUnitId)
+      const endpointsExist = entriesById.has(relation.parentId) && entriesById.has(relation.childId)
       const notExpired = relation.validThrough === null || relation.validThrough >= today
       const canShorten = relation.validThrough === null || relation.validThrough > relation.validFrom
-      return endpointsExist && notExpired && canShorten && relation.parentUnitId !== relation.childUnitId
+      return endpointsExist && notExpired && canShorten && relation.parentId !== relation.childId
     })
     .sort((first, second) => first.validFrom.localeCompare(second.validFrom)
-      || relationKey(first).localeCompare(relationKey(second))), [relations, today, unitById])
+      || relationKey(first).localeCompare(relationKey(second)))
   const selectedRelation = closeableRelations.find((relation) => relationKey(relation) === draft.relationKey)
+  const relationLabel = props.kind === 'unit' ? 'Relación de unidades' : 'Relación de sedes'
+  const sectionTitle = props.kind === 'unit' ? 'Cerrar una relación de unidades' : 'Cerrar una relación de sedes'
 
-  if (!authorization.canRead || !authorization.canWrite) return null
+  if (!props.authorization.canRead || !props.authorization.canWrite) return null
 
   function changeDraft(update: Partial<RelationDraft>) {
     setDraft((current) => ({ ...current, ...update }))
@@ -92,16 +121,16 @@ export function CloseAcademicOrganizationRelationForm({
       setFeedback({ type: 'error', text: 'La referencia institucional es obligatoria y debe tener hasta 240 caracteres válidos.' })
       return
     }
-    const parent = unitById.get(relation.parentUnitId)
-    const child = unitById.get(relation.childUnitId)
+    const parent = entriesById.get(relation.parentId)
+    const child = entriesById.get(relation.childId)
     if (!parent || !child) {
-      setFeedback({ type: 'error', text: 'No se encontraron ambas unidades. Actualiza la estructura antes de continuar.' })
+      setFeedback({ type: 'error', text: 'No se encontraron ambos registros. Actualiza la estructura antes de continuar.' })
       return
     }
     setFeedback(null)
     setConfirmation({
-      parentUnitId: relation.parentUnitId,
-      childUnitId: relation.childUnitId,
+      parentId: relation.parentId,
+      childId: relation.childId,
       parentName: parent.displayName,
       childName: child.displayName,
       command: {
@@ -113,16 +142,19 @@ export function CloseAcademicOrganizationRelationForm({
   }
 
   async function confirmClosure() {
-    if (pending || !confirmation || !authorization.canWrite) return
+    if (pending || !confirmation || !props.authorization.canWrite) return
     setPending(true)
     setFeedback(null)
     try {
-      await client.closeOrganizationRelation(
-        confirmation.parentUnitId,
-        confirmation.childUnitId,
-        confirmation.command,
-        authorization.accessToken,
-      )
+      if (props.kind === 'unit') {
+        await props.client.closeOrganizationRelation(
+          confirmation.parentId, confirmation.childId, confirmation.command, props.authorization.accessToken,
+        )
+      } else {
+        await props.client.closeSiteRelation(
+          confirmation.parentId, confirmation.childId, confirmation.command, props.authorization.accessToken,
+        )
+      }
     } catch (error) {
       setConfirmation(null)
       if (error instanceof AcademicOperationsApiError && (error.status === 401 || error.status === 403)) {
@@ -133,7 +165,7 @@ export function CloseAcademicOrganizationRelationForm({
             : 'El servidor negó el permiso para cerrar la relación. Estoy volviendo a comprobar los permisos.',
         })
         try {
-          await onAuthorizationRejected?.(authorization.accessToken)
+          await props.onAuthorizationRejected?.(props.authorization.accessToken)
         } catch {
           setFeedback({
             type: 'error',
@@ -142,7 +174,7 @@ export function CloseAcademicOrganizationRelationForm({
         }
       } else if (error instanceof AcademicOperationsApiError && error.status === 409) {
         try {
-          await onClosed()
+          await props.onClosed()
           setFeedback({
             type: 'error',
             text: 'El servidor encontró un conflicto y actualicé la estructura. Revisa la relación y su vigencia antes de otro intento.',
@@ -164,9 +196,9 @@ export function CloseAcademicOrganizationRelationForm({
 
     setConfirmation(null)
     setDraft({ relationKey: '', effectiveThrough: '', sourceReference: '' })
-    setFeedback({ type: 'success', text: 'Relación organizacional cerrada con referencia y auditoría.' })
+    setFeedback({ type: 'success', text: 'Relación cerrada con referencia y auditoría.' })
     try {
-      await onClosed()
+      await props.onClosed()
     } catch {
       setFeedback({
         type: 'warning',
@@ -178,25 +210,26 @@ export function CloseAcademicOrganizationRelationForm({
   }
 
   const maximumDate = selectedRelation?.validThrough ? previousCalendarDay(selectedRelation.validThrough) : undefined
+  const titleId = `academic-close-${props.kind}-relation-title`
 
   return (
-    <section className="academic-create-entry" aria-labelledby="academic-close-unit-relation-title">
+    <section className="academic-create-entry" aria-labelledby={titleId}>
       <div className="academic-create-entry-heading">
         <div>
           <p className="academic-panel-kicker">VIGENCIA Y AUDITORÍA</p>
-          <h3 id="academic-close-unit-relation-title">Cerrar una relación organizacional</h3>
+          <h3 id={titleId}>{sectionTitle}</h3>
         </div>
         <span aria-hidden="true">⌁</span>
       </div>
       <p className="academic-create-entry-intro">
-        Acorta el vínculo entre dos unidades sin eliminar ninguna. El último día indicado es inclusivo y la referencia queda auditada.
+        Acorta el vínculo entre dos registros sin eliminar ninguno. El último día indicado es inclusivo y la referencia queda auditada.
       </p>
       {closeableRelations.length === 0 ? (
         <p className="academic-empty-state">No hay relaciones actuales o futuras que puedan acortarse.</p>
       ) : (
         <form className="academic-create-entry-form" onSubmit={(event) => void reviewClosure(event)}>
           <label>
-            Relación organizacional
+            {relationLabel}
             <select
               required
               value={draft.relationKey}
@@ -205,8 +238,8 @@ export function CloseAcademicOrganizationRelationForm({
             >
               <option value="">Selecciona una relación fechada</option>
               {closeableRelations.map((relation) => {
-                const parent = unitById.get(relation.parentUnitId)!
-                const child = unitById.get(relation.childUnitId)!
+                const parent = entriesById.get(relation.parentId)!
+                const child = entriesById.get(relation.childId)!
                 return (
                   <option key={relationKey(relation)} value={relationKey(relation)}>
                     {parent.displayName} → {child.displayName} · Desde {relation.validFrom}
@@ -247,10 +280,10 @@ export function CloseAcademicOrganizationRelationForm({
           </label>
           {!confirmation && (
             <div className="academic-create-entry-actions">
-              <button type="submit" disabled={pending || !authorization.canWrite || closeableRelations.length === 0}>
+              <button type="submit" disabled={pending || !props.authorization.canWrite || closeableRelations.length === 0}>
                 Revisar cierre
               </button>
-              <p>El cierre termina este vínculo desde la fecha indicada; no borra unidades ni sus demás relaciones.</p>
+              <p>El cierre termina este vínculo desde la fecha indicada; no borra los registros ni sus demás relaciones.</p>
             </div>
           )}
         </form>
@@ -261,7 +294,7 @@ export function CloseAcademicOrganizationRelationForm({
           <p>
             {confirmation.parentName} → {confirmation.childName} quedará vigente hasta{' '}
             <time dateTime={confirmation.command.effectiveThrough}>{confirmation.command.effectiveThrough}</time>, inclusive.
-            {' '}La operación conserva ambas unidades y registra la referencia “{confirmation.command.sourceReference}”.
+            {' '}La operación conserva ambos registros y registra la referencia “{confirmation.command.sourceReference}”.
           </p>
           <div>
             <button type="button" disabled={pending} onClick={() => void confirmClosure()}>

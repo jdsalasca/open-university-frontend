@@ -3,7 +3,7 @@ import type {
   AcademicDisplayOrderCommand,
   AcademicOperationsClient,
   AcademicOrganizationUnitCreateCommand,
-  AcademicOrganizationRelationCloseCommand,
+  AcademicStructureRelationCloseCommand,
   AcademicSiteCreateCommand,
   AcademicStructureEntryCreateCommand,
   AcademicOrganizationRelation,
@@ -68,11 +68,7 @@ export function createAcademicOperationsClient(fetcher: typeof fetch = fetch): A
     },
 
     async closeOrganizationRelation(parentUnitId, childUnitId, command, accessToken, signal) {
-      const path = `${structureRelationPath('unit', parentUnitId, childUnitId)}/close`
-      await noContentResponse(await fetcher(
-        path,
-        jsonPatchRequestOptions(normalizeOrganizationRelationCloseCommand(command), accessToken, signal),
-      ))
+      await closeStructureRelation('unit', parentUnitId, childUnitId, command, accessToken, signal, fetcher)
     },
 
     async createSite(command, accessToken, signal) {
@@ -81,6 +77,10 @@ export function createAcademicOperationsClient(fetcher: typeof fetch = fetch): A
       const body = await responseBody(response)
       if (!isRecord(body) || !isUuid(body.id)) throw malformedResponse()
       return body.id
+    },
+
+    async closeSiteRelation(parentSiteId, childSiteId, command, accessToken, signal) {
+      await closeStructureRelation('site', parentSiteId, childSiteId, command, accessToken, signal, fetcher)
     },
 
     async relateOrganizationUnits(parentUnitId, childUnitId, command, accessToken, signal) {
@@ -162,6 +162,16 @@ export function createAcademicOperationsClient(fetcher: typeof fetch = fetch): A
       ))
     },
   }
+}
+
+async function closeStructureRelation(kind: 'unit' | 'site', parentId: string, childId: string,
+  command: AcademicStructureRelationCloseCommand, accessToken: string, signal: AbortSignal | undefined,
+  fetcher: typeof fetch): Promise<void> {
+  const path = `${structureRelationPath(kind, parentId, childId)}/close`
+  await noContentResponse(await fetcher(
+    path,
+    jsonPatchRequestOptions(normalizeStructureRelationCloseCommand(command), accessToken, signal),
+  ))
 }
 
 export const academicOperationsClient = createAcademicOperationsClient()
@@ -377,9 +387,9 @@ function jsonPatchRequestOptions(body: unknown, accessToken: string, signal?: Ab
   }
 }
 
-function normalizeOrganizationRelationCloseCommand(
-  command: AcademicOrganizationRelationCloseCommand,
-): AcademicOrganizationRelationCloseCommand {
+function normalizeStructureRelationCloseCommand(
+  command: AcademicStructureRelationCloseCommand,
+): AcademicStructureRelationCloseCommand {
   if (!isRecord(command)
     || !isDate(command.validFrom)
     || !isDate(command.effectiveThrough)

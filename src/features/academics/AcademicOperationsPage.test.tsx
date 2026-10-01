@@ -161,6 +161,7 @@ function createClient(overrides: Partial<AcademicOperationsClient> = {}): Academ
     createChildUnit: vi.fn().mockResolvedValue('94a06170-9acf-4718-854e-92e945a7db17'),
     closeOrganizationRelation: vi.fn().mockResolvedValue(undefined),
     createSite: vi.fn().mockResolvedValue('94a06170-9acf-4718-854e-92e945a7db17'),
+    closeSiteRelation: vi.fn().mockResolvedValue(undefined),
     relateOrganizationUnits: vi.fn().mockResolvedValue(undefined),
     relateSites: vi.fn().mockResolvedValue(undefined),
     affiliateProgram: vi.fn().mockResolvedValue(undefined),
@@ -193,7 +194,7 @@ describe('AcademicOperationsPage', () => {
     />)
 
     // Act
-    const relationSelector = await screen.findByLabelText('Relación organizacional')
+    const relationSelector = await screen.findByLabelText('Relación de unidades')
 
     // Assert
     expect(relationSelector).toBeVisible()
@@ -201,6 +202,48 @@ describe('AcademicOperationsPage', () => {
       name: /Facultad de Ciencias → Escuela de Sistemas.*Desde 2026-01-01.*Sin cierre/i,
     })).toBeInTheDocument()
     expect(client.closeOrganizationRelation).not.toHaveBeenCalled()
+  })
+
+  it('shows the dated site-relation closure control in the authorized site panel', async () => {
+    // Arrange
+    const { AcademicOperationsPage } = await loadPage()
+    const regionalSite = {
+      ...structure.sites[0]!,
+      id: 'bb783bf7-0fbb-48d5-9c49-17240492ef6e',
+      code: 'CHIQUINQUIRA',
+      type: 'SECCIONAL' as const,
+      displayName: 'Seccional Chiquinquirá',
+    }
+    const siteStructure: AcademicStructureSnapshot = {
+      ...structure,
+      sites: [...structure.sites, regionalSite],
+      siteRelations: [{
+        parentSiteId: structure.sites[0]!.id,
+        childSiteId: regionalSite.id,
+        displayOrder: 1,
+        validFrom: '2026-01-01',
+        validThrough: null,
+      }],
+    }
+    const client = createClient({
+      getStructure: vi.fn().mockResolvedValue(siteStructure),
+      getAdminStructure: vi.fn().mockResolvedValue(siteStructure),
+    })
+    render(<AcademicOperationsPage
+      client={client}
+      loadPrograms={async () => programs}
+      structureAuthorization={{ accessToken: 'synthetic-structure-token', canRead: true, canWrite: true }}
+    />)
+
+    // Act
+    const relationSelector = await screen.findByLabelText('Relación de sedes')
+
+    // Assert
+    expect(relationSelector).toBeVisible()
+    expect(within(relationSelector).getByRole('option', {
+      name: /Sede Central Tunja → Seccional Chiquinquirá.*Desde 2026-01-01.*Sin cierre/i,
+    })).toBeInTheDocument()
+    expect(client.closeSiteRelation).not.toHaveBeenCalled()
   })
 
   it('orders sibling units and sites by relationship order while preserving root order', async () => {

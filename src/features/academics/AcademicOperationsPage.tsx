@@ -20,7 +20,7 @@ import { containsAsciiControlCharacters } from '../../shared/inputValidation'
 import { CreateFacultyForm, CreateSiteForm } from './CreateFacultyForm'
 import { CreateAcademicChildUnitForm } from './CreateAcademicChildUnitForm'
 import { CreateAcademicStructureRelationForm } from './CreateAcademicStructureRelationForm'
-import { CloseAcademicOrganizationRelationForm } from './CloseAcademicOrganizationRelationForm'
+import { CloseAcademicStructureRelationForm } from './CloseAcademicStructureRelationForm'
 import { CreateAcademicProgramAffiliationForm } from './CreateAcademicProgramAffiliationForm'
 import './AcademicOperationsPage.scss'
 
@@ -421,8 +421,9 @@ export function AcademicOperationsPage({
                 />
               )}
               {canManageStructure && structureAuthorization && visibleRequestData.administrativeStructure && (
-                <CloseAcademicOrganizationRelationForm
-                  units={visibleRequestData.administrativeStructure.units}
+                <CloseAcademicStructureRelationForm
+                  kind="unit"
+                  entries={visibleRequestData.administrativeStructure.units}
                   relations={visibleRequestData.administrativeStructure.organizationRelations}
                   client={client}
                   authorization={structureAuthorization}
@@ -462,6 +463,17 @@ export function AcademicOperationsPage({
                   client={client}
                   authorization={structureAuthorization}
                   onCreated={refreshStructureAfterEntryCreation}
+                  onAuthorizationRejected={onAuthorizationRejected}
+                />
+              )}
+              {canManageStructure && structureAuthorization && visibleRequestData.administrativeStructure && (
+                <CloseAcademicStructureRelationForm
+                  kind="site"
+                  entries={visibleRequestData.administrativeStructure.sites}
+                  relations={visibleRequestData.administrativeStructure.siteRelations}
+                  client={client}
+                  authorization={structureAuthorization}
+                  onClosed={refreshStructureAfterEntryCreation}
                   onAuthorizationRejected={onAuthorizationRejected}
                 />
               )}

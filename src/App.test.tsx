@@ -73,6 +73,7 @@ function emptyAcademicOperationsClient(): AcademicOperationsClient {
     createChildUnit: async () => { throw new Error('Unexpected child organization unit creation') },
     closeOrganizationRelation: async () => { throw new Error('Unexpected organization relation closure') },
     createSite: async () => { throw new Error('Unexpected site creation') },
+    closeSiteRelation: async () => { throw new Error('Unexpected site relation closure') },
     relateOrganizationUnits: async () => { throw new Error('Unexpected organization relation creation') },
     relateSites: async () => { throw new Error('Unexpected site relation creation') },
     affiliateProgram: async () => { throw new Error('Unexpected program affiliation creation') },

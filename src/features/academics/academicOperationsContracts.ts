@@ -90,7 +90,7 @@ export interface AcademicStructureRelationCreateCommand {
   sourceReference: string
 }
 
-export interface AcademicOrganizationRelationCloseCommand {
+export interface AcademicStructureRelationCloseCommand {
   validFrom: string
   effectiveThrough: string
   sourceReference: string
@@ -122,8 +122,10 @@ export interface AcademicOperationsClient {
   createChildUnit(parentUnitId: string, command: AcademicOrganizationUnitCreateCommand, accessToken: string,
     signal?: AbortSignal): Promise<string>
   closeOrganizationRelation(parentUnitId: string, childUnitId: string,
-    command: AcademicOrganizationRelationCloseCommand, accessToken: string, signal?: AbortSignal): Promise<void>
+    command: AcademicStructureRelationCloseCommand, accessToken: string, signal?: AbortSignal): Promise<void>
   createSite(command: AcademicSiteCreateCommand, accessToken: string, signal?: AbortSignal): Promise<string>
+  closeSiteRelation(parentSiteId: string, childSiteId: string,
+    command: AcademicStructureRelationCloseCommand, accessToken: string, signal?: AbortSignal): Promise<void>
   relateOrganizationUnits(parentUnitId: string, childUnitId: string, command: AcademicStructureRelationCreateCommand,
     accessToken: string, signal?: AbortSignal): Promise<void>
   relateSites(parentSiteId: string, childSiteId: string, command: AcademicStructureRelationCreateCommand,

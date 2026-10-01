@@ -5,15 +5,17 @@ import type {
   AcademicOperationsClient,
   AcademicOrganizationRelation,
   AcademicOrganizationUnit,
+  AcademicSite,
+  AcademicSiteRelation,
 } from './academicOperationsContracts'
 import { AcademicOperationsApiError } from './academicOperationsClient'
 
-const formModules = import.meta.glob<typeof import('./CloseAcademicOrganizationRelationForm')>(
-  './CloseAcademicOrganizationRelationForm.tsx',
+const formModules = import.meta.glob<typeof import('./CloseAcademicStructureRelationForm')>(
+  './CloseAcademicStructureRelationForm.tsx',
 )
 
 async function loadForm() {
-  const loader = formModules['./CloseAcademicOrganizationRelationForm.tsx']
+  const loader = formModules['./CloseAcademicStructureRelationForm.tsx']
   expect(loader, 'the protected relation closure form is implemented').toBeTypeOf('function')
   return loader!()
 }
@@ -69,23 +71,55 @@ const relations: AcademicOrganizationRelation[] = [
 
 const authorization = { accessToken: 'institutional-access-token', canRead: true, canWrite: true }
 
-describe('CloseAcademicOrganizationRelationForm', () => {
+const sites: AcademicSite[] = [
+  {
+    id: 'b16116a1-10ba-4d79-839b-4195e4851d73',
+    code: 'SITE-CENTRAL-TEST',
+    type: 'CENTRAL',
+    displayName: 'Sede central de prueba',
+    displayOrder: 1,
+    status: 'ACTIVE',
+    validFrom: '2020-01-01',
+    validThrough: null,
+  },
+  {
+    id: '34a06170-9acf-4718-854e-92e945a7db17',
+    code: 'SITE-REGIONAL-TEST',
+    type: 'REGIONAL',
+    displayName: 'Sede regional de prueba',
+    displayOrder: 2,
+    status: 'ACTIVE',
+    validFrom: '2020-01-01',
+    validThrough: null,
+  },
+]
+
+const siteRelations: AcademicSiteRelation[] = [{
+  parentSiteId: sites[0]!.id,
+  childSiteId: sites[1]!.id,
+  displayOrder: 1,
+  validFrom: '2024-01-01',
+  validThrough: null,
+}]
+
+describe('CloseAcademicStructureRelationForm', () => {
   it('requires review and explicit confirmation, then closes only the selected dated relation', async () => {
     // Arrange
     const user = userEvent.setup()
     const closeOrganizationRelation = vi.fn().mockResolvedValue(undefined)
     const onClosed = vi.fn().mockResolvedValue(undefined)
     const client = { closeOrganizationRelation } as unknown as Pick<AcademicOperationsClient, 'closeOrganizationRelation'>
-    const { CloseAcademicOrganizationRelationForm } = await loadForm()
-    render(<CloseAcademicOrganizationRelationForm
-      units={units}
+    const { CloseAcademicStructureRelationForm } = await loadForm()
+    render(<CloseAcademicStructureRelationForm
+      kind="unit"
+      entries={units}
       relations={relations}
       client={client}
       authorization={authorization}
       onClosed={onClosed}
     />)
 
-    await user.selectOptions(screen.getByLabelText('Relación organizacional'), `${units[0]!.id}|${units[1]!.id}|2024-01-01`)
+    await user.selectOptions(screen.getByLabelText('Relación de unidades'), `${units[0]!.id}|${units[1]!.id}|2024-01-01`)
     await user.type(screen.getByLabelText('Último día de vigencia (inclusive)'), '2026-06-30')
     await user.type(screen.getByLabelText('Referencia institucional'), 'Acta de reorganización 17 de 2026')
 
@@ -115,22 +149,63 @@ describe('CloseAcademicOrganizationRelationForm', () => {
     expect(await screen.findByRole('status')).toHaveTextContent(/relación.*cerrada/i)
   })
 
+  it('closes a dated site relation with the same confirmation and refresh safeguards', async () => {
+    // Arrange
+    const user = userEvent.setup()
+    const closeSiteRelation = vi.fn().mockResolvedValue(undefined)
+    const onClosed = vi.fn().mockResolvedValue(undefined)
+    const client = { closeSiteRelation } as unknown as Pick<AcademicOperationsClient, 'closeSiteRelation'>
+    const { CloseAcademicStructureRelationForm } = await loadForm()
+    render(<CloseAcademicStructureRelationForm
+      kind="site"
+      entries={sites}
+      relations={siteRelations}
+      client={client}
+      authorization={authorization}
+      onClosed={onClosed}
+    />)
+
+    await user.selectOptions(screen.getByLabelText('Relación de sedes'),
+      `${sites[0]!.id}|${sites[1]!.id}|2024-01-01`)
+    await user.type(screen.getByLabelText('Último día de vigencia (inclusive)'), '2026-06-30')
+    await user.type(screen.getByLabelText('Referencia institucional'), 'Acta territorial de prueba')
+    await user.click(screen.getByRole('button', { name: 'Revisar cierre' }))
+
+    // Act
+    await user.click(screen.getByRole('button', { name: 'Confirmar cierre de relación' }))
+
+    // Assert
+    await waitFor(() => expect(closeSiteRelation).toHaveBeenCalledWith(
+      sites[0]!.id,
+      sites[1]!.id,
+      {
+        validFrom: '2024-01-01',
+        effectiveThrough: '2026-06-30',
+        sourceReference: 'Acta territorial de prueba',
+      },
+      'institutional-access-token',
+    ))
+    expect(onClosed).toHaveBeenCalledTimes(1)
+    expect(await screen.findByRole('status')).toHaveTextContent(/relación.*cerrada/i)
+  })
+
   it('refreshes after a concurrent change and does not retry the close automatically', async () => {
     // Arrange
     const user = userEvent.setup()
     const closeOrganizationRelation = vi.fn().mockRejectedValue(new AcademicOperationsApiError(409, 'Conflict'))
     const onClosed = vi.fn().mockResolvedValue(undefined)
     const client = { closeOrganizationRelation } as unknown as Pick<AcademicOperationsClient, 'closeOrganizationRelation'>
-    const { CloseAcademicOrganizationRelationForm } = await loadForm()
-    render(<CloseAcademicOrganizationRelationForm
-      units={units}
+    const { CloseAcademicStructureRelationForm } = await loadForm()
+    render(<CloseAcademicStructureRelationForm
+      kind="unit"
+      entries={units}
       relations={[relations[0]!]}
       client={client}
       authorization={authorization}
       onClosed={onClosed}
     />)
 
-    await user.selectOptions(screen.getByLabelText('Relación organizacional'), `${units[0]!.id}|${units[1]!.id}|2024-01-01`)
+    await user.selectOptions(screen.getByLabelText('Relación de unidades'), `${units[0]!.id}|${units[1]!.id}|2024-01-01`)
     await user.type(screen.getByLabelText('Último día de vigencia (inclusive)'), '2026-06-30')
     await user.type(screen.getByLabelText('Referencia institucional'), 'Referencia de prueba')
     await user.click(screen.getByRole('button', { name: 'Revisar cierre' }))
@@ -149,10 +224,11 @@ describe('CloseAcademicOrganizationRelationForm', () => {
     // Arrange
     const closeOrganizationRelation = vi.fn()
     const client = { closeOrganizationRelation } as unknown as Pick<AcademicOperationsClient, 'closeOrganizationRelation'>
-    const { CloseAcademicOrganizationRelationForm } = await loadForm()
+    const { CloseAcademicStructureRelationForm } = await loadForm()
     const finiteRelation: AcademicOrganizationRelation = { ...relations[0]!, validThrough: '2027-01-01' }
-    const { container } = render(<CloseAcademicOrganizationRelationForm
-      units={units}
+    const { container } = render(<CloseAcademicStructureRelationForm
+      kind="unit"
+      entries={units}
       relations={[finiteRelation]}
       client={client}
       authorization={authorization}
@@ -160,7 +236,7 @@ describe('CloseAcademicOrganizationRelationForm', () => {
     />)
 
     await userEvent.setup().selectOptions(
-      screen.getByLabelText('Relación organizacional'),
+      screen.getByLabelText('Relación de unidades'),
       `${units[0]!.id}|${units[1]!.id}|2024-01-01`,
     )
     const dateInput = screen.getByLabelText('Último día de vigencia (inclusive)')
@@ -180,11 +256,12 @@ describe('CloseAcademicOrganizationRelationForm', () => {
     // Arrange
     const closeOrganizationRelation = vi.fn()
     const client = { closeOrganizationRelation } as unknown as Pick<AcademicOperationsClient, 'closeOrganizationRelation'>
-    const { CloseAcademicOrganizationRelationForm } = await loadForm()
+    const { CloseAcademicStructureRelationForm } = await loadForm()
 
     // Act
-    const { container } = render(<CloseAcademicOrganizationRelationForm
-      units={units}
+    const { container } = render(<CloseAcademicStructureRelationForm
+      kind="unit"
+      entries={units}
       relations={relations}
       client={client}
       authorization={{ ...authorization, canWrite: false }}
@@ -200,11 +277,12 @@ describe('CloseAcademicOrganizationRelationForm', () => {
     // Arrange
     const closeOrganizationRelation = vi.fn()
     const client = { closeOrganizationRelation } as unknown as Pick<AcademicOperationsClient, 'closeOrganizationRelation'>
-    const { CloseAcademicOrganizationRelationForm } = await loadForm()
+    const { CloseAcademicStructureRelationForm } = await loadForm()
 
     // Act
-    render(<CloseAcademicOrganizationRelationForm
-      units={units}
+    render(<CloseAcademicStructureRelationForm
+      kind="unit"
+      entries={units}
       relations={[relations[1]!, relations[2]!]}
       client={client}
       authorization={authorization}
@@ -213,7 +291,7 @@ describe('CloseAcademicOrganizationRelationForm', () => {
 
     // Assert
     expect(screen.getByText(/no hay relaciones actuales o futuras que puedan acortarse/i)).toBeInTheDocument()
-    expect(screen.queryByLabelText('Relación organizacional')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Relación de unidades')).not.toBeInTheDocument()
     expect(closeOrganizationRelation).not.toHaveBeenCalled()
   })
 })
