@@ -1,5 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
-import type { SpaceDirectorySnapshot, SpaceLocation, SpaceLocationKind } from './spaceGuideContracts'
+import type {
+  SpaceDirectorySnapshot,
+  SpaceLocation,
+  SpaceLocationKind,
+  SpaceUseKind,
+  SpaceUsePathway,
+} from './spaceGuideContracts'
 import type { SpaceGuideClient } from './spaceGuideClient'
 import './SpaceGuidePage.scss'
 
@@ -24,6 +30,14 @@ const TYPE_FILTER_LABELS: Record<SpaceLocationKind, string> = {
   REGIONAL_SITE: 'Sedes regionales',
   CREAD: 'CREAD',
   SERVICE: 'Servicios',
+}
+
+const USE_KIND_LABELS: Record<SpaceUseKind, string> = {
+  AUDITORIUM_OR_ACADEMIC_SPACE: 'Préstamo o alquiler',
+  SPORTS_VENUE: 'Escenarios deportivos',
+  LIBRARY_ROOM: 'Espacios de biblioteca',
+  COMPUTER_CLASSROOM: 'Asignación académica',
+  INTERNAL_STAFF_SPACE: 'Uso interno',
 }
 
 export function SpaceGuidePage({ client }: SpaceGuidePageProps) {
@@ -67,7 +81,7 @@ export function SpaceGuidePage({ client }: SpaceGuidePageProps) {
           <p className="spaces-eyebrow"><span aria-hidden="true" /> ORIENTACIÓN · UPTC</p>
           <h1>Guía de espacios</h1>
           <p className="spaces-intro">
-            Encuentra sedes, CREAD y puntos de servicio a partir de las ubicaciones que publica la Universidad.
+            Consulta ubicaciones publicadas y encuentra los canales oficiales para préstamo, asignación o alquiler de algunos espacios.
           </p>
           <div className="spaces-source-note">
             <span className="spaces-source-dot" aria-hidden="true" />
@@ -139,6 +153,10 @@ export function SpaceGuidePage({ client }: SpaceGuidePageProps) {
       )}
 
       {visibleState.status === 'ready' && (
+        <SpaceUsePathways pathways={visibleState.snapshot.requestPathways} />
+      )}
+
+      {visibleState.status === 'ready' && (
         <div className="spaces-directory-footer">
           <div>
             <p className="spaces-eyebrow"><span aria-hidden="true" /> OTRAS UBICACIONES</p>
@@ -151,6 +169,49 @@ export function SpaceGuidePage({ client }: SpaceGuidePageProps) {
         </div>
       )}
     </section>
+  )
+}
+
+function SpaceUsePathways({ pathways }: { pathways: SpaceUsePathway[] }) {
+  return (
+    <section className="spaces-pathways" aria-labelledby="spaces-pathways-title">
+      <div className="spaces-pathways-heading">
+        <div>
+          <p className="spaces-eyebrow"><span aria-hidden="true" /> ORIENTACIÓN DE SERVICIOS</p>
+          <h2 id="spaces-pathways-title">Préstamo, asignación y alquiler</h2>
+          <p>Consulta con la unidad responsable las reglas vigentes para cada tipo de espacio.</p>
+        </div>
+        <span className="spaces-pathways-mark" aria-hidden="true">↗</span>
+      </div>
+      <div className="spaces-pathway-grid">
+        {pathways.map((pathway) => <SpaceUsePathwayCard key={pathway.id} pathway={pathway} />)}
+      </div>
+    </section>
+  )
+}
+
+function SpaceUsePathwayCard({ pathway }: { pathway: SpaceUsePathway }) {
+  return (
+    <article className="spaces-pathway-card" aria-label={pathway.title}>
+      <span className="spaces-pathway-kind">{USE_KIND_LABELS[pathway.kind]}</span>
+      <h3>{pathway.title}</h3>
+      <p className="spaces-pathway-audience">{pathway.audience}</p>
+      <p className="spaces-pathway-summary">{pathway.summary}</p>
+      <p className="spaces-pathway-note">{pathway.availabilityNote}</p>
+      <ul className="spaces-pathway-sources" aria-label={`Fuentes oficiales: ${pathway.title}`}>
+        {pathway.sources.map((source) => (
+          <li key={source.url}>
+            <a href={source.url} target="_blank" rel="noreferrer">
+              Consultar {source.label} <span aria-hidden="true">↗</span>
+            </a>
+            <span className="spaces-source-date">
+              {source.sourceUpdatedAt ? `Actualizada ${formatDate(source.sourceUpdatedAt)} · ` : ''}
+              Consultada {formatDate(source.checkedAt)}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </article>
   )
 }
 

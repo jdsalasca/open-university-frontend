@@ -3,6 +3,20 @@ import { createSpaceGuideClient, SpaceGuideApiError } from './spaceGuideClient'
 
 const payload = {
   officialOfficeDirectoryUrl: 'https://www.uptc.edu.co/sitio/portal/sitios/directorio/',
+  requestPathways: [{
+    id: 'library-rooms',
+    kind: 'LIBRARY_ROOM',
+    title: 'Salas y espacios de biblioteca',
+    audience: 'Comunidad UPTC según las condiciones de cada sala',
+    summary: 'Consulta los términos y la disponibilidad con la biblioteca correspondiente.',
+    availabilityNote: 'Esta guía no confirma reservas.',
+    sources: [{
+      label: 'Servicios de Biblioteca Presencial UPTC',
+      url: 'https://www.uptc.edu.co/sitio/portal/sitios/universidad/vic_aca/bibl/4_bpd/blbl_pres.html',
+      checkedAt: '2026-10-01',
+      sourceUpdatedAt: null,
+    }],
+  }],
   locations: [{
     id: 'cread-bogota',
     kind: 'CREAD',
@@ -37,6 +51,7 @@ describe('public space guide client', () => {
 
     // Assert
     expect(result.locations[0]).toMatchObject({ id: 'cread-bogota', department: null })
+    expect(result.requestPathways[0]).toMatchObject({ id: 'library-rooms', kind: 'LIBRARY_ROOM' })
     expect(fetcher).toHaveBeenCalledWith('/api/v1/spaces', {
       credentials: 'omit',
       headers: { Accept: 'application/json' },
@@ -52,6 +67,16 @@ describe('public space guide client', () => {
 
     // Act + Assert
     await expect(client.listSpaces()).rejects.toThrow('La fuente de un espacio no cumple el contrato público.')
+  })
+
+  it('rejects a request pathway source outside the official UPTC domain', async () => {
+    // Arrange
+    const invalidPayload = structuredClone(payload)
+    invalidPayload.requestPathways[0].sources[0].url = 'https://uptc.edu.co.attacker.example/reservas'
+    const client = createSpaceGuideClient(vi.fn().mockResolvedValue(jsonResponse(invalidPayload)))
+
+    // Act + Assert
+    await expect(client.listSpaces()).rejects.toThrow('La fuente de una solicitud de espacio no cumple el contrato público.')
   })
 
   it('rejects a map query for an entry with no published street address', async () => {

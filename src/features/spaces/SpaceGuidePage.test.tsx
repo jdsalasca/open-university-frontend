@@ -41,6 +41,43 @@ const locations: SpaceLocation[] = [
 const snapshot: SpaceDirectorySnapshot = {
   locations,
   officialOfficeDirectoryUrl: 'https://www.uptc.edu.co/sitio/portal/sitios/directorio/',
+  requestPathways: [
+    {
+      id: 'auditoriums-admin-spaces', kind: 'AUDITORIUM_OR_ACADEMIC_SPACE',
+      title: 'Auditorios y espacios académicos o administrativos', audience: 'Solicitantes según la unidad responsable',
+      summary: 'La unidad responsable revisa disponibilidad, viabilidad y requisitos; el alquiler depende del espacio y servicio.',
+      availabilityNote: 'La plataforma no muestra disponibilidad ni confirma reservas.',
+      sources: [{ label: 'Servicios Docente Asistenciales UPTC', url: 'https://dsp.uptc.edu.co/sitio/portal/sitios/universidad/vic_aca/sd_asistenciales/index.html', checkedAt: '2026-10-01', sourceUpdatedAt: null }],
+    },
+    {
+      id: 'sports-venues', kind: 'SPORTS_VENUE',
+      title: 'Escenarios deportivos', audience: 'Solicitantes según el reglamento institucional',
+      summary: 'La solicitud se dirige a Bienestar Universitario; consulta requisitos, tarifas y anticipación con el responsable.',
+      availabilityNote: 'La plataforma no muestra disponibilidad ni confirma reservas.',
+      sources: [{ label: 'Resolución 7189 de 2017', url: 'https://www.uptc.edu.co/export/sites/default/secretaria_general/rectoria/resoluciones_2017/Resolucion_7189_2017.pdf', checkedAt: '2026-10-01', sourceUpdatedAt: null }],
+    },
+    {
+      id: 'library-rooms', kind: 'LIBRARY_ROOM',
+      title: 'Salas y espacios de biblioteca', audience: 'Comunidad UPTC según las condiciones de cada sala',
+      summary: 'Consulta los términos, la disponibilidad y el canal de reserva de la biblioteca y seccional correspondiente.',
+      availabilityNote: 'Los aforos publicados son referenciales; no indican cupos disponibles.',
+      sources: [{ label: 'Servicios de Biblioteca Presencial UPTC', url: 'https://www.uptc.edu.co/sitio/portal/sitios/universidad/vic_aca/bibl/4_bpd/blbl_pres.html', checkedAt: '2026-10-01', sourceUpdatedAt: null }],
+    },
+    {
+      id: 'computer-classrooms', kind: 'COMPUTER_CLASSROOM',
+      title: 'Aulas de informática', audience: 'Docentes y dependencias académicas',
+      summary: 'DTIC distingue la asignación semestral para clase de la solicitud extra-clase para una fecha específica.',
+      availabilityNote: 'La programación se consulta y tramita en los canales oficiales de DTIC.',
+      sources: [{ label: 'Servicio de Aulas de Informática DTIC', url: 'https://www.uptc.edu.co/sitio/portal/sitios/universidad/rectoria/dtics/04_catserv/aulas.html', checkedAt: '2026-10-01', sourceUpdatedAt: '2025-08-14' }],
+    },
+    {
+      id: 'staff-break-room', kind: 'INTERNAL_STAFF_SPACE',
+      title: 'Break Room para personal administrativo', audience: 'Personal administrativo UPTC',
+      summary: 'La publicación institucional dirige las solicitudes anticipadas a Talento Humano y áreas responsables.',
+      availabilityNote: 'Uso interno sujeto a aprobación y coordinación institucional.',
+      sources: [{ label: 'Comunicado institucional sobre el Break Room', url: 'https://www.uptc.edu.co/sitio/portal/cal_not_eve/noticias/det/UPTC-invierte-en-comodidad-y-productividad-para-sus-funcionarios-con-el-nuevo-Break-Room/', checkedAt: '2026-10-01', sourceUpdatedAt: null }],
+    },
+  ],
 }
 
 function clientReturning(data: SpaceDirectorySnapshot = snapshot): SpaceGuideClient {
@@ -139,5 +176,23 @@ describe('SpaceGuidePage', () => {
 
     // Assert
     expect(within(serviceCard).queryByRole('link', { name: /abrir búsqueda de mapa/i })).not.toBeInTheDocument()
+  })
+
+  it('shows separate official pathways for borrowing, room assignment and rental without claiming availability', async () => {
+    // Arrange
+    render(<SpaceGuidePage client={clientReturning()} />)
+
+    // Act
+    const pathways = await screen.findByRole('region', { name: 'Préstamo, asignación y alquiler' })
+
+    // Assert
+    for (const title of snapshot.requestPathways.map((pathway) => pathway.title)) {
+      expect(within(pathways).getByRole('article', { name: title })).toBeVisible()
+    }
+    expect(within(pathways).getByRole('link', { name: 'Consultar Servicios de Biblioteca Presencial UPTC' }))
+      .toHaveAttribute('href', snapshot.requestPathways[2].sources[0].url)
+    expect(pathways).toHaveTextContent('La plataforma no muestra disponibilidad ni confirma reservas.')
+    expect(pathways.querySelector('form')).toBeNull()
+    expect(pathways.querySelector('input')).toBeNull()
   })
 })

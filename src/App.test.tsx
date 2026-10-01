@@ -117,6 +117,20 @@ function publicSpaceGuideClient(): SpaceGuideClient {
   return {
     listSpaces: async () => ({
       officialOfficeDirectoryUrl: 'https://www.uptc.edu.co/sitio/portal/sitios/directorio/',
+      requestPathways: [{
+        id: 'library-rooms',
+        kind: 'LIBRARY_ROOM',
+        title: 'Salas y espacios de biblioteca',
+        audience: 'Comunidad UPTC',
+        summary: 'Consulta condiciones y disponibilidad con la biblioteca.',
+        availabilityNote: 'La guía no confirma reservas.',
+        sources: [{
+          label: 'Servicios de Biblioteca UPTC',
+          url: 'https://www.uptc.edu.co/sitio/portal/sitios/universidad/vic_aca/bibl/4_bpd/blbl_pres.html',
+          checkedAt: '2026-10-01',
+          sourceUpdatedAt: null,
+        }],
+      }],
       locations: [{
         id: 'site-central-tunja',
         kind: 'CAMPUS',
