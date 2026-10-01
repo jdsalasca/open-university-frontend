@@ -1,8 +1,7 @@
-import { useEffect, useState } from 'react'
-import { AcademicCatalogPage } from './features/academics/AcademicCatalogPage'
+import { Component, lazy, Suspense, useEffect, useState } from 'react'
+import type { ReactNode } from 'react'
 import { academicCatalogClient } from './features/academics/academicCatalogClient'
 import type { AcademicCatalogClient, AcademicCatalogPermission } from './features/academics/contracts'
-import { AcademicOperationsPage } from './features/academics/AcademicOperationsPage'
 import { academicOperationsClient } from './features/academics/academicOperationsClient'
 import type {
   AcademicOperationsClient,
@@ -10,13 +9,25 @@ import type {
   AcademicStructureAuthorization,
 } from './features/academics/academicOperationsContracts'
 import { useBranding } from './features/branding/useBranding'
-import { VisualIdentityCenter } from './features/branding/VisualIdentityCenter'
 import { IdentityProvider } from './features/identity/IdentityProvider'
 import type { IdentitySessionManager } from './features/identity/IdentityProvider'
 import { useIdentity } from './features/identity/identityContext'
 import type { IdentityClient } from './features/identity/identityContracts'
 import type { OidcConfigurationResult } from './features/identity/oidcConfiguration'
 import './App.scss'
+
+const AcademicCatalogPage = lazy(() =>
+  import('./features/academics/AcademicCatalogPage')
+    .then(({ AcademicCatalogPage: page }) => ({ default: page })),
+)
+const AcademicOperationsPage = lazy(() =>
+  import('./features/academics/AcademicOperationsPage')
+    .then(({ AcademicOperationsPage: page }) => ({ default: page })),
+)
+const VisualIdentityCenter = lazy(() =>
+  import('./features/branding/VisualIdentityCenter')
+    .then(({ VisualIdentityCenter: page }) => ({ default: page })),
+)
 
 interface AppProps {
   catalogClient?: AcademicCatalogClient
@@ -224,22 +235,33 @@ function ApplicationShell({
           )}
           {isIdentityView && status === 'loading' && <p className="sr-only" role="status">Cargando identidad institucional…</p>}
 
-          {isProgramsView
-            ? <AcademicCatalogPage client={catalogClient} authorization={catalogAuthorization} />
-            : isAcademicOperationsView
-              ? <AcademicOperationsPage
-                client={operationsClient}
-                loadPrograms={catalogClient.listPrograms}
-                authorization={periodAuthorization}
-                structureAuthorization={structureAuthorization}
-                onAuthorizationRejected={revalidateRejectedStructureAccess}
-              />
-              : <VisualIdentityCenter
-                key={identityCenterKey}
-                accessToken={authenticatedIdentity?.accessToken ?? null}
-                permissions={authenticatedIdentity?.permissions ?? []}
-                initialConfiguration={branding}
-              />}
+          <ModuleLoadBoundary
+            key={view}
+            fallback={<ModuleLoadFailure label={isProgramsView || isAcademicOperationsView
+              ? 'el módulo académico'
+              : 'el centro de identidad visual'} />}
+          >
+            <Suspense fallback={<p className="module-loading" role="status" aria-live="polite">
+              Cargando {isProgramsView || isAcademicOperationsView ? 'módulo académico' : 'centro de identidad visual'}…
+            </p>}>
+              {isProgramsView
+                ? <AcademicCatalogPage client={catalogClient} authorization={catalogAuthorization} />
+                : isAcademicOperationsView
+                  ? <AcademicOperationsPage
+                    client={operationsClient}
+                    loadPrograms={catalogClient.listPrograms}
+                    authorization={periodAuthorization}
+                    structureAuthorization={structureAuthorization}
+                    onAuthorizationRejected={revalidateRejectedStructureAccess}
+                  />
+                  : <VisualIdentityCenter
+                    key={identityCenterKey}
+                    accessToken={authenticatedIdentity?.accessToken ?? null}
+                    permissions={authenticatedIdentity?.permissions ?? []}
+                    initialConfiguration={branding}
+                  />}
+            </Suspense>
+          </ModuleLoadBoundary>
 
           <footer className="page-footer"><span>{branding.institutionName}</span><span>{isProgramsView
             ? 'Vista previa de programas · Sin publicación institucional'
@@ -265,4 +287,27 @@ function readApplicationView(): ApplicationView {
 
 function isAcademicCatalogPermission(permission: string): permission is AcademicCatalogPermission {
   return permission === 'academic:catalog:read' || permission === 'academic:catalog:write'
+}
+
+class ModuleLoadBoundary extends Component<{ children: ReactNode; fallback: ReactNode }, { hasError: boolean }> {
+  state = { hasError: false }
+
+  static getDerivedStateFromError(): { hasError: boolean } {
+    return { hasError: true }
+  }
+
+  render() {
+    return this.state.hasError ? this.props.fallback : this.props.children
+  }
+}
+
+function ModuleLoadFailure({ label }: { label: string }) {
+  return (
+    <div className="module-load-failure" role="alert">
+      <p>No se pudo cargar {label}.</p>
+      <button className="module-load-retry" type="button" onClick={() => window.location.reload()}>
+        Recargar pantalla
+      </button>
+    </div>
+  )
 }

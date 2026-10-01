@@ -141,6 +141,11 @@
 .identity-session-button.secondary { border-color: #d6d7cf; background: transparent; color: #4b4d44; }
 
 .page-content { max-width: 1440px; margin: 0 auto; padding: 34px 42px 20px; }
+.module-loading { display: grid; min-height: clamp(220px, 54vh, 520px); place-items: center; color: #74766e; font-size: 12px; }
+.module-load-failure { display: grid; min-height: clamp(220px, 54vh, 520px); align-content: center; justify-items: center; gap: 12px; color: #74766e; font-size: 12px; }
+.module-load-failure p { margin: 0; }
+.module-load-retry { min-height: 34px; padding: 0 13px; border: 1px solid #393a32; border-radius: 8px; background: #252620; color: white; font: inherit; cursor: pointer; }
+.module-load-retry:focus-visible { outline: 3px solid var(--brand-focus, #1a1a1a); outline-offset: 3px; }
 .page-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin: 0 0 24px; }
 .eyebrow { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; color: #77796f; font-size: 9px; font-weight: 750; letter-spacing: .14em; }
 .eyebrow-mark { display: inline-block; width: 8px; height: 8px; transform: rotate(45deg); background: var(--brand-primary, #ffcc29); }

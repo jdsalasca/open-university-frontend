@@ -124,6 +124,22 @@ describe('App', () => {
     expect(screen.getByRole('link', { name: 'Identidad visual' })).toBeVisible()
   })
 
+  it('announces the selected academic module while its route chunk loads', () => {
+    // Arrange
+    window.history.replaceState(null, '', '#programas')
+    const catalogClient = emptyAcademicCatalogClient()
+
+    // Act
+    render(
+      <BrandingProvider loader={async () => DEFAULT_BRANDING}>
+        <App catalogClient={catalogClient} />
+      </BrandingProvider>,
+    )
+
+    // Assert
+    expect(screen.getByText('Cargando módulo académico…')).toBeVisible()
+  })
+
   it('opens Programs as a keyboard accessible development preview while branding availability stays false', async () => {
     // Arrange
     const user = userEvent.setup()
