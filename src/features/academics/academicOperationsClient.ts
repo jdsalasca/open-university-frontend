@@ -277,7 +277,9 @@ function parseCalendarRevision(input: unknown): AcademicCalendarRevision {
     || !isOneOf(CALENDAR_REVISION_STATUSES, input.status)
     || !Array.isArray(input.activities)
     || input.activities.length > 200) throw malformedResponse()
-  return { ...input, activities: input.activities.map(parseCalendarActivity) } as AcademicCalendarRevision
+  const activities = input.activities.map(parseCalendarActivity)
+  assertUnique(activities.map(({ key }) => key))
+  return { ...input, activities } as AcademicCalendarRevision
 }
 
 function parseCalendarActivity(input: unknown): AcademicCalendarActivity {

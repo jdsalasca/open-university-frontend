@@ -966,6 +966,37 @@ describe('academic operations client', () => {
     expect(fetcher).toHaveBeenCalledTimes(2)
   })
 
+  it('rejects duplicate activity keys inside one calendar revision', async () => {
+    // Arrange
+    const { createAcademicOperationsClient } = await loadClient()
+    const revisionId = 'c2d11854-487b-4d55-b825-0b321fb1f414'
+    const activity = {
+      key: 'REGISTRATION',
+      label: 'Inscripción',
+      startsAt: '2026-06-22T08:00:00',
+      endsAt: '2026-06-28T16:00:00',
+      organizationUnitId: null,
+      siteId: null,
+    }
+    const fetcher = vi.fn().mockResolvedValue(jsonResponse({
+      period,
+      calendarRevisions: [{
+        id: revisionId,
+        periodId: period.id,
+        version: 1,
+        officialReference: 'Calendario institucional de prueba',
+        status: 'PUBLISHED',
+        activities: [activity, { ...activity, label: 'Inscripción duplicada' }],
+      }],
+      auditEvents: [],
+    }))
+    const client = createAcademicOperationsClient(fetcher)
+
+    // Act + Assert
+    await expect(client.getPeriodHistory(period.id, 'synthetic-read-token')).rejects.toThrow(/malformed/i)
+    expect(fetcher).toHaveBeenCalledOnce()
+  })
+
   it('changes all five structure order targets through audited conditional PATCH requests', async () => {
     // Arrange
     const { createAcademicOperationsClient } = await loadClient()
