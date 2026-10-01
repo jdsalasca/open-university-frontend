@@ -24,6 +24,10 @@ const AcademicOperationsPage = lazy(() =>
   import('./features/academics/AcademicOperationsPage')
     .then(({ AcademicOperationsPage: page }) => ({ default: page })),
 )
+const AdmissionsCalendarPage = lazy(() =>
+  import('./features/admissions/AdmissionsCalendarPage')
+    .then(({ AdmissionsCalendarPage: page }) => ({ default: page })),
+)
 const VisualIdentityCenter = lazy(() =>
   import('./features/branding/VisualIdentityCenter')
     .then(({ VisualIdentityCenter: page }) => ({ default: page })),
@@ -37,7 +41,7 @@ interface AppProps {
   currentIdentityClient?: IdentityClient
 }
 
-type ApplicationView = 'identity' | 'programs' | 'academia'
+type ApplicationView = 'identity' | 'programs' | 'academia' | 'admissions'
 
 const MODULE_SYMBOLS: Record<string, string> = {
   home: '⌂',
@@ -46,6 +50,7 @@ const MODULE_SYMBOLS: Record<string, string> = {
   curricula: '▤',
   subjects: '◇',
   'academic-load': '◷',
+  admissions: '◇',
   'visual-identity': '✳',
 }
 
@@ -84,16 +89,19 @@ function ApplicationShell({
     return () => window.removeEventListener('hashchange', onHashChange)
   }, [])
 
-  const modules = branding.modules.filter((module) => module.key !== 'visual-identity' && module.key !== 'programs')
+  const modules = branding.modules.filter((module) => !['visual-identity', 'programs', 'admissions'].includes(module.key))
   const identityModule = branding.modules.find((module) => module.key === 'visual-identity')
   const programsModule = branding.modules.find((module) => module.key === 'programs')
+  const admissionsModule = branding.modules.find((module) => module.key === 'admissions')
   const institutionLogo = branding.assets.logoDark
     ? `/assets/${branding.assets.logoDark}`
     : null
   const identityLabel = identityModule?.label ?? 'Identidad visual'
   const programsLabel = programsModule?.label ?? 'Programas'
+  const admissionsLabel = admissionsModule?.label ?? 'Admisiones'
   const isProgramsView = view === 'programs'
   const isAcademicOperationsView = view === 'academia'
+  const isAdmissionsView = view === 'admissions'
   const isIdentityView = view === 'identity'
   const authenticatedIdentity = identity.status === 'authenticated' ? identity : null
   const hasInstitutionalSession = authenticatedIdentity !== null
@@ -131,7 +139,8 @@ function ApplicationShell({
           : identity.reason === 'expired' ? 'Sesión vencida · Sin acceso'
             : 'Sin sesión institucional'
   const identityCenterKey = `${branding.revision}:${authenticatedIdentity?.subject ?? 'anonymous'}`
-  const currentPageLabel = isProgramsView ? programsLabel
+  const currentPageLabel = isAdmissionsView ? admissionsLabel
+    : isProgramsView ? programsLabel
     : isAcademicOperationsView ? 'Estructura y periodos'
       : identityLabel
 
@@ -165,6 +174,11 @@ function ApplicationShell({
               <span>{programsLabel} · Vista previa</span>
               {isProgramsView && <span className="nav-status" aria-hidden="true" />}
             </a>
+            <a className={`nav-item${isAdmissionsView ? ' active' : ''}`} href="#admisiones" aria-current={isAdmissionsView ? 'page' : undefined}>
+              <span className="nav-glyph" aria-hidden="true">{MODULE_SYMBOLS.admissions}</span>
+              <span>{admissionsLabel} · Información pública</span>
+              {isAdmissionsView && <span className="nav-status" aria-hidden="true" />}
+            </a>
             <a className={`nav-item${isAcademicOperationsView ? ' active' : ''}`} href="#academia" aria-current={isAcademicOperationsView ? 'page' : undefined}>
               <span className="nav-glyph" aria-hidden="true">◷</span>
               <span>Estructura y periodos · Vista previa</span>
@@ -194,11 +208,13 @@ function ApplicationShell({
 
       <div className="workspace">
         <header className="topbar">
-          <div className="breadcrumbs"><span>{isProgramsView || isAcademicOperationsView ? 'Vida universitaria' : 'Administración'}</span><span aria-hidden="true">/</span><strong>{currentPageLabel}</strong></div>
+          <div className="breadcrumbs"><span>{isProgramsView || isAcademicOperationsView || isAdmissionsView ? 'Vida universitaria' : 'Administración'}</span><span aria-hidden="true">/</span><strong>{currentPageLabel}</strong></div>
           <div className="topbar-meta">
-            <span className="autosave-indicator"><span aria-hidden="true" />{isProgramsView ? 'Consulta de programas' : isAcademicOperationsView ? 'Consulta académica' : status === 'ready' ? 'Identidad sincronizada' : 'Identidad de respaldo'}</span>
+            <span className="autosave-indicator"><span aria-hidden="true" />{isAdmissionsView ? 'Consulta de admisiones' : isProgramsView ? 'Consulta de programas' : isAcademicOperationsView ? 'Consulta académica' : status === 'ready' ? 'Identidad sincronizada' : 'Identidad de respaldo'}</span>
             <span className="topbar-divider" aria-hidden="true" />
-            {isProgramsView
+            {isAdmissionsView
+              ? <span className="revision-chip">PREGRADO · 2027-I</span>
+              : isProgramsView
               ? <span className="revision-chip">PREGRADO · PRESENCIAL</span>
               : isAcademicOperationsView
                 ? <span className="revision-chip">ESTRUCTURA · PERIODOS</span>
@@ -227,8 +243,8 @@ function ApplicationShell({
           </div>
         </header>
 
-        <main id={view === 'identity' ? 'inicio' : view === 'programs' ? 'programas' : 'academia'}
-          className={isProgramsView ? 'catalog-page-content' : isAcademicOperationsView ? 'academic-page-content' : 'page-content identity-page-content'}>
+        <main id={view === 'identity' ? 'inicio' : view === 'programs' ? 'programas' : isAdmissionsView ? 'admisiones' : 'academia'}
+          className={isAdmissionsView ? 'admissions-page-content' : isProgramsView ? 'catalog-page-content' : isAcademicOperationsView ? 'academic-page-content' : 'page-content identity-page-content'}>
           {isIdentityView && status === 'fallback' && (
             <div className="status-banner" role="status">
               <span className="status-banner-icon" aria-hidden="true">i</span>
@@ -239,12 +255,14 @@ function ApplicationShell({
 
           <ModuleLoadBoundary
             key={view}
-            fallback={<ModuleLoadFailure label={isProgramsView || isAcademicOperationsView
-              ? 'el módulo académico'
-              : 'el centro de identidad visual'} />}
+            fallback={<ModuleLoadFailure label={isAdmissionsView
+              ? 'la agenda de admisiones'
+              : isProgramsView || isAcademicOperationsView
+                ? 'el módulo académico'
+                : 'el centro de identidad visual'} />}
           >
             <Suspense fallback={<p className="module-loading" role="status" aria-live="polite">
-              Cargando {isProgramsView || isAcademicOperationsView ? 'módulo académico' : 'centro de identidad visual'}…
+              Cargando {isAdmissionsView ? 'agenda de admisiones' : isProgramsView || isAcademicOperationsView ? 'módulo académico' : 'centro de identidad visual'}…
             </p>}>
               {isProgramsView
                 ? <AcademicCatalogPage client={catalogClient} authorization={catalogAuthorization} />
@@ -256,7 +274,9 @@ function ApplicationShell({
                     structureAuthorization={structureAuthorization}
                     onAuthorizationRejected={revalidateRejectedStructureAccess}
                   />
-                  : <VisualIdentityCenter
+                  : isAdmissionsView
+                    ? <AdmissionsCalendarPage />
+                    : <VisualIdentityCenter
                     key={identityCenterKey}
                     accessToken={authenticatedIdentity?.accessToken ?? null}
                     permissions={authenticatedIdentity?.permissions ?? []}
@@ -265,7 +285,9 @@ function ApplicationShell({
             </Suspense>
           </ModuleLoadBoundary>
 
-          <footer className="page-footer"><span>{branding.institutionName}</span><span>{isProgramsView
+          <footer className="page-footer"><span>{branding.institutionName}</span><span>{isAdmissionsView
+            ? 'Calendario público de admisiones · Información de ACRA'
+            : isProgramsView
             ? 'Vista previa de programas · Sin publicación institucional'
           : isAcademicOperationsView
               ? periodAuthorization?.canWrite
@@ -284,6 +306,7 @@ function readApplicationView(): ApplicationView {
   if (typeof window === 'undefined') return 'identity'
   if (window.location.hash === '#programas') return 'programs'
   if (window.location.hash === '#academia') return 'academia'
+  if (window.location.hash === '#admisiones') return 'admissions'
   return 'identity'
 }
 

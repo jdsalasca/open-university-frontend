@@ -200,6 +200,25 @@ describe('App', () => {
     expect(link).toHaveAttribute('aria-current', 'page')
   })
 
+  it('opens the public undergraduate admissions calendar from the application navigation', async () => {
+    // Arrange
+    const user = userEvent.setup()
+    render(
+      <BrandingProvider loader={async () => DEFAULT_BRANDING}>
+        <App />
+      </BrandingProvider>,
+    )
+
+    // Act
+    const link = await screen.findByRole('link', { name: /admisiones/i })
+    await user.click(link)
+
+    // Assert
+    expect(await screen.findByRole('heading', { name: /pregrado presencial.*2027-i/i })).toBeVisible()
+    expect(link).toHaveAttribute('href', '#admisiones')
+    expect(link).toHaveAttribute('aria-current', 'page')
+  })
+
   it('uses backend branding permission without granting academic catalog controls', async () => {
     // Arrange
     const user = userEvent.setup()
