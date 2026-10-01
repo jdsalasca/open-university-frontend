@@ -210,7 +210,7 @@ describe('IdentityProvider', () => {
     await renderProvider({ manager, identityClient: api })
 
     // Assert
-    expect(await screen.findByRole('status')).toHaveTextContent('error')
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('error'))
     expect(screen.getByText(/funciones administrativas siguen cerradas/i)).toBeVisible()
     expect(screen.queryByText(/branding:read/)).not.toBeInTheDocument()
     expect(manager.removeUser).not.toHaveBeenCalled()

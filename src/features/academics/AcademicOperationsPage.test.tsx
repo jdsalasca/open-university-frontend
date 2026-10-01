@@ -541,10 +541,75 @@ describe('AcademicOperationsPage', () => {
     expect(screen.getByRole('status')).toHaveTextContent(/el periodo 2026-2 quedó abierto/i)
   })
 
+  it('refreshes the active calendar and requires a new confirmation after a stale close conflict', async () => {
+    // Arrange
+    const user = userEvent.setup()
+    const { AcademicOperationsPage } = await loadPage()
+    const amendedPeriod = {
+      ...regularPeriod,
+      calendarRevisionId: 'ac83a27f-3753-4a2d-8e1d-a8ee160555e7',
+      calendarRevisionNumber: 2,
+      officialReference: 'Resolución modificatoria de calendario',
+    }
+    const getAdminPeriods = vi.fn()
+      .mockResolvedValueOnce([regularPeriod])
+      .mockResolvedValueOnce([amendedPeriod])
+    const closePeriod = vi.fn().mockRejectedValue(new AcademicOperationsApiError(409, 'Conflict'))
+    const client = createClient({ getAdminPeriods, closePeriod })
+    render(<AcademicOperationsPage
+      client={client}
+      loadPrograms={async () => programs}
+      authorization={{ accessToken: 'synthetic-access-token', canRead: true, canWrite: true }}
+    />)
+
+    // Act
+    await user.click(await screen.findByRole('button', { name: 'Cerrar periodo 2026-2' }))
+    await user.click(screen.getByRole('button', { name: 'Confirmar cierre' }))
+
+    // Assert
+    expect(await screen.findByRole('alert')).toHaveTextContent(/otro cambio modificó el periodo/i)
+    expect(getAdminPeriods).toHaveBeenCalledTimes(2)
+    expect(screen.getByText(/Calendario rev\. 2/)).toBeVisible()
+    expect(screen.queryByText(/Calendario rev\. 1/)).not.toBeInTheDocument()
+    expect(screen.queryByRole('group', { name: 'Confirmar cierre de 2026-2' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Cerrar periodo 2026-2' })).toBeEnabled()
+  })
+
+  it.each([401, 403])('revalidates institutional authorization after a period transition returns %i', async (status) => {
+    // Arrange
+    const user = userEvent.setup()
+    const { AcademicOperationsPage } = await loadPage()
+    const accessToken = 'synthetic-access-token'
+    const closePeriod = vi.fn().mockRejectedValue(new AcademicOperationsApiError(status, 'Denied'))
+    const onAuthorizationRejected = vi.fn().mockResolvedValue(undefined)
+    const client = createClient({ closePeriod })
+    render(<AcademicOperationsPage
+      client={client}
+      loadPrograms={async () => programs}
+      authorization={{ accessToken, canRead: true, canWrite: true }}
+      onAuthorizationRejected={onAuthorizationRejected}
+    />)
+
+    // Act
+    await user.click(await screen.findByRole('button', { name: 'Cerrar periodo 2026-2' }))
+    await user.click(screen.getByRole('button', { name: 'Confirmar cierre' }))
+
+    // Assert
+    expect(await screen.findByRole('alert')).toHaveTextContent(status === 401
+      ? /el servidor rechazó la sesión/i
+      : /el servidor negó el permiso/i)
+    expect(onAuthorizationRejected).toHaveBeenCalledWith(accessToken)
+  })
+
   it('shows approved and open periods for readers but hides transitions without write permission', async () => {
     // Arrange
     const { AcademicOperationsPage } = await loadPage()
-    const approved = { ...regularPeriod, status: 'APPROVED' as const }
+    const approved = {
+      ...regularPeriod,
+      id: '0326036b-58de-4897-bc5b-1e54d498ec4d',
+      code: '2026-3',
+      status: 'APPROVED' as const,
+    }
     const client = createClient({ getAdminPeriods: vi.fn().mockResolvedValue([approved, regularPeriod]) })
     render(<AcademicOperationsPage
       client={client}

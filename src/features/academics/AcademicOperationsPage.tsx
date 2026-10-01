@@ -123,7 +123,45 @@ export function AcademicOperationsPage({
         type: 'success',
         text: `El periodo ${updatedPeriod.code} quedó ${action === 'open' ? 'abierto' : 'cerrado'}. La oferta de asignaturas y la matrícula no cambiaron.`,
       })
-    } catch {
+    } catch (error) {
+      setPeriodConfirmation(null)
+      if (error instanceof AcademicOperationsApiError && error.status === 409) {
+        try {
+          const periodSource = authorization?.canRead ? 'admin' : 'public'
+          const periods = periodSource === 'admin'
+            ? await client.getAdminPeriods(authorization.accessToken)
+            : await client.getOpenPeriods()
+          setRequestData((current) => current ? { ...current, periods, periodSource } : current)
+          setPeriodActionMessage({
+            type: 'error',
+            text: 'Otro cambio modificó el periodo o su calendario. Actualicé la vista; revisa el estado y confirma de nuevo si aún corresponde.',
+          })
+        } catch {
+          setRequestState('error')
+          setPeriodActionMessage({
+            type: 'error',
+            text: 'Otro cambio modificó el periodo y no pude actualizarlo. Recarga la vista antes de intentar otra vez.',
+          })
+        }
+        return
+      }
+      if (error instanceof AcademicOperationsApiError && (error.status === 401 || error.status === 403)) {
+        setPeriodActionMessage({
+          type: 'error',
+          text: error.status === 401
+            ? 'El servidor rechazó la sesión. Estoy comprobando la identidad; inicia sesión de nuevo si hace falta.'
+            : 'El servidor negó el permiso para cambiar el periodo. Estoy volviendo a comprobar los permisos.',
+        })
+        try {
+          await onAuthorizationRejected?.(authorization.accessToken)
+        } catch {
+          setPeriodActionMessage({
+            type: 'error',
+            text: 'El servidor rechazó el cambio y no pude revalidar los permisos. Vuelve a iniciar sesión antes de continuar.',
+          })
+        }
+        return
+      }
       setPeriodActionMessage({ type: 'error', text: 'No fue posible cambiar el estado del periodo. Actualiza la vista y vuelve a intentarlo.' })
     } finally {
       setPendingPeriodId(null)
