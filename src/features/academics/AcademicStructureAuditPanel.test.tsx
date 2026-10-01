@@ -11,7 +11,10 @@ async function loadPanel() {
   return loader!()
 }
 
-afterEach(() => cleanup())
+afterEach(() => {
+  cleanup()
+  vi.restoreAllMocks()
+})
 
 const firstEntityId = 'fae06170-9acf-4718-854e-92e945a7db17'
 
@@ -117,6 +120,27 @@ describe('AcademicStructureAuditPanel', () => {
       'synthetic-token',
       expect.any(AbortSignal),
     )
+  })
+
+  it('keeps separate events when their entity, action, actor, and timestamp match', async () => {
+    // Arrange
+    const { AcademicStructureAuditPanel } = await loadPanel()
+    const simultaneousEvent: AcademicStructureAuditEvent = {
+      ...firstEvent,
+      summary: 'Segundo movimiento de la misma entidad',
+    }
+    const client = createClient(vi.fn().mockResolvedValue({
+      events: [firstEvent, simultaneousEvent],
+      nextCursor: null,
+    } satisfies AcademicStructureAuditPage))
+
+    // Act
+    render(<AcademicStructureAuditPanel canRead accessToken="synthetic-token" client={client} />)
+
+    // Assert
+    expect(await screen.findByText('Se creó la unidad FAC-CIENCIAS')).toBeInTheDocument()
+    expect(await screen.findByText('Segundo movimiento de la misma entidad')).toBeInTheDocument()
+    expect(screen.getAllByRole('listitem')).toHaveLength(2)
   })
 
   it('shows a useful empty state when no audit events match', async () => {

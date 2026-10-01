@@ -208,7 +208,7 @@ function AcademicStructureAuditPanelContent({
       {events.length > 0 && <>
         {loadError && <p className="academic-structure-audit-error" role="alert">{loadError}</p>}
         <ol className="academic-structure-audit-events">
-          {events.map((event) => <li key={auditEventKey(event)}>
+          {events.map((event, index) => <li key={index}>
             <div className="academic-structure-audit-event-heading">
               <time dateTime={event.occurredAt}>{formatAuditInstant(event.occurredAt)}</time>
               <span>{ACTION_LABELS[event.actionKey]}</span>
@@ -230,10 +230,6 @@ function AcademicStructureAuditPanelContent({
       </>}
     </section>
   )
-}
-
-function auditEventKey(event: AcademicStructureAuditEvent): string {
-  return [event.entityId, event.actionKey, event.occurredAt, event.actor].join(':')
 }
 
 function formatAuditInstant(value: string): string {
