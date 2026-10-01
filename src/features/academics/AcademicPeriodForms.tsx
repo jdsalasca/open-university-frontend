@@ -114,7 +114,7 @@ export function CreateAcademicPeriodForm({
           label="Número del periodo"
           type="number"
           min={1}
-          max={kind === 'REGULAR' ? 2 : undefined}
+          max={kind === 'REGULAR' ? 2 : 99}
           step={1}
           registration={register('sequenceNumber', {
             valueAsNumber: true,
@@ -122,11 +122,12 @@ export function CreateAcademicPeriodForm({
             min: { value: 1, message: 'El número debe ser mayor que cero.' },
             validate: (value) => {
               if (typeof value !== 'number' || !Number.isInteger(value)) return 'El número del periodo debe ser entero.'
+              if (value > 99) return 'El número máximo admitido es 99.'
               return kind !== 'REGULAR' || value <= 2 || 'En un periodo regular el número debe ser 1 o 2.'
             },
           })}
           error={errors.sequenceNumber?.message}
-          hint={kind === 'REGULAR' ? 'Los periodos regulares admiten 1 o 2.' : 'El identificador intersemestral es independiente del semestre curricular.'}
+          hint={kind === 'REGULAR' ? 'Los periodos regulares admiten 1 o 2.' : 'Usa un número del 1 al 99, independiente del semestre curricular.'}
           disabled={isSubmitting}
         />
         <RHFInputField

@@ -62,6 +62,7 @@ function normalizePeriodCreateCommand(command: AcademicPeriodCreateCommand): Aca
     || !isOneOf(PERIOD_KINDS, command.kind)
     || !Number.isInteger(command.academicYear) || command.academicYear < 1900 || command.academicYear > 9999
     || !isPositiveInteger(command.sequenceNumber)
+    || command.sequenceNumber > 99
     || (command.kind === 'REGULAR' && command.sequenceNumber > 2)
     || !isDate(command.startsOn) || !isDate(command.endsOn) || command.endsOn < command.startsOn
     || containsAsciiControlCharacters(code)) {

@@ -996,6 +996,23 @@ describe('academic operations client', () => {
     expect(fetcher).not.toHaveBeenCalled()
   })
 
+  it('rejects an intersemester sequence above the API limit before sending the period request', async () => {
+    // Arrange
+    const { createAcademicOperationsClient } = await loadClient()
+    const fetcher = vi.fn()
+    const client = createAcademicOperationsClient(fetcher)
+
+    // Act
+    const result = client.createPeriod({
+      code: '2027-int-100', kind: 'INTERSEMESTRAL', academicYear: 2027, sequenceNumber: 100,
+      startsOn: '2027-06-01', endsOn: '2027-06-30',
+    }, 'synthetic-access-token')
+
+    // Assert
+    await expect(result).rejects.toThrow(/period/i)
+    expect(fetcher).not.toHaveBeenCalled()
+  })
+
   it('loads an administrative period history with the read bearer token and validates the response', async () => {
     // Arrange
     const { createAcademicOperationsClient } = await loadClient()
