@@ -1,6 +1,7 @@
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { BrandingProvider } from './BrandingProvider'
+import { DEFAULT_BRANDING, parsePublicBranding } from './contracts'
 import { useBranding } from './useBranding'
 import type { PublicBranding } from './contracts'
 
@@ -42,6 +43,25 @@ afterEach(() => {
 })
 
 describe('BrandingProvider', () => {
+  it('keeps the public space guide as a configurable module and validates its label and visibility', () => {
+    // Arrange
+    const payload = {
+      ...DEFAULT_BRANDING,
+      modules: DEFAULT_BRANDING.modules.map((module) => module.key === 'spaces'
+        ? { ...module, label: 'Sedes y puntos de atención', visible: false }
+        : module),
+    }
+
+    // Act
+    const branding = parsePublicBranding(payload)
+    const spacesModule = branding.modules.find((module) => module.key === 'spaces')
+
+    // Assert
+    expect(spacesModule).toMatchObject({
+      key: 'spaces', available: true, visible: false, label: 'Sedes y puntos de atención', order: 70,
+    })
+  })
+
   it('applies the API palette as CSS variables', async () => {
     // Arrange
     vi.stubGlobal('fetch', vi.fn().mockReturnValue(jsonResponse(apiBranding)))

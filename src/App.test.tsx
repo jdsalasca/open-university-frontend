@@ -7,6 +7,7 @@ import { BrandingProvider } from './features/branding/BrandingProvider'
 import { DEFAULT_BRANDING } from './features/branding/contracts'
 import type { AcademicCatalogClient } from './features/academics/contracts'
 import type { AcademicOperationsClient, AcademicOrganizationUnitCreateCommand, AcademicPeriod } from './features/academics/academicOperationsContracts'
+import type { SpaceGuideClient } from './features/spaces/spaceGuideClient'
 import type { CurrentIdentity, IdentityClient } from './features/identity/identityContracts'
 import { IdentityApiError } from './features/identity/identityClient'
 import type { IdentitySessionManager } from './features/identity/IdentityProvider'
@@ -88,6 +89,30 @@ function emptyAcademicOperationsClient(): AcademicOperationsClient {
     changeOrganizationRelationOrder: async () => { throw new Error('Unexpected organization relation order change') },
     changeSiteRelationOrder: async () => { throw new Error('Unexpected site relation order change') },
     changeProgramAffiliationOrder: async () => { throw new Error('Unexpected program affiliation order change') },
+  }
+}
+
+function publicSpaceGuideClient(): SpaceGuideClient {
+  return {
+    listSpaces: async () => ({
+      officialOfficeDirectoryUrl: 'https://www.uptc.edu.co/sitio/portal/sitios/directorio/',
+      locations: [{
+        id: 'site-central-tunja',
+        kind: 'CAMPUS',
+        name: 'Sede Central Tunja',
+        municipality: 'Tunja',
+        department: 'Boyacá',
+        address: 'Avenida Central del Norte 39-115',
+        locationDetail: null,
+        mapQuery: 'Avenida Central del Norte 39-115, Tunja, Boyacá',
+        source: {
+          label: 'Localización y sedes UPTC',
+          url: 'https://uptc.edu.co/sitio/portal/sitios/localizacion/',
+          checkedAt: '2026-10-01',
+          sourceUpdatedAt: '2026-07-03',
+        },
+      }],
+    }),
   }
 }
 
@@ -239,6 +264,57 @@ describe('App', () => {
 
     // Assert
     expect(screen.queryByRole('link', { name: /admisiones.*información pública/i })).not.toBeInTheDocument()
+    expect(pageHeading).toBeVisible()
+  })
+
+  it('opens the public space guide from navigation and applies the configured module label', async () => {
+    // Arrange
+    const user = userEvent.setup()
+    const branding = {
+      ...DEFAULT_BRANDING,
+      modules: DEFAULT_BRANDING.modules.map((module) => module.key === 'spaces'
+        ? { ...module, label: 'Sedes y lugares' }
+        : module),
+    }
+    window.history.replaceState(null, '', '#inicio')
+    render(
+      <BrandingProvider loader={async () => branding}>
+        <App spaceGuideClient={publicSpaceGuideClient()} />
+      </BrandingProvider>,
+    )
+
+    // Act
+    const spacesLink = await screen.findByRole('link', { name: /sedes y lugares/i })
+    await user.click(spacesLink)
+
+    // Assert
+    expect(await screen.findByRole('heading', { name: 'Guía de espacios' })).toBeVisible()
+    expect(await screen.findByRole('article', { name: 'Sede Central Tunja' })).toBeVisible()
+    expect(spacesLink).toHaveAttribute('href', '#espacios')
+    expect(spacesLink).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByText('Sedes y lugares', { selector: '.breadcrumbs strong' })).toBeVisible()
+  })
+
+  it('hides the space navigation link when branding disables visibility but keeps the direct public route', async () => {
+    // Arrange
+    const branding = {
+      ...DEFAULT_BRANDING,
+      modules: DEFAULT_BRANDING.modules.map((module) => module.key === 'spaces'
+        ? { ...module, visible: false }
+        : module),
+    }
+    window.history.replaceState(null, '', '#espacios')
+    render(
+      <BrandingProvider loader={async () => branding}>
+        <App spaceGuideClient={publicSpaceGuideClient()} />
+      </BrandingProvider>,
+    )
+
+    // Act
+    const pageHeading = await screen.findByRole('heading', { name: 'Guía de espacios' })
+
+    // Assert
+    expect(screen.queryByRole('link', { name: /guía de espacios/i })).not.toBeInTheDocument()
     expect(pageHeading).toBeVisible()
   })
 
