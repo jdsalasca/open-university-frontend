@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
 import { academicCatalogClient } from './academicCatalogClient'
 import type { AcademicProgram } from './contracts'
@@ -38,6 +38,7 @@ interface AcademicOperationsPageProps {
   loadPrograms?: (signal?: AbortSignal) => Promise<AcademicProgram[]>
   authorization?: AcademicPeriodAuthorization | null
   structureAuthorization?: AcademicStructureAuthorization | null
+  onAuthorizationRejected?: () => Promise<void>
 }
 
 const defaultLoadPrograms = (signal?: AbortSignal) => academicCatalogClient.listPrograms(signal)
@@ -47,6 +48,7 @@ export function AcademicOperationsPage({
   loadPrograms = defaultLoadPrograms,
   authorization = null,
   structureAuthorization = null,
+  onAuthorizationRejected,
 }: AcademicOperationsPageProps) {
   const [requestState, setRequestState] = useState<RequestState>('loading')
   const [requestData, setRequestData] = useState<RequestData | null>(null)
@@ -55,6 +57,17 @@ export function AcademicOperationsPage({
   const [pendingPeriodId, setPendingPeriodId] = useState<string | null>(null)
   const [periodActionMessage, setPeriodActionMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [structureOrderMessage, setStructureOrderMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [structureOrderAuthorizationRejected, setStructureOrderAuthorizationRejected] = useState(false)
+  const lastStructureAccessToken = useRef<string | null>(null)
+  const structureWriteToken = structureAuthorization?.accessToken ?? null
+  const canWriteStructure = structureAuthorization?.canWrite === true
+  const canChangeStructureOrder = canWriteStructure && !structureOrderAuthorizationRejected
+
+  useEffect(() => {
+    if (!canWriteStructure || structureWriteToken === lastStructureAccessToken.current) return
+    lastStructureAccessToken.current = structureWriteToken
+    setStructureOrderAuthorizationRejected(false)
+  }, [canWriteStructure, structureWriteToken])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -142,6 +155,24 @@ export function AcademicOperationsPage({
     try {
       await submitStructureOrder(client, target, command, structureAuthorization.accessToken)
     } catch (error) {
+      if (error instanceof AcademicOperationsApiError && (error.status === 401 || error.status === 403)) {
+        setStructureOrderAuthorizationRejected(true)
+        setStructureOrderMessage({
+          type: 'error',
+          text: error.status === 401
+            ? 'El servidor rechazó la sesión. Oculté los controles y estoy comprobando la identidad; inicia sesión de nuevo si hace falta.'
+            : 'El servidor negó el permiso para este cambio. Oculté los controles mientras vuelvo a comprobar los permisos.',
+        })
+        try {
+          await onAuthorizationRejected?.()
+        } catch {
+          setStructureOrderMessage({
+            type: 'error',
+            text: 'El servidor rechazó el cambio y no pude revalidar los permisos. Los controles siguen ocultos; vuelve a iniciar sesión antes de continuar.',
+          })
+        }
+        return
+      }
       if (error instanceof AcademicOperationsApiError && error.status === 409) {
         try {
           const refreshed = await client.getStructure()
@@ -247,7 +278,7 @@ export function AcademicOperationsPage({
                     affiliations={visibleRequestData.structure.programAffiliations}
                     programs={programById}
                     sites={sortedSites}
-                    canChangeOrder={structureAuthorization?.canWrite === true}
+                    canChangeOrder={canChangeStructureOrder}
                     onSaveOrder={saveStructureOrder}
                   />}
               <p className="academic-panel-footnote">La jerarquía y el orden vienen de relaciones institucionales fechadas.</p>
@@ -264,7 +295,7 @@ export function AcademicOperationsPage({
                 : <SiteTree
                     sites={sortedSites}
                     relations={visibleRequestData.structure.siteRelations}
-                    canChangeOrder={structureAuthorization?.canWrite === true}
+                    canChangeOrder={canChangeStructureOrder}
                     onSaveOrder={saveStructureOrder}
                   />}
               <p className="academic-panel-footnote">Las sedes se administran aparte de las facultades.</p>

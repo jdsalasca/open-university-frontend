@@ -1,12 +1,14 @@
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { App } from './App'
+import { AcademicOperationsApiError } from './features/academics/academicOperationsClient'
 import { BrandingProvider } from './features/branding/BrandingProvider'
 import { DEFAULT_BRANDING } from './features/branding/contracts'
 import type { AcademicCatalogClient } from './features/academics/contracts'
 import type { AcademicOperationsClient, AcademicPeriod } from './features/academics/academicOperationsContracts'
 import type { CurrentIdentity, IdentityClient } from './features/identity/identityContracts'
+import { IdentityApiError } from './features/identity/identityClient'
 import type { IdentitySessionManager } from './features/identity/IdentityProvider'
 import type { OidcConfigurationResult } from './features/identity/oidcConfiguration'
 
@@ -352,5 +354,64 @@ describe('App', () => {
       'synthetic-access-token',
     )
     expect(screen.queryByRole('button', { name: /abrir periodo|cerrar periodo/i })).not.toBeInTheDocument()
+  })
+
+  it.each([
+    [401, new IdentityApiError(401)],
+    [403, { subject: 'synthetic-subject', permissions: [] } satisfies CurrentIdentity],
+    [403, { subject: 'synthetic-subject', permissions: ['academic:structure:write'] } satisfies CurrentIdentity],
+  ])('revalidates identity and hides the order editor after a PATCH %i response', async (status, revalidatedIdentity) => {
+    // Arrange
+    const user = userEvent.setup()
+    const unitId = 'fae06170-9acf-4718-854e-92e945a7db17'
+    const identityCurrent = vi.fn()
+      .mockResolvedValueOnce({ subject: 'synthetic-subject', permissions: ['academic:structure:write'] })
+      .mockImplementationOnce(() => revalidatedIdentity instanceof Error
+        ? Promise.reject(revalidatedIdentity)
+        : Promise.resolve(revalidatedIdentity))
+    const operations = emptyAcademicOperationsClient()
+    operations.getStructure = vi.fn().mockResolvedValue({
+      units: [{
+        id: unitId,
+        code: 'FAC-CIENCIAS',
+        type: 'FACULTY',
+        displayName: 'Facultad de Ciencias',
+        displayOrder: 2,
+        status: 'ACTIVE',
+        validFrom: '2026-01-01',
+        validThrough: null,
+      }],
+      organizationRelations: [],
+      sites: [],
+      siteRelations: [],
+      programAffiliations: [],
+    })
+    operations.changeOrganizationUnitOrder = vi.fn().mockRejectedValue(
+      new AcademicOperationsApiError(status, 'Authorization rejected'),
+    )
+    window.history.replaceState(null, '', '#academia')
+    render(
+      <BrandingProvider loader={async () => DEFAULT_BRANDING}>
+        <App
+          catalogClient={emptyAcademicCatalogClient()}
+          academicOperationsClient={operations}
+          oidcConfiguration={oidcConfiguration}
+          identityManager={authenticatedSessionManager()}
+          currentIdentityClient={{ current: identityCurrent }}
+        />
+      </BrandingProvider>,
+    )
+
+    // Act
+    await user.click(await screen.findByRole('button', { name: 'Cambiar orden de Facultad de Ciencias' }))
+    await user.clear(screen.getByLabelText('Nuevo orden de Facultad de Ciencias'))
+    await user.type(screen.getByLabelText('Nuevo orden de Facultad de Ciencias'), '6')
+    await user.type(screen.getByLabelText('Referencia institucional de Facultad de Ciencias'), 'Resolución 456')
+    await user.click(screen.getByRole('button', { name: 'Guardar orden de Facultad de Ciencias' }))
+
+    // Assert
+    await waitFor(() => expect(identityCurrent).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(screen.queryByLabelText('Nuevo orden de Facultad de Ciencias')).not.toBeInTheDocument())
+    expect(operations.changeOrganizationUnitOrder).toHaveBeenCalledOnce()
   })
 })

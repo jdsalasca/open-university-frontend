@@ -226,6 +226,7 @@ function ApplicationShell({
                 loadPrograms={catalogClient.listPrograms}
                 authorization={periodAuthorization}
                 structureAuthorization={structureAuthorization}
+                onAuthorizationRejected={retry}
               />
               : <VisualIdentityCenter
                 key={identityCenterKey}
