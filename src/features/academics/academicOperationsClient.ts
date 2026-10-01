@@ -409,11 +409,16 @@ function normalizeStructureRelationCommand(command: AcademicStructureRelationCre
 }
 
 function structureRelationPath(kind: 'unit' | 'site', parentId: string, childId: string): string {
-  if (!isUuid(parentId) || !isUuid(childId) || parentId === childId) {
+  if (!isUuid(parentId) || !isUuid(childId)) {
+    throw new Error('The academic structure relation identifiers are invalid.')
+  }
+  const canonicalParentId = parentId.toLowerCase()
+  const canonicalChildId = childId.toLowerCase()
+  if (canonicalParentId === canonicalChildId) {
     throw new Error('The academic structure relation identifiers are invalid.')
   }
   const resource = kind === 'unit' ? 'units' : 'sites'
-  return `/api/v1/admin/academic-structure/${resource}/${parentId}/children/${childId}`
+  return `/api/v1/admin/academic-structure/${resource}/${canonicalParentId}/children/${canonicalChildId}`
 }
 
 function normalizeOrderCommand(command: AcademicDisplayOrderCommand): AcademicDisplayOrderCommand {

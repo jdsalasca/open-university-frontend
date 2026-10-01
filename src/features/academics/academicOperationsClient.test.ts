@@ -236,6 +236,27 @@ describe('academic operations client', () => {
     expect(fetcher).not.toHaveBeenCalled()
   })
 
+  it('rejects equivalent UUIDs when letter casing differs', async () => {
+    // Arrange
+    const { createAcademicOperationsClient } = await loadClient()
+    const fetcher = vi.fn()
+    const client = createAcademicOperationsClient(fetcher)
+    const upperCaseId = 'FAE06170-9ACF-4718-854E-92E945A7DB17'
+    const lowerCaseId = upperCaseId.toLowerCase()
+
+    // Act
+    const request = client.relateOrganizationUnits(upperCaseId, lowerCaseId, {
+      displayOrder: 1,
+      validFrom: '2026-09-30',
+      validThrough: null,
+      sourceReference: 'Referencia institucional',
+    }, 'institutional-access-token')
+
+    // Assert
+    await expect(request).rejects.toThrow(/identifiers are invalid/i)
+    expect(fetcher).not.toHaveBeenCalled()
+  })
+
   it('preserves a conflict when a relation would create an invalid hierarchy', async () => {
     // Arrange
     const { createAcademicOperationsClient } = await loadClient()
