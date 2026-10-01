@@ -47,7 +47,8 @@ interface AcademicOperationsPageProps {
   loadPrograms?: (signal?: AbortSignal) => Promise<AcademicProgram[]>
   authorization?: AcademicPeriodAuthorization | null
   structureAuthorization?: AcademicStructureAuthorization | null
-  onAuthorizationRejected?: (accessToken: string) => Promise<void>
+  onStructureAuthorizationRejected?: (accessToken: string) => Promise<void>
+  onPeriodAuthorizationRejected?: (accessToken: string) => Promise<void>
 }
 
 const defaultLoadPrograms = (signal?: AbortSignal) => academicCatalogClient.listPrograms(signal)
@@ -57,7 +58,8 @@ export function AcademicOperationsPage({
   loadPrograms = defaultLoadPrograms,
   authorization = null,
   structureAuthorization = null,
-  onAuthorizationRejected,
+  onStructureAuthorizationRejected,
+  onPeriodAuthorizationRejected,
 }: AcademicOperationsPageProps) {
   const [requestState, setRequestState] = useState<RequestState>('loading')
   const [requestData, setRequestData] = useState<RequestData | null>(null)
@@ -102,14 +104,14 @@ export function AcademicOperationsPage({
         || !currentStructureAuthorizationRef.current.canRead) throw error
       if (error instanceof AcademicOperationsApiError && (error.status === 401 || error.status === 403)) {
         setRejectedStructureAccessToken(structureAccessToken)
-        void Promise.resolve(onAuthorizationRejected?.(structureAccessToken)).catch(() => undefined)
+        void Promise.resolve(onStructureAuthorizationRejected?.(structureAccessToken)).catch(() => undefined)
         return null
       }
       throw error
     })
     const [current, administrative] = await Promise.all([currentRequest, administrativeRequest])
     return { current, administrative }
-  }, [canReadStructure, client, onAuthorizationRejected, structureAccessToken])
+  }, [canReadStructure, client, onStructureAuthorizationRejected, structureAccessToken])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -215,7 +217,7 @@ export function AcademicOperationsPage({
             : 'El servidor negó el permiso para cambiar el periodo. Estoy volviendo a comprobar los permisos.',
         })
         try {
-          await onAuthorizationRejected?.(authorization.accessToken)
+          await onPeriodAuthorizationRejected?.(authorization.accessToken)
         } catch {
           setPeriodActionMessage({
             type: 'error',
@@ -255,7 +257,7 @@ export function AcademicOperationsPage({
             : 'El servidor negó el permiso para este cambio. Oculté los controles mientras vuelvo a comprobar los permisos.',
         })
         try {
-          await onAuthorizationRejected?.(structureAuthorization.accessToken)
+          await onStructureAuthorizationRejected?.(structureAuthorization.accessToken)
         } catch {
           setStructureOrderMessage({
             type: 'error',
@@ -399,7 +401,7 @@ export function AcademicOperationsPage({
                   client={client}
                   authorization={structureAuthorization}
                   onCreated={refreshStructureAfterEntryCreation}
-                  onAuthorizationRejected={onAuthorizationRejected}
+                  onAuthorizationRejected={onStructureAuthorizationRejected}
                 />
               )}
               {canManageStructure && structureAuthorization && (
@@ -409,7 +411,7 @@ export function AcademicOperationsPage({
                   authorization={structureAuthorization}
                   onCreated={refreshStructureAfterEntryCreation}
                   onRefresh={refreshStructureAfterEntryCreation}
-                  onAuthorizationRejected={onAuthorizationRejected}
+                  onAuthorizationRejected={onStructureAuthorizationRejected}
                 />
               )}
               {canManageStructure && structureAuthorization && (
@@ -419,7 +421,7 @@ export function AcademicOperationsPage({
                   client={client}
                   authorization={structureAuthorization}
                   onCreated={refreshStructureAfterEntryCreation}
-                  onAuthorizationRejected={onAuthorizationRejected}
+                  onAuthorizationRejected={onStructureAuthorizationRejected}
                 />
               )}
               {canManageStructure && structureAuthorization && visibleRequestData.administrativeStructure && (
@@ -430,7 +432,7 @@ export function AcademicOperationsPage({
                   client={client}
                   authorization={structureAuthorization}
                   onClosed={refreshStructureAfterEntryCreation}
-                  onAuthorizationRejected={onAuthorizationRejected}
+                  onAuthorizationRejected={onStructureAuthorizationRejected}
                 />
               )}
               <p className="academic-panel-footnote">La jerarquía y el orden vienen de relaciones institucionales fechadas.</p>
@@ -455,7 +457,7 @@ export function AcademicOperationsPage({
                   client={client}
                   authorization={structureAuthorization}
                   onCreated={refreshStructureAfterEntryCreation}
-                  onAuthorizationRejected={onAuthorizationRejected}
+                  onAuthorizationRejected={onStructureAuthorizationRejected}
                 />
               )}
               {canManageStructure && structureAuthorization && (
@@ -465,7 +467,7 @@ export function AcademicOperationsPage({
                   client={client}
                   authorization={structureAuthorization}
                   onCreated={refreshStructureAfterEntryCreation}
-                  onAuthorizationRejected={onAuthorizationRejected}
+                  onAuthorizationRejected={onStructureAuthorizationRejected}
                 />
               )}
               {canManageStructure && structureAuthorization && visibleRequestData.administrativeStructure && (
@@ -476,7 +478,7 @@ export function AcademicOperationsPage({
                   client={client}
                   authorization={structureAuthorization}
                   onClosed={refreshStructureAfterEntryCreation}
-                  onAuthorizationRejected={onAuthorizationRejected}
+                  onAuthorizationRejected={onStructureAuthorizationRejected}
                 />
               )}
               <p className="academic-panel-footnote">Las sedes se administran aparte de las facultades.</p>
@@ -498,7 +500,7 @@ export function AcademicOperationsPage({
                   client={client}
                   authorization={structureAuthorization}
                   onCreated={refreshStructureAfterEntryCreation}
-                  onAuthorizationRejected={onAuthorizationRejected}
+                  onAuthorizationRejected={onStructureAuthorizationRejected}
                 />
               )}
               {canManageStructure && structureAuthorization && (
@@ -511,7 +513,7 @@ export function AcademicOperationsPage({
                   client={client}
                   authorization={structureAuthorization}
                   onClosed={refreshStructureAfterEntryCreation}
-                  onAuthorizationRejected={onAuthorizationRejected}
+                  onAuthorizationRejected={onStructureAuthorizationRejected}
                 />
               )}
               <ProgramAffiliationTimeline
@@ -539,7 +541,7 @@ export function AcademicOperationsPage({
                     ? { ...current, periods: [...current.periods, createdPeriod], periodSource: 'admin' }
                     : current)
                 }}
-                onAuthorizationRejected={onAuthorizationRejected}
+                onAuthorizationRejected={onPeriodAuthorizationRejected}
               />
             )}
             {sortedPeriods.length === 0
@@ -554,7 +556,7 @@ export function AcademicOperationsPage({
                     client={client}
                     units={sortedUnits}
                     sites={sortedSites}
-                    onAuthorizationRejected={onAuthorizationRejected}
+                    onAuthorizationRejected={onPeriodAuthorizationRejected}
                     onPeriodUpdated={(updatedPeriod) => {
                       setRequestData((current) => current ? {
                         ...current,

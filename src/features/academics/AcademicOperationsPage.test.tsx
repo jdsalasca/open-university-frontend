@@ -757,7 +757,7 @@ describe('AcademicOperationsPage', () => {
       client={client}
       loadPrograms={async () => programs}
       authorization={{ accessToken, canRead: true, canWrite: false }}
-      onAuthorizationRejected={onAuthorizationRejected}
+      onPeriodAuthorizationRejected={onAuthorizationRejected}
     />)
 
     // Act
@@ -846,7 +846,7 @@ describe('AcademicOperationsPage', () => {
       client={client}
       loadPrograms={async () => programs}
       authorization={{ accessToken, canRead: true, canWrite: true }}
-      onAuthorizationRejected={onAuthorizationRejected}
+      onPeriodAuthorizationRejected={onAuthorizationRejected}
     />)
 
     // Act
@@ -952,7 +952,7 @@ describe('AcademicOperationsPage', () => {
       client={client}
       loadPrograms={async () => programs}
       structureAuthorization={{ accessToken, canRead: true, canWrite: true }}
-      onAuthorizationRejected={onAuthorizationRejected}
+      onStructureAuthorizationRejected={onAuthorizationRejected}
     />)
 
     // Act: keep the public tree pending while authorization is revalidated.
@@ -988,7 +988,7 @@ describe('AcademicOperationsPage', () => {
       client={client}
       loadPrograms={async () => programs}
       structureAuthorization={{ accessToken: 'synthetic-obsolete-token', canRead: true, canWrite: true }}
-      onAuthorizationRejected={onAuthorizationRejected}
+      onStructureAuthorizationRejected={onAuthorizationRejected}
     />)
     await waitFor(() => expect(getAdminStructure).toHaveBeenCalledOnce())
 
@@ -1028,7 +1028,7 @@ describe('AcademicOperationsPage', () => {
       client={client}
       loadPrograms={async () => programs}
       structureAuthorization={{ accessToken: 'synthetic-refresh-token', canRead: true, canWrite: true }}
-      onAuthorizationRejected={onAuthorizationRejected}
+      onStructureAuthorizationRejected={onAuthorizationRejected}
     />)
     const facultyForm = within(await screen.findByRole('region', { name: 'Registrar facultad raíz' }))
     await user.type(facultyForm.getByLabelText('Código institucional'), 'fac-prueba')

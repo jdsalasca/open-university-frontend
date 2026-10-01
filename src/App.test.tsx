@@ -546,6 +546,63 @@ describe('App', () => {
     expect(openPeriod).toHaveBeenCalledWith(period.id, 'synthetic-access-token')
   })
 
+  it('keeps period controls suspended when a write gets 403 and /me still returns the same permission', async () => {
+    // Arrange
+    const user = userEvent.setup()
+    const period: AcademicPeriod = {
+      id: 'fb750786-79cc-49cf-9814-0f1047c76ba4',
+      code: '2026-2',
+      kind: 'REGULAR',
+      academicYear: 2026,
+      sequenceNumber: 2,
+      startsOn: '2026-07-15',
+      endsOn: '2026-12-18',
+      status: 'APPROVED',
+      calendarRevisionId: '7ecfa4a1-52f6-4b56-9b3c-8fc0cebdc98f',
+      calendarRevisionNumber: 1,
+      approvalReference: 'Synthetic approved calendar',
+      officialReference: 'Synthetic academic period',
+      createdAt: '2026-06-15T10:00:00Z',
+    }
+    const permissions: CurrentIdentity['permissions'] = ['academic:period:read', 'academic:period:write']
+    const identityCurrent = vi.fn()
+      .mockResolvedValueOnce({ subject: 'synthetic-subject', permissions })
+      .mockResolvedValueOnce({ subject: 'synthetic-subject', permissions })
+    const operations = emptyAcademicOperationsClient()
+    operations.getAdminPeriods = vi.fn().mockResolvedValue([period])
+    const openPeriod = vi.fn().mockRejectedValue(new AcademicOperationsApiError(403, 'Permission rejected'))
+    operations.openPeriod = openPeriod
+    window.history.replaceState(null, '', '#academia')
+    render(
+      <BrandingProvider loader={async () => DEFAULT_BRANDING}>
+        <App
+          catalogClient={emptyAcademicCatalogClient()}
+          academicOperationsClient={operations}
+          oidcConfiguration={oidcConfiguration}
+          identityManager={authenticatedSessionManager()}
+          currentIdentityClient={{ current: identityCurrent }}
+        />
+      </BrandingProvider>,
+    )
+
+    // Act
+    await user.click(await screen.findByRole('button', { name: 'Abrir periodo 2026-2' }))
+    await user.click(screen.getByRole('button', { name: 'Confirmar apertura' }))
+
+    // Assert: stale /me permission must not re-enable the rejected bearer.
+    await waitFor(() => expect(identityCurrent).toHaveBeenCalledTimes(2))
+    expect(openPeriod).toHaveBeenCalledOnce()
+    expect(await screen.findByRole('alert')).toHaveTextContent(/permiso|sesión|servidor/i)
+    expect(screen.queryByRole('button', { name: 'Abrir periodo 2026-2' })).not.toBeInTheDocument()
+
+    // Act: navigating away and back must keep the token rejected for period writes.
+    await user.click(screen.getByRole('link', { name: 'Programas · Vista previa' }))
+    await user.click(screen.getByRole('link', { name: 'Estructura y periodos · Vista previa' }))
+
+    // Assert
+    expect(screen.queryByRole('button', { name: 'Abrir periodo 2026-2' })).not.toBeInTheDocument()
+  })
+
   it('requires administrative read and write permissions for the audited order editor', async () => {
     // Arrange
     const user = userEvent.setup()

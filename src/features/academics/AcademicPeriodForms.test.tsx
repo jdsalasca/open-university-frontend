@@ -46,7 +46,7 @@ describe('academic period administration forms', () => {
     await user.type(screen.getByLabelText('Código del periodo'), '2027-int-1')
     await user.selectOptions(screen.getByLabelText('Tipo de periodo'), 'INTERSEMESTRAL')
     await user.type(screen.getByLabelText('Año académico'), '2027')
-    await user.type(screen.getByLabelText('Número del periodo'), '3')
+    await user.type(screen.getByLabelText('Número del periodo'), '100')
     await user.type(screen.getByLabelText('Inicio de instrucción'), '2027-06-01')
     await user.type(screen.getByLabelText('Fin de instrucción'), '2027-06-30')
     await user.click(screen.getByRole('button', { name: 'Crear borrador de periodo' }))
@@ -54,9 +54,35 @@ describe('academic period administration forms', () => {
     // Assert
     await waitFor(() => expect(onCreated).toHaveBeenCalledWith(draftPeriod))
     expect(createPeriod).toHaveBeenCalledWith({
-      code: '2027-int-1', kind: 'INTERSEMESTRAL', academicYear: 2027, sequenceNumber: 3,
+      code: '2027-int-1', kind: 'INTERSEMESTRAL', academicYear: 2027, sequenceNumber: 100,
       startsOn: '2027-06-01', endsOn: '2027-06-30',
     }, 'synthetic-write-token')
+  })
+
+  it('shows field errors for fractional academic years and sequence numbers before requesting a period', async () => {
+    // Arrange
+    const user = userEvent.setup()
+    const { CreateAcademicPeriodForm } = await loadForms()
+    const createPeriod = vi.fn()
+    render(<CreateAcademicPeriodForm
+      client={{ createPeriod } as unknown as Pick<AcademicOperationsClient, 'createPeriod'>}
+      accessToken="synthetic-write-token"
+      onCreated={vi.fn()}
+    />)
+
+    // Act
+    await user.type(screen.getByLabelText('Código del periodo'), '2027-1')
+    await user.selectOptions(screen.getByLabelText('Tipo de periodo'), 'REGULAR')
+    await user.type(screen.getByLabelText('Año académico'), '2027.5')
+    await user.type(screen.getByLabelText('Número del periodo'), '1.5')
+    await user.type(screen.getByLabelText('Inicio de instrucción'), '2027-01-01')
+    await user.type(screen.getByLabelText('Fin de instrucción'), '2027-06-30')
+    await user.click(screen.getByRole('button', { name: 'Crear borrador de periodo' }))
+
+    // Assert
+    expect(await screen.findByText('El año académico debe ser un número entero.')).toBeVisible()
+    expect(screen.getByText('El número del periodo debe ser entero.')).toBeVisible()
+    expect(createPeriod).not.toHaveBeenCalled()
   })
 
   it('blocks a regular period sequence above two before the server request', async () => {

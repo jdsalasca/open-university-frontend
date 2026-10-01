@@ -104,6 +104,7 @@ export function CreateAcademicPeriodForm({
             required: 'Escribe el año académico.',
             min: { value: 1900, message: 'El año mínimo admitido es 1900.' },
             max: { value: 9999, message: 'El año máximo admitido es 9999.' },
+            validate: (value) => Number.isInteger(value) || 'El año académico debe ser un número entero.',
           })}
           error={errors.academicYear?.message}
           disabled={isSubmitting}
@@ -113,14 +114,16 @@ export function CreateAcademicPeriodForm({
           label="Número del periodo"
           type="number"
           min={1}
-          max={kind === 'REGULAR' ? 2 : 99}
+          max={kind === 'REGULAR' ? 2 : undefined}
           step={1}
           registration={register('sequenceNumber', {
             valueAsNumber: true,
             required: 'Escribe el número del periodo.',
             min: { value: 1, message: 'El número debe ser mayor que cero.' },
-            max: { value: 99, message: 'El número máximo admitido es 99.' },
-            validate: (value) => kind !== 'REGULAR' || Number(value) <= 2 || 'En un periodo regular el número debe ser 1 o 2.',
+            validate: (value) => {
+              if (typeof value !== 'number' || !Number.isInteger(value)) return 'El número del periodo debe ser entero.'
+              return kind !== 'REGULAR' || value <= 2 || 'En un periodo regular el número debe ser 1 o 2.'
+            },
           })}
           error={errors.sequenceNumber?.message}
           hint={kind === 'REGULAR' ? 'Los periodos regulares admiten 1 o 2.' : 'El identificador intersemestral es independiente del semestre curricular.'}

@@ -118,6 +118,7 @@ function ApplicationShell({
   const { state: identity, login, logout, retry, loginAvailable } = useIdentity()
   const [view, setView] = useState<ApplicationView>(() => readApplicationView())
   const [rejectedStructureAccessToken, setRejectedStructureAccessToken] = useState<string | null>(null)
+  const [rejectedPeriodAccessToken, setRejectedPeriodAccessToken] = useState<string | null>(null)
   const [rejectedRoleAccessToken, setRejectedRoleAccessToken] = useState<string | null>(null)
   useEffect(() => {
     const onHashChange = () => setView(readApplicationView())
@@ -155,8 +156,10 @@ function ApplicationShell({
   const periodAuthorization: AcademicPeriodAuthorization | null = authenticatedIdentity
     ? {
       accessToken: authenticatedIdentity.accessToken,
-      canRead: authenticatedIdentity.permissions.includes('academic:period:read'),
-      canWrite: authenticatedIdentity.permissions.includes('academic:period:write'),
+      canRead: authenticatedIdentity.permissions.includes('academic:period:read')
+        && authenticatedIdentity.accessToken !== rejectedPeriodAccessToken,
+      canWrite: authenticatedIdentity.permissions.includes('academic:period:write')
+        && authenticatedIdentity.accessToken !== rejectedPeriodAccessToken,
     }
     : null
   const structureAuthorization: AcademicStructureAuthorization | null = authenticatedIdentity
@@ -179,6 +182,10 @@ function ApplicationShell({
     : null
   const revalidateRejectedStructureAccess = useCallback(async (accessToken: string): Promise<void> => {
     setRejectedStructureAccessToken(accessToken)
+    await retry()
+  }, [retry])
+  const revalidateRejectedPeriodAccess = useCallback(async (accessToken: string): Promise<void> => {
+    setRejectedPeriodAccessToken(accessToken)
     await retry()
   }, [retry])
   const revalidateRejectedRoleAccess = useCallback(async (accessToken: string): Promise<void> => {
@@ -381,7 +388,8 @@ function ApplicationShell({
                     loadPrograms={catalogClient.listPrograms}
                     authorization={periodAuthorization}
                     structureAuthorization={structureAuthorization}
-                    onAuthorizationRejected={revalidateRejectedStructureAccess}
+                    onStructureAuthorizationRejected={revalidateRejectedStructureAccess}
+                    onPeriodAuthorizationRejected={revalidateRejectedPeriodAccess}
                   />
                   : isAdmissionsView
                     ? <AdmissionsCalendarPage />
