@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import type { ComponentType } from 'react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -32,7 +32,7 @@ async function renderCatalogPage(props: AcademicCatalogPageProps) {
   expect(loader, 'the accessible academic catalog page is implemented').toBeTypeOf('function')
   const module = await loader!()
   const Page = module.AcademicCatalogPage
-  return render(Page ? <Page {...props} /> : null)
+  return { ...render(Page ? <Page {...props} /> : null), Page }
 }
 
 const program: AcademicProgram = {
@@ -667,7 +667,7 @@ describe('AcademicCatalogPage', () => {
     await userEvent.click(screen.getByRole('button', { name: /validar csv/i }))
 
     // Assert the first request is a no-write preview.
-    expect(client.previewCsv).toHaveBeenCalledWith(file, authorization.accessToken)
+    expect(client.previewCsv).toHaveBeenCalledWith(file, authorization.accessToken, expect.any(AbortSignal))
     expect(client.importCsv).not.toHaveBeenCalled()
     expect(await screen.findByText('Cálculo I')).toBeVisible()
     expect(screen.getByText('Electiva A')).toBeVisible()
@@ -721,7 +721,7 @@ describe('AcademicCatalogPage', () => {
 
     // Assert
     expect(client.previewCsv).toHaveBeenCalledTimes(2)
-    expect(client.previewCsv).toHaveBeenLastCalledWith(file, authorization.accessToken)
+    expect(client.previewCsv).toHaveBeenLastCalledWith(file, authorization.accessToken, expect.any(AbortSignal))
     expect(await screen.findByText('Cálculo I')).toBeVisible()
     expect(client.importCsv).not.toHaveBeenCalled()
   })
@@ -744,6 +744,65 @@ describe('AcademicCatalogPage', () => {
     expect(screen.queryByText('Cálculo I')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: /validar csv/i })).toBeEnabled()
     expect(client.importCsv).not.toHaveBeenCalled()
+  })
+
+  it('aborts a pending CSV preview and clears its result when write permission is removed', async () => {
+    // Arrange
+    let resolveFirstPreview: ((preview: CurriculumImportPreview) => void) | undefined
+    const previewCsv = vi.fn((file: File, _accessToken: string, _signal?: AbortSignal) => {
+      if (file.name === 'first.csv') {
+        return new Promise<CurriculumImportPreview>((resolve) => {
+          resolveFirstPreview = resolve
+        })
+      }
+      return Promise.resolve(importPreview)
+    })
+    const client = createClient({ previewCsv: previewCsv as AcademicCatalogClient['previewCsv'] })
+    const { Page, rerender } = await renderCatalogPage({ client, authorization })
+    const input = await screen.findByLabelText(/archivo CSV/i)
+    const firstFile = new File(['first'], 'first.csv', { type: 'text/csv' })
+    fireEvent.change(input, { target: { files: [firstFile] } })
+    await userEvent.click(screen.getByRole('button', { name: /validar csv/i }))
+    await waitFor(() => expect(previewCsv).toHaveBeenCalledTimes(1))
+    const firstSignal = previewCsv.mock.calls[0]?.[2]
+
+    // Act
+    rerender(<Page client={client} authorization={{
+      accessToken: authorization.accessToken,
+      permissions: ['academic:catalog:read'],
+    }} />)
+
+    // Assert
+    expect(firstSignal?.aborted).toBe(true)
+    expect(screen.queryByLabelText(/archivo CSV/i)).not.toBeInTheDocument()
+
+    // Act: a client that resolves after cancellation must not restore the preview.
+    await act(async () => {
+      resolveFirstPreview?.({ ...importPreview, programName: 'Vista previa obsoleta' })
+      await Promise.resolve()
+    })
+    expect(screen.queryByText('Vista previa obsoleta')).not.toBeInTheDocument()
+  })
+
+  it('aborts a pending CSV preview when the administrative view unmounts', async () => {
+    // Arrange
+    let previewSignal: AbortSignal | undefined
+    const previewCsv = vi.fn((_file: File, _accessToken: string, signal?: AbortSignal) => {
+      previewSignal = signal
+      return new Promise<CurriculumImportPreview>(() => {})
+    })
+    const client = createClient({ previewCsv: previewCsv as AcademicCatalogClient['previewCsv'] })
+    await renderCatalogPage({ client, authorization })
+    const input = await screen.findByLabelText(/archivo CSV/i)
+    fireEvent.change(input, { target: { files: [new File(['plan'], 'plan.csv', { type: 'text/csv' })] } })
+
+    // Act
+    await userEvent.click(screen.getByRole('button', { name: /validar csv/i }))
+    await waitFor(() => expect(previewCsv).toHaveBeenCalledTimes(1))
+    cleanup()
+
+    // Assert
+    expect(previewSignal?.aborted).toBe(true)
   })
 
   it('shows safe row and field details when the backend rejects a confirmed import', async () => {

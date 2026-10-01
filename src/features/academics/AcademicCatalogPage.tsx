@@ -582,10 +582,31 @@ function CatalogAdministration({ accessToken, authorization, client, onPublished
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const selectedFileRef = useRef<File | null>(null)
   const [filePreview, setFilePreview] = useState<{ file: File; preview: CurriculumImportPreview } | null>(null)
+  const previewControllerRef = useRef<AbortController | null>(null)
+  const canWriteCatalogRef = useRef(canWriteCatalog)
   const [previewPending, setPreviewPending] = useState(false)
   const [actionPending, setActionPending] = useState(false)
   const [actionMessage, setActionMessage] = useState('')
   const [actionError, setActionError] = useState<ApiFailure | null>(null)
+
+  useEffect(() => () => {
+    previewControllerRef.current?.abort()
+    previewControllerRef.current = null
+  }, [])
+
+  useEffect(() => {
+    const lostWritePermission = canWriteCatalogRef.current && !canWriteCatalog
+    canWriteCatalogRef.current = canWriteCatalog
+    if (!lostWritePermission) return
+
+    previewControllerRef.current?.abort()
+    previewControllerRef.current = null
+    selectedFileRef.current = null
+    setSelectedFile(null)
+    setFilePreview(null)
+    setPreviewPending(false)
+    setActionError(null)
+  }, [canWriteCatalog])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -616,9 +637,12 @@ function CatalogAdministration({ accessToken, authorization, client, onPublished
   function chooseFile(event: ChangeEvent<HTMLInputElement>) {
     const file = event.currentTarget.files?.[0] ?? null
     event.currentTarget.value = ''
+    previewControllerRef.current?.abort()
+    previewControllerRef.current = null
     selectedFileRef.current = file
     setSelectedFile(file)
     setFilePreview(null)
+    setPreviewPending(false)
     setActionMessage('')
     setActionError(null)
     if (!file) return
@@ -630,16 +654,27 @@ function CatalogAdministration({ accessToken, authorization, client, onPublished
   async function previewCurriculum() {
     const file = selectedFile
     if (!canWriteCatalog || !file || actionError) return
+    const controller = new AbortController()
+    previewControllerRef.current = controller
     setPreviewPending(true)
     setActionMessage('')
     setActionError(null)
     try {
-      const preview = await client.previewCsv(file, accessToken)
-      if (selectedFileRef.current === file) setFilePreview({ file, preview })
+      const preview = await client.previewCsv(file, accessToken, controller.signal)
+      if (previewControllerRef.current === controller && selectedFileRef.current === file) {
+        setFilePreview({ file, preview })
+      }
     } catch (error) {
-      if (selectedFileRef.current === file) setActionError(asApiFailure(error))
+      if (!controller.signal.aborted
+        && previewControllerRef.current === controller
+        && selectedFileRef.current === file) {
+        setActionError(asApiFailure(error))
+      }
     } finally {
-      setPreviewPending(false)
+      if (previewControllerRef.current === controller) {
+        previewControllerRef.current = null
+        setPreviewPending(false)
+      }
     }
   }
 
