@@ -90,6 +90,12 @@ export interface AcademicStructureRelationCreateCommand {
   sourceReference: string
 }
 
+export interface AcademicOrganizationRelationCloseCommand {
+  validFrom: string
+  effectiveThrough: string
+  sourceReference: string
+}
+
 export interface AcademicProgramAffiliationCreateCommand extends AcademicStructureRelationCreateCommand {
   organizationUnitId: string
   siteId: string
@@ -115,6 +121,8 @@ export interface AcademicOperationsClient {
     signal?: AbortSignal): Promise<string>
   createChildUnit(parentUnitId: string, command: AcademicOrganizationUnitCreateCommand, accessToken: string,
     signal?: AbortSignal): Promise<string>
+  closeOrganizationRelation(parentUnitId: string, childUnitId: string,
+    command: AcademicOrganizationRelationCloseCommand, accessToken: string, signal?: AbortSignal): Promise<void>
   createSite(command: AcademicSiteCreateCommand, accessToken: string, signal?: AbortSignal): Promise<string>
   relateOrganizationUnits(parentUnitId: string, childUnitId: string, command: AcademicStructureRelationCreateCommand,
     accessToken: string, signal?: AbortSignal): Promise<void>

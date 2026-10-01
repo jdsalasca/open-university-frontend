@@ -159,6 +159,7 @@ function createClient(overrides: Partial<AcademicOperationsClient> = {}): Academ
     getAdminPeriods: vi.fn().mockResolvedValue([regularPeriod, intersemester]),
     createOrganizationUnit: vi.fn().mockResolvedValue('34a06170-9acf-4718-854e-92e945a7db17'),
     createChildUnit: vi.fn().mockResolvedValue('94a06170-9acf-4718-854e-92e945a7db17'),
+    closeOrganizationRelation: vi.fn().mockResolvedValue(undefined),
     createSite: vi.fn().mockResolvedValue('94a06170-9acf-4718-854e-92e945a7db17'),
     relateOrganizationUnits: vi.fn().mockResolvedValue(undefined),
     relateSites: vi.fn().mockResolvedValue(undefined),
@@ -181,6 +182,27 @@ function createClient(overrides: Partial<AcademicOperationsClient> = {}): Academ
 }
 
 describe('AcademicOperationsPage', () => {
+  it('shows the dated relation closure control only inside the authorized structure console', async () => {
+    // Arrange
+    const { AcademicOperationsPage } = await loadPage()
+    const client = createClient()
+    render(<AcademicOperationsPage
+      client={client}
+      loadPrograms={async () => programs}
+      structureAuthorization={{ accessToken: 'synthetic-structure-token', canRead: true, canWrite: true }}
+    />)
+
+    // Act
+    const relationSelector = await screen.findByLabelText('Relación organizacional')
+
+    // Assert
+    expect(relationSelector).toBeVisible()
+    expect(within(relationSelector).getByRole('option', {
+      name: /Facultad de Ciencias → Escuela de Sistemas.*Desde 2026-01-01.*Sin cierre/i,
+    })).toBeInTheDocument()
+    expect(client.closeOrganizationRelation).not.toHaveBeenCalled()
+  })
+
   it('orders sibling units and sites by relationship order while preserving root order', async () => {
     // Arrange
     const { AcademicOperationsPage } = await loadPage()

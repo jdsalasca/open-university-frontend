@@ -3,6 +3,7 @@ import type {
   AcademicDisplayOrderCommand,
   AcademicOperationsClient,
   AcademicOrganizationUnitCreateCommand,
+  AcademicOrganizationRelationCloseCommand,
   AcademicSiteCreateCommand,
   AcademicStructureEntryCreateCommand,
   AcademicOrganizationRelation,
@@ -64,6 +65,14 @@ export function createAcademicOperationsClient(fetcher: typeof fetch = fetch): A
       const body = await responseBody(response)
       if (!isRecord(body) || !isUuid(body.id)) throw malformedResponse()
       return body.id
+    },
+
+    async closeOrganizationRelation(parentUnitId, childUnitId, command, accessToken, signal) {
+      const path = `${structureRelationPath('unit', parentUnitId, childUnitId)}/close`
+      await noContentResponse(await fetcher(
+        path,
+        jsonPatchRequestOptions(normalizeOrganizationRelationCloseCommand(command), accessToken, signal),
+      ))
     },
 
     async createSite(command, accessToken, signal) {
@@ -351,7 +360,10 @@ function orderRequestOptions(
   accessToken: string,
   signal?: AbortSignal,
 ): RequestInit {
-  const normalizedCommand = normalizeOrderCommand(command)
+  return jsonPatchRequestOptions(normalizeOrderCommand(command), accessToken, signal)
+}
+
+function jsonPatchRequestOptions(body: unknown, accessToken: string, signal?: AbortSignal): RequestInit {
   return {
     credentials: 'omit',
     method: 'PATCH',
@@ -360,9 +372,25 @@ function orderRequestOptions(
       Authorization: `Bearer ${requireAccessToken(accessToken)}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify(normalizedCommand),
+    body: JSON.stringify(body),
     ...(signal ? { signal } : {}),
   }
+}
+
+function normalizeOrganizationRelationCloseCommand(
+  command: AcademicOrganizationRelationCloseCommand,
+): AcademicOrganizationRelationCloseCommand {
+  if (!isRecord(command)
+    || !isDate(command.validFrom)
+    || !isDate(command.effectiveThrough)
+    || command.effectiveThrough < command.validFrom) {
+    throw new Error('The academic organization relation closure interval is invalid.')
+  }
+  const sourceReference = typeof command.sourceReference === 'string' ? command.sourceReference.trim() : ''
+  if (!isBoundedText(sourceReference, 240) || containsAsciiControlCharacters(sourceReference)) {
+    throw new Error('An institutional source reference is required and must be valid.')
+  }
+  return { validFrom: command.validFrom, effectiveThrough: command.effectiveThrough, sourceReference }
 }
 
 function jsonPostRequestOptions(body: unknown, accessToken: string, signal?: AbortSignal): RequestInit {

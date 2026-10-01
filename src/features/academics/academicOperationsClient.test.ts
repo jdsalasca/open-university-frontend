@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type {
   AcademicOperationsClient,
   AcademicOrganizationUnitCreateCommand,
+  AcademicOrganizationRelationCloseCommand,
   AcademicSiteCreateCommand,
   AcademicStructureRelationCreateCommand,
 } from './academicOperationsContracts'
@@ -505,6 +506,75 @@ describe('academic operations client', () => {
         signal,
       },
     )
+  })
+
+  it('closes a dated organization relation through an authorized patch without sending credentials', async () => {
+    // Arrange
+    const { createAcademicOperationsClient } = await loadClient()
+    const parentId = 'A4A06170-9ACF-4718-854E-92E945A7DB17'
+    const childId = '94a06170-9acf-4718-854e-92e945a7db17'
+    const fetcher = vi.fn().mockResolvedValue(new Response(null, { status: 204 }))
+    const client = createAcademicOperationsClient(fetcher)
+    const command: AcademicOrganizationRelationCloseCommand = {
+      validFrom: '2024-08-01',
+      effectiveThrough: '2026-06-30',
+      sourceReference: '  Acta institucional 17 de 2026  ',
+    }
+    const closeRelation = Reflect.get(client, 'closeOrganizationRelation') as
+      ((parent: string, child: string, value: AcademicOrganizationRelationCloseCommand, token: string,
+        signal?: AbortSignal) => Promise<void>) | undefined
+    expect(closeRelation).toBeTypeOf('function')
+    if (!closeRelation) return
+    const signal = new AbortController().signal
+
+    // Act
+    await closeRelation.call(client, parentId, childId, command, 'institutional-access-token', signal)
+
+    // Assert
+    expect(fetcher).toHaveBeenCalledWith(
+      '/api/v1/admin/academic-structure/units/a4a06170-9acf-4718-854e-92e945a7db17/children/94a06170-9acf-4718-854e-92e945a7db17/close',
+      {
+        credentials: 'omit',
+        method: 'PATCH',
+        headers: {
+          Accept: 'application/json',
+          Authorization: 'Bearer institutional-access-token',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          validFrom: '2024-08-01',
+          effectiveThrough: '2026-06-30',
+          sourceReference: 'Acta institucional 17 de 2026',
+        }),
+        signal,
+      },
+    )
+  })
+
+  it('rejects a relation closure that ends before its selected start date without calling the API', async () => {
+    // Arrange
+    const { createAcademicOperationsClient } = await loadClient()
+    const fetcher = vi.fn()
+    const client = createAcademicOperationsClient(fetcher)
+    const command: AcademicOrganizationRelationCloseCommand = {
+      validFrom: '2026-10-01',
+      effectiveThrough: '2026-09-30',
+      sourceReference: 'Resolución de prueba',
+    }
+    const closeRelation = Reflect.get(client, 'closeOrganizationRelation') as
+      AcademicOperationsClient['closeOrganizationRelation'] | undefined
+    expect(closeRelation).toBeTypeOf('function')
+    if (!closeRelation) return
+
+    // Act and Assert
+    await expect(closeRelation.call(
+      client,
+      'a4a06170-9acf-4718-854e-92e945a7db17',
+      '94a06170-9acf-4718-854e-92e945a7db17',
+      command,
+      'institutional-access-token',
+    )).rejects.toThrow(/interval is invalid/i)
+    expect(fetcher).not.toHaveBeenCalled()
   })
 
   it('rejects invalid faculty data before sending a request', async () => {

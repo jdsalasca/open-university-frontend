@@ -163,6 +163,15 @@
 .academic-period-confirmation > div { display: flex; flex-wrap: wrap; gap: 6px; }
 .academic-period-confirmation button { min-height: 27px; padding: 0 9px; border: 1px solid #465947; border-radius: 5px; background: #465947; color: #fff; font: inherit; font-size: 8px; font-weight: 700; cursor: pointer; }
 .academic-period-confirmation button.secondary { border-color: #d3d1c7; background: #fff; color: #55564e; }
+.academic-relation-close-current { grid-column: 1 / -1; margin: 0; color: #77796f; font-size: 8px; line-height: 1.5; }
+.academic-relation-close-confirmation { display: grid; gap: 8px; margin-top: 11px; padding: 11px; border: 1px solid #e8dfc6; border-radius: 8px; background: #faf7ed; }
+.academic-relation-close-confirmation h4 { margin: 0; color: #30342c; font-size: 10px; }
+.academic-relation-close-confirmation p { margin: 0; color: #625c49; font-size: 8px; line-height: 1.6; }
+.academic-relation-close-confirmation > div { display: flex; flex-wrap: wrap; gap: 7px; }
+.academic-relation-close-confirmation button { min-height: 29px; padding: 0 10px; border: 1px solid #465947; border-radius: 6px; background: #465947; color: #fff; font: inherit; font-size: 8px; font-weight: 700; cursor: pointer; }
+.academic-relation-close-confirmation button.secondary { border-color: #d3d1c7; background: #fff; color: #55564e; }
+.academic-relation-close-confirmation button:focus-visible { @include tokens.focus-ring; }
+.academic-relation-close-confirmation button:disabled { opacity: .55; cursor: wait; }
 .academic-period-action-message { margin: 12px 0; padding: 10px 12px; border: 1px solid #dbe8dd; border-radius: 7px; background: #f3f8f2; color: #47714c; font-size: 9px; line-height: 1.5; }
 .academic-period-action-message.is-error { border-color: #efd8d0; background: #fbf3f0; color: #965347; }
 
