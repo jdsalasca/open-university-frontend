@@ -174,11 +174,13 @@ function ApplicationShell({
               <span>{programsLabel} · Vista previa</span>
               {isProgramsView && <span className="nav-status" aria-hidden="true" />}
             </a>
-            <a className={`nav-item${isAdmissionsView ? ' active' : ''}`} href="#admisiones" aria-current={isAdmissionsView ? 'page' : undefined}>
-              <span className="nav-glyph" aria-hidden="true">{MODULE_SYMBOLS.admissions}</span>
-              <span>{admissionsLabel} · Información pública</span>
-              {isAdmissionsView && <span className="nav-status" aria-hidden="true" />}
-            </a>
+            {admissionsModule?.available && admissionsModule.visible && (
+              <a className={`nav-item${isAdmissionsView ? ' active' : ''}`} href="#admisiones" aria-current={isAdmissionsView ? 'page' : undefined}>
+                <span className="nav-glyph" aria-hidden="true">{MODULE_SYMBOLS.admissions}</span>
+                <span>{admissionsLabel} · Información pública</span>
+                {isAdmissionsView && <span className="nav-status" aria-hidden="true" />}
+              </a>
+            )}
             <a className={`nav-item${isAcademicOperationsView ? ' active' : ''}`} href="#academia" aria-current={isAcademicOperationsView ? 'page' : undefined}>
               <span className="nav-glyph" aria-hidden="true">◷</span>
               <span>Estructura y periodos · Vista previa</span>

@@ -219,6 +219,29 @@ describe('App', () => {
     expect(link).toHaveAttribute('aria-current', 'page')
   })
 
+  it('hides admissions from navigation when branding disables visibility but keeps its public route accessible', async () => {
+    // Arrange
+    const branding = {
+      ...DEFAULT_BRANDING,
+      modules: DEFAULT_BRANDING.modules.map((module) => module.key === 'admissions'
+        ? { ...module, visible: false }
+        : module),
+    }
+    window.history.replaceState(null, '', '#admisiones')
+    render(
+      <BrandingProvider loader={async () => branding}>
+        <App />
+      </BrandingProvider>,
+    )
+
+    // Act
+    const pageHeading = await screen.findByRole('heading', { name: /pregrado presencial.*2027-i/i })
+
+    // Assert
+    expect(screen.queryByRole('link', { name: /admisiones.*información pública/i })).not.toBeInTheDocument()
+    expect(pageHeading).toBeVisible()
+  })
+
   it('uses backend branding permission without granting academic catalog controls', async () => {
     // Arrange
     const user = userEvent.setup()
