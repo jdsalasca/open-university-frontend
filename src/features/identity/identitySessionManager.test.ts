@@ -37,7 +37,7 @@ describe('OIDC session manager', () => {
     expect(manager.settings.stateStore).toBeDefined()
   })
 
-  it('removes refresh tokens and unneeded profile claims before writing a session user', async () => {
+  it('keeps usable token data in memory without persisting the user to browser storage', async () => {
     // Arrange
     const { createOidcUserManager } = await loadManager()
     const manager = createOidcUserManager(configuration)
@@ -56,9 +56,27 @@ describe('OIDC session manager', () => {
 
     // Assert
     expect(stored).not.toBeNull()
+    expect(JSON.parse(stored!).access_token).toBe('synthetic-access-token')
+    expect(JSON.parse(stored!).id_token).toBe('synthetic-id-token')
     expect(JSON.parse(stored!)).not.toHaveProperty('refresh_token')
     expect(JSON.parse(stored!).profile).toEqual({ sub: 'subject-42' })
     const keys = [...Array(window.sessionStorage.length)].map((_, index) => window.sessionStorage.key(index))
-    expect(keys.some((storedKey) => storedKey?.includes('universiry.oidc.user:'))).toBe(true)
+    expect(keys.some((storedKey) => storedKey?.includes('universiry.oidc.user:'))).toBe(false)
+    expect(window.sessionStorage.getItem(key)).toBeNull()
+  })
+
+  it('keeps OIDC transaction state in tab storage so the authorization callback can complete', async () => {
+    // Arrange
+    const { createOidcUserManager } = await loadManager()
+    const manager = createOidcUserManager(configuration)
+
+    // Act
+    await manager.settings.stateStore.set('callback-state', '{"code_verifier":"synthetic-verifier"}')
+
+    // Assert
+    expect(await manager.settings.stateStore.get('callback-state')).toBe('{"code_verifier":"synthetic-verifier"}')
+    expect([...Array(window.sessionStorage.length)]
+      .map((_, index) => window.sessionStorage.key(index))
+      .some((storedKey) => storedKey?.includes('universiry.oidc.state:'))).toBe(true)
   })
 })

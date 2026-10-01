@@ -10,10 +10,7 @@ export function createOidcUserManager(settings: OidcSettings, tabStorage: Storag
     store: tabStorage,
     prefix: 'universiry.oidc.state:',
   })
-  const userStore = new SessionUserStore(new WebStorageStateStore({
-    store: tabStorage,
-    prefix: 'universiry.oidc.user:',
-  }))
+  const userStore = new InMemorySessionUserStore()
 
   return new UserManager({
     authority: settings.authority,
@@ -33,32 +30,30 @@ export function createOidcUserManager(settings: OidcSettings, tabStorage: Storag
   })
 }
 
-class SessionUserStore implements StateStore {
-  private readonly store: StateStore
-
-  constructor(store: StateStore) {
-    this.store = store
-  }
+class InMemorySessionUserStore implements StateStore {
+  private readonly users = new Map<string, string>()
 
   async set(key: string, value: string): Promise<void> {
-    await this.store.set(key, this.sanitizeUser(key, value))
+    this.users.set(key, this.sanitizeUser(key, value))
   }
 
   async get(key: string): Promise<string | null> {
-    const value = await this.store.get(key)
-    if (value === null) return null
+    const value = this.users.get(key)
+    if (value === undefined) return null
 
     const sanitized = this.sanitizeUser(key, value)
-    if (sanitized !== value) await this.store.set(key, sanitized)
+    if (sanitized !== value) this.users.set(key, sanitized)
     return sanitized
   }
 
-  remove(key: string): Promise<string | null> {
-    return this.store.remove(key)
+  async remove(key: string): Promise<string | null> {
+    const value = this.users.get(key) ?? null
+    this.users.delete(key)
+    return value
   }
 
-  getAllKeys(): Promise<string[]> {
-    return this.store.getAllKeys()
+  async getAllKeys(): Promise<string[]> {
+    return [...this.users.keys()]
   }
 
   private sanitizeUser(key: string, value: string): string {
