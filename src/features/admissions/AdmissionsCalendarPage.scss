@@ -42,9 +42,13 @@
 .admissions-intro { max-width: 690px; margin: 17px 0 16px; color: #66675f; font-size: 12px; line-height: 1.75; }
 .admissions-source-stamp { display: flex; align-items: center; gap: 8px; color: #838378; font-size: 9px; }
 .admissions-source-dot { width: 7px; height: 7px; border-radius: 50%; background: #759378; box-shadow: 0 0 0 3px #7593781b; }
-.admissions-primary-link { display: inline-flex; align-items: center; gap: 9px; margin-top: 18px; padding: 10px 13px; border: 1px solid #ded6ad; border-radius: 8px; background: #fffdf5; color: #403c2a; font-size: 10px; font-weight: 750; text-decoration: none; transition: background .16s ease, transform .16s ease; }
+.admissions-hero-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 9px; margin-top: 18px; }
+.admissions-calendar-download { display: inline-flex; min-height: 36px; align-items: center; justify-content: center; padding: 9px 13px; border: 1px solid #393a30; border-radius: 8px; background: #20221c; color: #fffdf5; cursor: pointer; font: inherit; font-size: 10px; font-weight: 750; transition: background .16s ease, transform .16s ease; }
+.admissions-calendar-download:hover { background: #383a30; transform: translateY(-1px); }
+.admissions-primary-link { display: inline-flex; min-height: 36px; align-items: center; gap: 9px; padding: 10px 13px; border: 1px solid #ded6ad; border-radius: 8px; background: #fffdf5; color: #403c2a; font-size: 10px; font-weight: 750; text-decoration: none; transition: background .16s ease, transform .16s ease; }
 .admissions-primary-link:hover { background: #fff8d8; transform: translateY(-1px); }
-.admissions-primary-link:focus-visible, .admissions-official-source a:focus-visible { @include tokens.focus-ring; }
+.admissions-calendar-download:focus-visible, .admissions-primary-link:focus-visible, .admissions-official-source a:focus-visible { @include tokens.focus-ring; }
+.admissions-download-note { margin: 7px 0 0; color: #828175; font-size: 9px; line-height: 1.5; }
 
 .admissions-call-card { position: relative; display: flex; min-height: 208px; flex-direction: column; align-items: flex-start; justify-content: center; overflow: hidden; padding: 23px; border: 1px solid #383a31; border-radius: 18px; background: linear-gradient(145deg, #20221c, #171815 74%); color: #f9f8ef; box-shadow: 0 16px 34px #16171124; }
 .admissions-call-card::before, .admissions-call-card::after { position: absolute; right: -48px; width: 190px; height: 190px; border: 1px solid #ffcc2924; border-radius: 50%; content: ''; pointer-events: none; }
@@ -116,5 +120,5 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .admissions-primary-link, .admissions-milestone-card { transition-duration: .01ms; }
+  .admissions-calendar-download, .admissions-primary-link, .admissions-milestone-card { transition-duration: .01ms; }
 }

@@ -1,4 +1,5 @@
 import type { AdmissionsMilestone, PublicAdmissionsCalendar } from './admissionsContracts'
+import { downloadAdmissionsCalendar } from './admissionsCalendarIcs'
 import { OFFICIAL_ADMISSIONS_CALENDAR_2027_I } from './official2027ICalendar'
 import './AdmissionsCalendarPage.scss'
 
@@ -28,9 +29,19 @@ export function AdmissionsCalendarPage({
             <span className="admissions-source-dot" aria-hidden="true" />
             <span>Fuente ACRA · actualizada el {calendar.updatedAt} · consultada el {calendar.checkedAt}</span>
           </div>
-          <a className="admissions-primary-link" href={calendar.source.url} target="_blank" rel="noreferrer">
-            Consultar {calendar.source.label} <span aria-hidden="true">↗</span>
-          </a>
+          <div className="admissions-hero-actions">
+            <button
+              className="admissions-calendar-download"
+              type="button"
+              onClick={() => downloadAdmissionsCalendar(calendar)}
+            >
+              Descargar fechas oficiales (.ics)
+            </button>
+            <a className="admissions-primary-link" href={calendar.source.url} target="_blank" rel="noreferrer">
+              Consultar {calendar.source.label} <span aria-hidden="true">↗</span>
+            </a>
+          </div>
+          <p className="admissions-download-note">Copia personal de las fechas publicadas. Verifica cambios en ACRA.</p>
         </div>
 
         <aside className="admissions-call-card" aria-label="Convocatoria vigente">

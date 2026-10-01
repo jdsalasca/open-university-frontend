@@ -1,6 +1,10 @@
-import { cleanup, render, screen } from '@testing-library/react'
-import { afterEach, describe, expect, it } from 'vitest'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { downloadAdmissionsCalendar } from './admissionsCalendarIcs'
 import { AdmissionsCalendarPage } from './AdmissionsCalendarPage'
+import { OFFICIAL_ADMISSIONS_CALENDAR_2027_I } from './official2027ICalendar'
+
+vi.mock('./admissionsCalendarIcs', () => ({ downloadAdmissionsCalendar: vi.fn() }))
 
 afterEach(cleanup)
 
@@ -45,5 +49,16 @@ describe('AdmissionsCalendarPage', () => {
       'href',
       'https://dsp.uptc.edu.co/sitio/portal/cal_not_eve/noticias/det/UPTC-abre-inscripciones-para-estudiar-un-pregrado-presencial-a-distancia-o-virtual-el-proximo-semestre/',
     )
+  })
+
+  it('downloads a personal calendar snapshot only after an explicit request', () => {
+    // Arrange
+    render(<AdmissionsCalendarPage />)
+
+    // Act
+    fireEvent.click(screen.getByRole('button', { name: /descargar fechas oficiales.*ics/i }))
+
+    // Assert
+    expect(downloadAdmissionsCalendar).toHaveBeenCalledWith(OFFICIAL_ADMISSIONS_CALENDAR_2027_I)
   })
 })

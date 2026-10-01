@@ -15,6 +15,8 @@ export const OFFICIAL_ADMISSIONS_CALENDAR_2027_I: PublicAdmissionsCalendar = {
   milestones: [
     {
       id: 'pin-sale',
+      startsOn: '2026-09-21',
+      endsOn: '2026-10-21',
       dateLabel: '21 sep – 21 oct 2026',
       title: 'Venta de pines de inscripción',
       description: 'ACRA publica este intervalo para los programas presenciales. Consulta en su página los medios, valores y condiciones vigentes.',
@@ -22,6 +24,8 @@ export const OFFICIAL_ADMISSIONS_CALENDAR_2027_I: PublicAdmissionsCalendar = {
     },
     {
       id: 'application-close',
+      startsOn: '2026-10-23',
+      endsOn: '2026-10-23',
       dateLabel: 'Hasta el 23 oct 2026',
       title: 'Cierre de inscripciones',
       description: 'La fecha de cierre publicada para registrar la inscripción de pregrado presencial.',
@@ -29,6 +33,8 @@ export const OFFICIAL_ADMISSIONS_CALENDAR_2027_I: PublicAdmissionsCalendar = {
     },
     {
       id: 'special-tests',
+      startsOn: '2026-10-28',
+      endsOn: '2026-10-29',
       dateLabel: '28 y 29 oct 2026',
       title: 'Pruebas especiales',
       description: 'ACRA anuncia pruebas para Artes Plásticas y Visuales, Licenciatura en Educación Física, Recreación y Deporte, y Licenciatura en Música.',
@@ -36,6 +42,8 @@ export const OFFICIAL_ADMISSIONS_CALENDAR_2027_I: PublicAdmissionsCalendar = {
     },
     {
       id: 'results',
+      startsOn: '2026-11-13',
+      endsOn: '2026-11-13',
       dateLabel: '13 nov 2026',
       title: 'Publicación de resultados',
       description: 'Fecha publicada para los resultados de pregrado presencial.',
@@ -43,6 +51,8 @@ export const OFFICIAL_ADMISSIONS_CALENDAR_2027_I: PublicAdmissionsCalendar = {
     },
     {
       id: 'ise-form',
+      startsOn: '2026-11-17',
+      endsOn: '2026-11-27',
       dateLabel: '17–27 nov 2026',
       title: 'Formulario de registro ISE',
       description: 'Ventana informada por ACRA después de la publicación de resultados.',
@@ -50,6 +60,8 @@ export const OFFICIAL_ADMISSIONS_CALENDAR_2027_I: PublicAdmissionsCalendar = {
     },
     {
       id: 'tuition-and-enrollment',
+      startsOn: '2026-11-23',
+      endsOn: '2026-12-10',
       dateLabel: '23 nov – 10 dic 2026',
       title: 'Derechos pecuniarios y matrícula',
       description: 'Intervalo publicado para el pago de derechos pecuniarios y la matrícula de pregrado presencial.',
@@ -57,6 +69,8 @@ export const OFFICIAL_ADMISSIONS_CALENDAR_2027_I: PublicAdmissionsCalendar = {
     },
     {
       id: 'waitlist-call',
+      startsOn: '2026-12-09',
+      endsOn: '2026-12-15',
       dateLabel: '9–15 dic 2026',
       title: 'Llamado a opcionados',
       description: 'Periodo de llamados publicado para aspirantes opcionados de pregrado presencial y FESAD.',

@@ -7,6 +7,8 @@ export interface AdmissionsCalendarSource {
 
 export interface AdmissionsMilestone {
   id: string
+  startsOn: string
+  endsOn: string
   dateLabel: string
   title: string
   description: string
