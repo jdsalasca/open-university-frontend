@@ -87,6 +87,15 @@ export interface AcademicPeriod {
   createdAt: string
 }
 
+export interface AcademicPeriodCreateCommand {
+  code: string
+  kind: AcademicPeriodKind
+  academicYear: number
+  sequenceNumber: number
+  startsOn: string
+  endsOn: string
+}
+
 export interface AcademicCalendarActivity {
   key: string
   label: string
@@ -94,6 +103,16 @@ export interface AcademicCalendarActivity {
   endsAt: string
   organizationUnitId: string | null
   siteId: string | null
+}
+
+export interface AcademicCalendarDraftCommand {
+  officialReference: string | null
+  activities: AcademicCalendarActivity[]
+}
+
+export interface AcademicPeriodApprovalCommand {
+  calendarRevisionId: string
+  approvalReference: string
 }
 
 export interface AcademicCalendarRevision {
@@ -180,6 +199,13 @@ export interface AcademicOperationsClient {
   getOpenPeriods(signal?: AbortSignal): Promise<AcademicPeriod[]>
   getAdminPeriods(accessToken: string, signal?: AbortSignal): Promise<AcademicPeriod[]>
   getPeriodHistory(periodId: string, accessToken: string, signal?: AbortSignal): Promise<AcademicPeriodHistory>
+  createPeriod(command: AcademicPeriodCreateCommand, accessToken: string, signal?: AbortSignal): Promise<AcademicPeriod>
+  createCalendar(periodId: string, command: AcademicCalendarDraftCommand, accessToken: string,
+    signal?: AbortSignal): Promise<AcademicCalendarRevision>
+  publishCalendar(periodId: string, revisionId: string, accessToken: string,
+    signal?: AbortSignal): Promise<AcademicCalendarRevision>
+  approvePeriod(periodId: string, command: AcademicPeriodApprovalCommand, accessToken: string,
+    signal?: AbortSignal): Promise<AcademicPeriod>
   openPeriod(periodId: string, accessToken: string, signal?: AbortSignal): Promise<AcademicPeriod>
   closePeriod(periodId: string, accessToken: string, signal?: AbortSignal): Promise<AcademicPeriod>
   changeOrganizationUnitOrder(unitId: string, command: AcademicDisplayOrderCommand,

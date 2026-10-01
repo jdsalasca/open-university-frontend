@@ -2,7 +2,6 @@ import { Component, lazy, Suspense, useCallback, useEffect, useState } from 'rea
 import type { ReactNode } from 'react'
 import { academicCatalogClient } from './features/academics/academicCatalogClient'
 import type { AcademicCatalogClient, AcademicCatalogPermission } from './features/academics/contracts'
-import { academicOperationsClient } from './features/academics/academicOperationsClient'
 import type {
   AcademicOperationsClient,
   AcademicPeriodAuthorization,
@@ -56,6 +55,19 @@ interface AppProps {
   roleAccessClient?: RoleAccessClient
 }
 
+let academicOperationsClientPromise: Promise<AcademicOperationsClient> | null = null
+
+function resolveAcademicOperationsClient(client?: AcademicOperationsClient): Promise<AcademicOperationsClient> {
+  if (client) return Promise.resolve(client)
+  academicOperationsClientPromise ??= import('./features/academics/academicOperationsClient')
+    .then(({ academicOperationsClient: defaultClient }) => defaultClient)
+    .catch((error: unknown) => {
+      academicOperationsClientPromise = null
+      throw error
+    })
+  return academicOperationsClientPromise
+}
+
 type ApplicationView = 'identity' | 'programs' | 'academia' | 'admissions' | 'spaces' | 'access'
 
 const MODULE_SYMBOLS: Record<string, string> = {
@@ -72,7 +84,7 @@ const MODULE_SYMBOLS: Record<string, string> = {
 
 export function App({
   catalogClient = academicCatalogClient,
-  academicOperationsClient: operationsClient = academicOperationsClient,
+  academicOperationsClient: operationsClient,
   spaceGuideClient: guideClient = defaultSpaceGuideClient,
   oidcConfiguration,
   identityManager,
@@ -98,7 +110,7 @@ function ApplicationShell({
   roleAccessClient,
 }: {
   catalogClient: AcademicCatalogClient
-  operationsClient: AcademicOperationsClient
+  operationsClient?: AcademicOperationsClient
   spaceGuideClient: SpaceGuideClient
   roleAccessClient: RoleAccessClient
 }) {
@@ -178,7 +190,8 @@ function ApplicationShell({
     signal?: AbortSignal,
   ): Promise<RoleAccessScopeOption[]> => {
     if (kind === 'SITE' || kind === 'FACULTY') {
-      const structure = await operationsClient.getStructure(signal)
+      const structureClient = await resolveAcademicOperationsClient(operationsClient)
+      const structure = await structureClient.getStructure(signal)
       if (kind === 'SITE') {
         return structure.sites
           .filter((site) => site.status === 'ACTIVE')

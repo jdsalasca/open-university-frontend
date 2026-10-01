@@ -49,6 +49,7 @@ export class AcademicOperationsApiError extends Error {
 }
 
 export function createAcademicOperationsClient(fetcher: typeof fetch = fetch): AcademicOperationsClient {
+  const periodWorkflow = createLazyAcademicPeriodWorkflow(fetcher)
   return {
     async getStructure(signal) {
       const response = await fetcher('/api/v1/academic-structure', requestOptions(signal))
@@ -137,6 +138,22 @@ export function createAcademicOperationsClient(fetcher: typeof fetch = fetch): A
       return parseAcademicPeriodHistory(await responseBody(response), periodId)
     },
 
+    async createPeriod(command, accessToken, signal) {
+      return (await periodWorkflow()).createPeriod(command, accessToken, signal)
+    },
+
+    async createCalendar(periodId, command, accessToken, signal) {
+      return (await periodWorkflow()).createCalendar(periodId, command, accessToken, signal)
+    },
+
+    async publishCalendar(periodId, revisionId, accessToken, signal) {
+      return (await periodWorkflow()).publishCalendar(periodId, revisionId, accessToken, signal)
+    },
+
+    async approvePeriod(periodId, command, accessToken, signal) {
+      return (await periodWorkflow()).approvePeriod(periodId, command, accessToken, signal)
+    },
+
     async openPeriod(periodId, accessToken, signal) {
       const response = await fetcher(periodActionPath(periodId, 'open'), postRequestOptions(accessToken, signal))
       return parseTransitionResponse(await responseBody(response), 'OPEN')
@@ -181,6 +198,18 @@ export function createAcademicOperationsClient(fetcher: typeof fetch = fetch): A
         orderRequestOptions(command, accessToken, signal),
       ))
     },
+  }
+}
+
+type AcademicPeriodWorkflowClient = Pick<AcademicOperationsClient,
+  'createPeriod' | 'createCalendar' | 'publishCalendar' | 'approvePeriod'>
+
+function createLazyAcademicPeriodWorkflow(fetcher: typeof fetch): () => Promise<AcademicPeriodWorkflowClient> {
+  let workflow: Promise<AcademicPeriodWorkflowClient> | null = null
+  return () => {
+    workflow ??= import('./academicPeriodClient')
+      .then(({ createAcademicPeriodWorkflowClient }) => createAcademicPeriodWorkflowClient(fetcher))
+    return workflow
   }
 }
 
@@ -268,7 +297,7 @@ function parseAcademicPeriodHistory(input: unknown, expectedPeriodId: string): A
   return { period, calendarRevisions, auditEvents }
 }
 
-function parseCalendarRevision(input: unknown): AcademicCalendarRevision {
+export function parseCalendarRevision(input: unknown): AcademicCalendarRevision {
   if (!isRecord(input)
     || !isUuid(input.id)
     || !isUuid(input.periodId)
@@ -372,7 +401,7 @@ function parseProgramAffiliation(input: unknown): AcademicProgramAffiliation {
   return input as unknown as AcademicProgramAffiliation
 }
 
-function parseAcademicPeriod(input: unknown, expectedStatus?: AcademicPeriod['status']): AcademicPeriod {
+export function parseAcademicPeriod(input: unknown, expectedStatus?: AcademicPeriod['status']): AcademicPeriod {
   if (!isRecord(input)
     || !isUuid(input.id)
     || !isIdentifier(input.code)
@@ -413,7 +442,7 @@ function hasValidPeriodReferences(input: Record<string, unknown>): boolean {
   return hasNoPeriodReferences(input) || hasCompletePeriodReferences(input)
 }
 
-async function responseBody(response: Response): Promise<unknown> {
+export async function responseBody(response: Response): Promise<unknown> {
   let body: unknown
   try {
     body = await response.json()
@@ -445,7 +474,7 @@ function authorizedRequestOptions(accessToken: string, signal?: AbortSignal): Re
   }
 }
 
-function postRequestOptions(accessToken: string, signal?: AbortSignal): RequestInit {
+export function postRequestOptions(accessToken: string, signal?: AbortSignal): RequestInit {
   return { ...authorizedRequestOptions(accessToken, signal), method: 'POST' }
 }
 
@@ -487,7 +516,7 @@ function normalizeStructureRelationCloseCommand(
   return { validFrom: command.validFrom, effectiveThrough: command.effectiveThrough, sourceReference }
 }
 
-function jsonPostRequestOptions(body: unknown, accessToken: string, signal?: AbortSignal): RequestInit {
+export function jsonPostRequestOptions(body: unknown, accessToken: string, signal?: AbortSignal): RequestInit {
   return {
     credentials: 'omit',
     method: 'POST',
@@ -728,6 +757,6 @@ function isPositiveInteger(input: unknown): input is number {
   return Number.isSafeInteger(input) && Number(input) > 0
 }
 
-function malformedResponse() {
+export function malformedResponse() {
   return new Error('The academic operations response is malformed.')
 }

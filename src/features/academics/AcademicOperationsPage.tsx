@@ -23,6 +23,7 @@ import { CreateAcademicStructureRelationForm } from './CreateAcademicStructureRe
 import { CloseAcademicStructureRelationForm } from './CloseAcademicStructureRelationForm'
 import { CreateAcademicProgramAffiliationForm } from './CreateAcademicProgramAffiliationForm'
 import { AcademicPeriodHistoryPanel } from './AcademicPeriodHistoryPanel'
+import { CreateAcademicPeriodForm } from './AcademicPeriodForms'
 import './AcademicOperationsPage.scss'
 
 type RequestState = 'loading' | 'ready' | 'error'
@@ -529,6 +530,18 @@ export function AcademicOperationsPage({
               <span className="academic-open-badge"><span aria-hidden="true" />{visibleRequestData.periodSource === 'admin' ? 'Vista por estado' : 'Solo periodos abiertos'}</span>
             </header>
             {periodActionMessage && <p className={`academic-period-action-message is-${periodActionMessage.type}`} role={periodActionMessage.type === 'error' ? 'alert' : 'status'}>{periodActionMessage.text}</p>}
+            {visibleRequestData.periodSource === 'admin' && authorization?.canRead && authorization.canWrite && (
+              <CreateAcademicPeriodForm
+                client={client}
+                accessToken={authorization.accessToken}
+                onCreated={(createdPeriod) => {
+                  setRequestData((current) => current
+                    ? { ...current, periods: [...current.periods, createdPeriod], periodSource: 'admin' }
+                    : current)
+                }}
+                onAuthorizationRejected={onAuthorizationRejected}
+              />
+            )}
             {sortedPeriods.length === 0
               ? <p className="academic-empty-state">{visibleRequestData.periodSource === 'admin' ? 'No hay periodos académicos registrados.' : 'No hay periodos académicos abiertos para consulta.'}</p>
               : <ul className="academic-period-list">
@@ -539,7 +552,15 @@ export function AcademicOperationsPage({
                     canReadHistory={visibleRequestData.periodSource === 'admin' && authorization?.canRead === true}
                     accessToken={authorization?.accessToken ?? ''}
                     client={client}
+                    units={sortedUnits}
+                    sites={sortedSites}
                     onAuthorizationRejected={onAuthorizationRejected}
+                    onPeriodUpdated={(updatedPeriod) => {
+                      setRequestData((current) => current ? {
+                        ...current,
+                        periods: current.periods.map((item) => item.id === updatedPeriod.id ? updatedPeriod : item),
+                      } : current)
+                    }}
                     confirmation={periodConfirmation?.id === period.id ? periodConfirmation.action : null}
                     pending={pendingPeriodId === period.id}
                     onRequestTransition={(action) => {
@@ -933,6 +954,9 @@ function PeriodCard({
   canReadHistory,
   accessToken,
   client,
+  units,
+  sites,
+  onPeriodUpdated,
   onAuthorizationRejected,
   confirmation,
   pending,
@@ -945,6 +969,9 @@ function PeriodCard({
   canReadHistory: boolean
   accessToken: string
   client: AcademicOperationsClient
+  units: AcademicOrganizationUnit[]
+  sites: AcademicSite[]
+  onPeriodUpdated(period: AcademicPeriod): void
   onAuthorizationRejected?: (accessToken: string) => Promise<void>
   confirmation: 'open' | 'close' | null
   pending: boolean
@@ -987,7 +1014,11 @@ function PeriodCard({
           key={accessToken}
           period={period}
           accessToken={accessToken}
+          canWrite={canReadHistory && canWrite}
           client={client}
+          units={units}
+          sites={sites}
+          onPeriodUpdated={onPeriodUpdated}
           onAuthorizationRejected={onAuthorizationRejected}
         />}
       </div>

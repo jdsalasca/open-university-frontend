@@ -887,6 +887,115 @@ describe('academic operations client', () => {
     })
   })
 
+  it('creates, publishes, and approves a versioned calendar with separate references', async () => {
+    // Arrange
+    const { createAcademicOperationsClient } = await loadClient()
+    const revisionId = 'c2d11854-487b-4d55-b825-0b321fb1f414'
+    const draftPeriod = {
+      ...period,
+      code: '2027-1',
+      academicYear: 2027,
+      startsOn: '2027-01-15',
+      endsOn: '2027-06-20',
+      status: 'DRAFT',
+      calendarRevisionId: null,
+      calendarRevisionNumber: null,
+      approvalReference: null,
+      officialReference: null,
+    }
+    const activity = {
+      key: 'REGISTRATION',
+      label: 'Inscripción',
+      startsAt: '2026-11-01T08:00',
+      endsAt: '2026-11-10T16:00',
+      organizationUnitId: null,
+      siteId: null,
+    }
+    const revision = {
+      id: revisionId,
+      periodId: period.id,
+      version: 1,
+      officialReference: 'Resolución de calendario de prueba',
+      status: 'DRAFT',
+      activities: [activity],
+    }
+    const approved = {
+      ...draftPeriod,
+      calendarRevisionId: revisionId,
+      calendarRevisionNumber: 1,
+      approvalReference: 'Resolución aprobatoria de prueba',
+      officialReference: 'Resolución de calendario de prueba',
+      status: 'APPROVED',
+    }
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(jsonResponse(draftPeriod, 201))
+      .mockResolvedValueOnce(jsonResponse(revision, 201))
+      .mockResolvedValueOnce(jsonResponse({ ...revision, status: 'PUBLISHED' }))
+      .mockResolvedValueOnce(jsonResponse(approved))
+    const client = createAcademicOperationsClient(fetcher)
+    const signal = new AbortController().signal
+
+    // Act
+    const created = await client.createPeriod({
+      code: ' 2027-1 ', kind: 'REGULAR', academicYear: 2027, sequenceNumber: 1,
+      startsOn: '2027-01-15', endsOn: '2027-06-20',
+    }, 'synthetic-access-token', signal)
+    const calendar = await client.createCalendar(period.id, {
+      officialReference: ' Resolución de calendario de prueba ', activities: [activity],
+    }, 'synthetic-access-token', signal)
+    const published = await client.publishCalendar(period.id, revisionId, 'synthetic-access-token', signal)
+    const approvedResult = await client.approvePeriod(period.id, {
+      calendarRevisionId: revisionId, approvalReference: ' Resolución aprobatoria de prueba ',
+    }, 'synthetic-access-token', signal)
+
+    // Assert
+    expect(created.status).toBe('DRAFT')
+    expect(calendar.activities).toEqual([activity])
+    expect(published.status).toBe('PUBLISHED')
+    expect(approvedResult.status).toBe('APPROVED')
+    expect(fetcher).toHaveBeenNthCalledWith(1, '/api/v1/admin/academic-periods', {
+      credentials: 'omit', method: 'POST',
+      headers: { Accept: 'application/json', Authorization: 'Bearer synthetic-access-token', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: '2027-1', kind: 'REGULAR', academicYear: 2027, sequenceNumber: 1,
+        startsOn: '2027-01-15', endsOn: '2027-06-20' }), signal,
+    })
+    expect(fetcher).toHaveBeenNthCalledWith(2, `/api/v1/admin/academic-periods/${period.id}/calendars`, {
+      credentials: 'omit', method: 'POST',
+      headers: { Accept: 'application/json', Authorization: 'Bearer synthetic-access-token', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ officialReference: 'Resolución de calendario de prueba', activities: [activity] }), signal,
+    })
+    expect(fetcher).toHaveBeenNthCalledWith(3, `/api/v1/admin/academic-periods/${period.id}/calendars/${revisionId}/publish`, {
+      credentials: 'omit', method: 'POST',
+      headers: { Accept: 'application/json', Authorization: 'Bearer synthetic-access-token' }, signal,
+    })
+    expect(fetcher).toHaveBeenNthCalledWith(4, `/api/v1/admin/academic-periods/${period.id}/approve`, {
+      credentials: 'omit', method: 'POST',
+      headers: { Accept: 'application/json', Authorization: 'Bearer synthetic-access-token', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ calendarRevisionId: revisionId, approvalReference: 'Resolución aprobatoria de prueba' }), signal,
+    })
+  })
+
+  it('rejects an invalid period range and activity before sending administrative writes', async () => {
+    // Arrange
+    const { createAcademicOperationsClient } = await loadClient()
+    const fetcher = vi.fn()
+    const client = createAcademicOperationsClient(fetcher)
+
+    // Act + Assert
+    await expect(client.createPeriod({
+      code: '2027-1', kind: 'REGULAR', academicYear: 2027, sequenceNumber: 3,
+      startsOn: '2027-06-20', endsOn: '2027-01-15',
+    }, 'synthetic-access-token')).rejects.toThrow(/period/i)
+    await expect(client.createCalendar(period.id, {
+      officialReference: 'Resolución de calendario de prueba',
+      activities: [{
+        key: 'REGISTRATION', label: 'Inscripción', startsAt: '2026-11-10T16:00', endsAt: '2026-11-01T08:00',
+        organizationUnitId: null, siteId: null,
+      }],
+    }, 'synthetic-access-token')).rejects.toThrow(/calendar/i)
+    expect(fetcher).not.toHaveBeenCalled()
+  })
+
   it('loads an administrative period history with the read bearer token and validates the response', async () => {
     // Arrange
     const { createAcademicOperationsClient } = await loadClient()

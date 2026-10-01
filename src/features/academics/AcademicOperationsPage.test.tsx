@@ -158,6 +158,10 @@ function createClient(overrides: Partial<AcademicOperationsClient> = {}): Academ
     getOpenPeriods: vi.fn().mockResolvedValue([regularPeriod, intersemester]),
     getAdminPeriods: vi.fn().mockResolvedValue([regularPeriod, intersemester]),
     getPeriodHistory: vi.fn().mockResolvedValue({ period: regularPeriod, calendarRevisions: [], auditEvents: [] }),
+    createPeriod: vi.fn().mockResolvedValue(regularPeriod),
+    createCalendar: vi.fn().mockResolvedValue({}),
+    publishCalendar: vi.fn().mockResolvedValue({}),
+    approvePeriod: vi.fn().mockResolvedValue(regularPeriod),
     createOrganizationUnit: vi.fn().mockResolvedValue('34a06170-9acf-4718-854e-92e945a7db17'),
     createChildUnit: vi.fn().mockResolvedValue('94a06170-9acf-4718-854e-92e945a7db17'),
     closeOrganizationRelation: vi.fn().mockResolvedValue(undefined),
@@ -652,6 +656,48 @@ describe('AcademicOperationsPage', () => {
     expect(screen.getByText(/Actor: synthetic-period-operator/)).toBeVisible()
     expect(screen.queryByRole('button', { name: /abrir periodo|cerrar periodo/i })).not.toBeInTheDocument()
     expect(getPeriodHistory).toHaveBeenCalledWith(regularPeriod.id, 'synthetic-read-token', expect.any(AbortSignal))
+  })
+
+  it('creates a period draft in the administrative view and adds it to the current list', async () => {
+    // Arrange
+    const user = userEvent.setup()
+    const { AcademicOperationsPage } = await loadPage()
+    const draft: AcademicPeriod = {
+      ...regularPeriod,
+      code: '2027-1',
+      academicYear: 2027,
+      sequenceNumber: 1,
+      startsOn: '2027-01-15',
+      endsOn: '2027-06-20',
+      status: 'DRAFT',
+      calendarRevisionId: null,
+      calendarRevisionNumber: null,
+      approvalReference: null,
+      officialReference: null,
+    }
+    const createPeriod = vi.fn().mockResolvedValue(draft)
+    const client = createClient({ getAdminPeriods: vi.fn().mockResolvedValue([]), createPeriod })
+    render(<AcademicOperationsPage
+      client={client}
+      loadPrograms={async () => programs}
+      authorization={{ accessToken: 'synthetic-write-token', canRead: true, canWrite: true }}
+    />)
+
+    // Act
+    const form = within(await screen.findByRole('region', { name: 'Crear periodo académico' }))
+    await user.type(form.getByLabelText('Código del periodo'), '2027-1')
+    await user.type(form.getByLabelText('Año académico'), '2027')
+    await user.type(form.getByLabelText('Número del periodo'), '1')
+    await user.type(form.getByLabelText('Inicio de instrucción'), '2027-01-15')
+    await user.type(form.getByLabelText('Fin de instrucción'), '2027-06-20')
+    await user.click(form.getByRole('button', { name: 'Crear borrador de periodo' }))
+
+    // Assert
+    expect(await screen.findByText('2027-1')).toBeVisible()
+    expect(createPeriod).toHaveBeenCalledWith({
+      code: '2027-1', kind: 'REGULAR', academicYear: 2027, sequenceNumber: 1,
+      startsOn: '2027-01-15', endsOn: '2027-06-20',
+    }, 'synthetic-write-token')
   })
 
   it('does not expose administrative period history to a write-only user', async () => {

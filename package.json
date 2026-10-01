@@ -14,7 +14,8 @@
   "dependencies": {
     "oidc-client-ts": "^3.5.0",
     "react": "^19.3.0",
-    "react-dom": "^19.3.0"
+    "react-dom": "^19.3.0",
+    "react-hook-form": "7.89.0"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^7.0.1",

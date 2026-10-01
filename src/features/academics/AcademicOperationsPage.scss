@@ -136,6 +136,30 @@
 .academic-create-entry-feedback.is-error { color: #965347; }
 
 .academic-periods-panel { margin-top: 14px; }
+.academic-period-form-panel { display: grid; gap: 10px; margin-top: 15px; padding: 13px; border: 1px solid #e4e6dd; border-radius: 10px; background: #fbfcf8; }
+.academic-period-form-panel > header h3, .academic-period-form-panel > header h4 { margin: 3px 0 0; color: #30342c; font-size: 13px; font-weight: 650; }
+.academic-period-form-intro { margin: 0; color: #77796f; font-size: 9px; line-height: 1.55; }
+.academic-period-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 9px 10px; }
+.academic-period-form-field { display: grid; min-width: 0; gap: 5px; color: #52574d; font-size: 9px; font-weight: 700; line-height: 1.4; }
+.academic-period-form-select { box-sizing: border-box; width: 100%; min-width: 0; min-height: 34px; padding: 7px 9px; border: 1px solid #d9ddd5; border-radius: 6px; background: #fff; color: #33352f; font: inherit; font-size: 10px; }
+.academic-period-form-select:focus-visible, .academic-period-form-field select:focus-visible { outline: 3px solid var(--brand-focus, #1a1a1a); outline-offset: 2px; }
+.academic-period-form-field [role='alert'], .academic-period-form-field-error { color: #965347; font-size: 8px; font-weight: 500; }
+.academic-period-form-actions { display: flex; grid-column: 1 / -1; flex-wrap: wrap; align-items: center; gap: 8px; }
+.academic-period-form-actions button, .academic-period-form-remove { min-height: 32px; padding: 0 11px; border: 1px solid #465947; border-radius: 6px; background: #465947; color: #fff; font: inherit; font-size: 9px; font-weight: 700; cursor: pointer; }
+.academic-period-form-actions button.secondary { border-color: #d3d7ce; background: #fff; color: #55564e; }
+.academic-period-form-actions button:focus-visible, .academic-period-form-remove:focus-visible { outline: 3px solid var(--brand-focus, #1a1a1a); outline-offset: 2px; }
+.academic-period-form-actions button:disabled, .academic-period-form-remove:disabled { opacity: .55; cursor: wait; }
+.academic-period-form-actions > span { color: #77796f; font-size: 8px; line-height: 1.45; }
+.academic-period-form-feedback { margin: 0; font-size: 9px; line-height: 1.5; }
+.academic-period-form-feedback.is-success { color: #356148; }
+.academic-period-form-feedback.is-warning { color: #816324; }
+.academic-period-form-feedback.is-error { color: #965347; }
+.academic-calendar-create-panel, .academic-period-approval-panel { margin-top: 12px; padding: 11px; }
+.academic-calendar-activity { display: grid; grid-column: 1 / -1; min-width: 0; gap: 9px; margin: 0; padding: 10px; border: 1px solid #e7e8df; border-radius: 8px; background: #fff; }
+.academic-calendar-activity legend { padding: 0 5px; color: #465947; font-size: 9px; font-weight: 750; }
+.academic-calendar-activity .academic-period-form-grid { width: 100%; }
+.academic-period-form-remove { width: fit-content; border-color: #d3d7ce; background: #fff; color: #76544c; }
+.academic-calendar-create-panel .academic-period-form-actions { justify-content: flex-start; }
 .academic-open-badge { display: inline-flex; align-items: center; gap: 7px; margin-left: auto; padding: 6px 8px; border: 1px solid #dbe8dd; border-radius: 6px; color: #597861; font-size: 8px; white-space: nowrap; }
 .academic-open-badge > span { width: 5px; height: 5px; border-radius: 50%; background: #78b184; }
 .academic-period-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
@@ -215,6 +239,9 @@
   .academic-order-form { width: min(100%, 260px); }
   .academic-create-entry-form { grid-template-columns: minmax(0, 1fr); }
   .academic-create-entry-reference, .academic-create-entry-actions { grid-column: auto; }
+  .academic-period-form-grid { grid-template-columns: minmax(0, 1fr); }
+  .academic-period-form-actions { grid-column: auto; }
+  .academic-calendar-activity { grid-column: auto; }
   .academic-program-node small { margin-left: 0; }
   .academic-affiliation-row-heading { flex-wrap: wrap; }
 }
