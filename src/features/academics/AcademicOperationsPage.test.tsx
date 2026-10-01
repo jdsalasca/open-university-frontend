@@ -156,6 +156,7 @@ function createClient(overrides: Partial<AcademicOperationsClient> = {}): Academ
     getStructure: vi.fn().mockResolvedValue(structure),
     getOpenPeriods: vi.fn().mockResolvedValue([regularPeriod, intersemester]),
     getAdminPeriods: vi.fn().mockResolvedValue([regularPeriod, intersemester]),
+    createOrganizationUnit: vi.fn().mockResolvedValue('34a06170-9acf-4718-854e-92e945a7db17'),
     openPeriod: vi.fn().mockImplementation(async (_periodId: string, _accessToken: string) => ({
       ...regularPeriod,
       status: 'OPEN',
@@ -687,6 +688,86 @@ describe('AcademicOperationsPage', () => {
     expect(await screen.findByText(/no hay unidades cargadas/i)).toBeVisible()
     expect(screen.getByText(/no hay periodos académicos abiertos/i)).toBeVisible()
     expect(screen.queryByText(/Ingeniería de Sistemas/)).not.toBeInTheDocument()
+  })
+
+  it('shows root-faculty creation only to an authorized structure writer', async () => {
+    // Arrange
+    const { AcademicOperationsPage } = await loadPage()
+    const client = createClient()
+    const { rerender } = render(
+      <AcademicOperationsPage client={client} loadPrograms={async () => programs} />,
+    )
+    expect(await screen.findByText('Facultad de Ciencias')).toBeVisible()
+    expect(screen.queryByRole('button', { name: 'Crear facultad' })).not.toBeInTheDocument()
+
+    // Act
+    rerender(
+      <AcademicOperationsPage
+        client={client}
+        loadPrograms={async () => programs}
+        structureAuthorization={{ accessToken: 'synthetic-structure-token', canWrite: true }}
+      />,
+    )
+
+    // Assert
+    expect(await screen.findByRole('button', { name: 'Crear facultad' })).toBeVisible()
+  })
+
+  it('creates a faculty through the protected client and reloads the authoritative structure', async () => {
+    // Arrange
+    const user = userEvent.setup()
+    const { AcademicOperationsPage } = await loadPage()
+    const facultyId = '34a06170-9acf-4718-854e-92e945a7db17'
+    const createdFaculty = {
+      id: facultyId,
+      code: 'FAC-APLICADAS',
+      type: 'FACULTY' as const,
+      displayName: 'Facultad de Ciencias Aplicadas',
+      displayOrder: 3,
+      status: 'ACTIVE' as const,
+      validFrom: '2026-09-30',
+      validThrough: null,
+    }
+    const updatedStructure: AcademicStructureSnapshot = {
+      ...structure,
+      units: [...structure.units, createdFaculty],
+    }
+    const getStructure = vi.fn()
+      .mockResolvedValueOnce(structure)
+      .mockResolvedValueOnce(updatedStructure)
+    const createOrganizationUnit = vi.fn().mockResolvedValue(facultyId)
+    const client = createClient({ getStructure, createOrganizationUnit })
+    render(
+      <AcademicOperationsPage
+        client={client}
+        loadPrograms={async () => programs}
+        structureAuthorization={{ accessToken: 'synthetic-structure-token', canWrite: true }}
+      />,
+    )
+    await screen.findByText('Facultad de Ciencias')
+    await user.type(screen.getByLabelText('Código institucional'), 'fac-aplicadas')
+    await user.type(screen.getByLabelText('Nombre de la facultad'), 'Facultad de Ciencias Aplicadas')
+    await user.clear(screen.getByLabelText('Prioridad de visualización'))
+    await user.type(screen.getByLabelText('Prioridad de visualización'), '3')
+    await user.clear(screen.getByLabelText('Vigente desde'))
+    await user.type(screen.getByLabelText('Vigente desde'), '2026-09-30')
+    await user.type(screen.getByLabelText('Referencia institucional'), 'Acuerdo institucional de prueba')
+
+    // Act
+    await user.click(screen.getByRole('button', { name: 'Crear facultad' }))
+
+    // Assert
+    expect(createOrganizationUnit).toHaveBeenCalledWith({
+      code: 'fac-aplicadas',
+      type: 'FACULTY',
+      displayName: 'Facultad de Ciencias Aplicadas',
+      displayOrder: 3,
+      validFrom: '2026-09-30',
+      validThrough: null,
+      sourceReference: 'Acuerdo institucional de prueba',
+    }, 'synthetic-structure-token')
+    expect(await screen.findByText('Facultad de Ciencias Aplicadas')).toBeVisible()
+    expect(getStructure).toHaveBeenCalledTimes(2)
   })
 
   it('lets the user retry a failed public request', async () => {

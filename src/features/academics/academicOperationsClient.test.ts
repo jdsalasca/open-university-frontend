@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import type { AcademicOperationsClient, AcademicOrganizationUnitCreateCommand } from './academicOperationsContracts'
 
 const clientModules = import.meta.glob<typeof import('./academicOperationsClient')>('./academicOperationsClient.ts')
 
@@ -82,6 +83,108 @@ const period = {
 }
 
 describe('academic operations client', () => {
+  it('creates an authorized faculty with normalized values and returns its identifier', async () => {
+    // Arrange
+    const { createAcademicOperationsClient } = await loadClient()
+    const unitId = '34a06170-9acf-4718-854e-92e945a7db17'
+    const fetcher = vi.fn().mockResolvedValue(jsonResponse({ id: unitId }, 201))
+    const client = createAcademicOperationsClient(fetcher)
+    const command: AcademicOrganizationUnitCreateCommand = {
+      code: ' fac-ciencias ',
+      type: 'FACULTY',
+      displayName: ' Facultad de Ciencias ',
+      displayOrder: 0,
+      validFrom: '2026-09-30',
+      validThrough: null,
+      sourceReference: ' Acuerdo institucional 2026 ',
+    }
+    const createUnit = Reflect.get(client, 'createOrganizationUnit') as
+      AcademicOperationsClient['createOrganizationUnit'] | undefined
+    expect(createUnit).toBeTypeOf('function')
+    if (!createUnit) return
+    const signal = new AbortController().signal
+
+    // Act
+    const createdUnitId = await createUnit.call(client, command, 'institutional-access-token', signal)
+
+    // Assert
+    expect(createdUnitId).toBe(unitId)
+    expect(fetcher).toHaveBeenCalledWith('/api/v1/admin/academic-structure/units', {
+      credentials: 'omit',
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        Authorization: 'Bearer institutional-access-token',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        code: 'FAC-CIENCIAS',
+        type: 'FACULTY',
+        displayName: 'Facultad de Ciencias',
+        displayOrder: 0,
+        validFrom: '2026-09-30',
+        validThrough: null,
+        sourceReference: 'Acuerdo institucional 2026',
+      }),
+      signal,
+    })
+  })
+
+  it('rejects invalid faculty data before sending a request', async () => {
+    // Arrange
+    const { createAcademicOperationsClient } = await loadClient()
+    const fetcher = vi.fn()
+    const client = createAcademicOperationsClient(fetcher)
+    const createUnit = Reflect.get(client, 'createOrganizationUnit') as
+      AcademicOperationsClient['createOrganizationUnit'] | undefined
+    expect(createUnit).toBeTypeOf('function')
+    if (!createUnit) return
+    const invalidCommand = {
+      code: 'FAC CIENCIAS',
+      type: 'FACULTY',
+      displayName: 'Facultad de Ciencias',
+      displayOrder: -1,
+      validFrom: '2026-09-30',
+      validThrough: '2026-09-29',
+      sourceReference: 'Resolución de prueba',
+    }
+
+    // Act
+    const request = createUnit.call(client, invalidCommand as unknown as AcademicOrganizationUnitCreateCommand,
+      'institutional-access-token')
+
+    // Assert
+    await expect(request).rejects.toThrow(/invalid|valid/i)
+    expect(fetcher).not.toHaveBeenCalled()
+  })
+
+  it('preserves a server conflict when a faculty code already exists', async () => {
+    // Arrange
+    const { createAcademicOperationsClient } = await loadClient()
+    const fetcher = vi.fn().mockResolvedValue(jsonResponse({ code: 'academic_structure_conflict', message: 'Conflicto de estructura' }, 409))
+    const client = createAcademicOperationsClient(fetcher)
+    const createUnit = Reflect.get(client, 'createOrganizationUnit') as
+      AcademicOperationsClient['createOrganizationUnit'] | undefined
+    expect(createUnit).toBeTypeOf('function')
+    if (!createUnit) return
+    const command: AcademicOrganizationUnitCreateCommand = {
+      code: 'FAC-CIENCIAS',
+      type: 'FACULTY',
+      displayName: 'Facultad de Ciencias',
+      displayOrder: 0,
+      validFrom: '2026-09-30',
+      validThrough: null,
+      sourceReference: 'Acuerdo institucional',
+    }
+
+    // Act
+    const request = createUnit.call(client, command, 'institutional-access-token')
+
+    // Assert
+    await expect(request).rejects.toMatchObject({ status: 409, message: 'Conflicto de estructura' })
+    expect(fetcher).toHaveBeenCalledTimes(1)
+  })
+
   it('loads structure and open periods from separate public contracts without credentials', async () => {
     // Arrange
     const { createAcademicOperationsClient } = await loadClient()

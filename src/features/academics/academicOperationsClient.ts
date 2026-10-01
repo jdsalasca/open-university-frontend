@@ -2,6 +2,7 @@ import type {
   AcademicEntityStatus,
   AcademicDisplayOrderCommand,
   AcademicOperationsClient,
+  AcademicOrganizationUnitCreateCommand,
   AcademicOrganizationRelation,
   AcademicOrganizationUnit,
   AcademicOrganizationUnitType,
@@ -37,6 +38,14 @@ export function createAcademicOperationsClient(fetcher: typeof fetch = fetch): A
     async getStructure(signal) {
       const response = await fetcher('/api/v1/academic-structure', requestOptions(signal))
       return parseAcademicStructure(await responseBody(response))
+    },
+
+    async createOrganizationUnit(command, accessToken, signal) {
+      const response = await fetcher('/api/v1/admin/academic-structure/units',
+        jsonPostRequestOptions(normalizeOrganizationUnitCommand(command), accessToken, signal))
+      const body = await responseBody(response)
+      if (!isRecord(body) || !isUuid(body.id)) throw malformedResponse()
+      return body.id
     },
 
     async getOpenPeriods(signal) {
@@ -303,6 +312,52 @@ function orderRequestOptions(
     },
     body: JSON.stringify(normalizedCommand),
     ...(signal ? { signal } : {}),
+  }
+}
+
+function jsonPostRequestOptions(body: unknown, accessToken: string, signal?: AbortSignal): RequestInit {
+  return {
+    credentials: 'omit',
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      Authorization: `Bearer ${requireAccessToken(accessToken)}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+    ...(signal ? { signal } : {}),
+  }
+}
+
+function normalizeOrganizationUnitCommand(
+  command: AcademicOrganizationUnitCreateCommand,
+): AcademicOrganizationUnitCreateCommand {
+  if (!isRecord(command)) throw new Error('The academic organization unit request is invalid.')
+  const code = typeof command.code === 'string' ? command.code.trim().toLocaleUpperCase('en-US') : ''
+  const displayName = typeof command.displayName === 'string' ? command.displayName.trim() : ''
+  const sourceReference = typeof command.sourceReference === 'string' ? command.sourceReference.trim() : ''
+  if (!isIdentifier(code)
+    || !isOneOf(UNIT_TYPES, command.type)
+    || !isBoundedText(displayName, 240)
+    || !isNonNegativeInteger(command.displayOrder)
+    || Number(command.displayOrder) > 2_147_483_647
+    || !isDate(command.validFrom)
+    || !(command.validThrough === null || isDate(command.validThrough))
+    || (command.validThrough !== null && command.validThrough < command.validFrom)
+    || !isBoundedText(sourceReference, 240)
+    || containsAsciiControlCharacters(code)
+    || containsAsciiControlCharacters(displayName)
+    || containsAsciiControlCharacters(sourceReference)) {
+    throw new Error('The academic organization unit request is invalid.')
+  }
+  return {
+    code,
+    type: command.type,
+    displayName,
+    displayOrder: command.displayOrder,
+    validFrom: command.validFrom,
+    validThrough: command.validThrough,
+    sourceReference,
   }
 }
 

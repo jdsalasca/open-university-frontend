@@ -6,7 +6,7 @@ import { AcademicOperationsApiError } from './features/academics/academicOperati
 import { BrandingProvider } from './features/branding/BrandingProvider'
 import { DEFAULT_BRANDING } from './features/branding/contracts'
 import type { AcademicCatalogClient } from './features/academics/contracts'
-import type { AcademicOperationsClient, AcademicPeriod } from './features/academics/academicOperationsContracts'
+import type { AcademicOperationsClient, AcademicOrganizationUnitCreateCommand, AcademicPeriod } from './features/academics/academicOperationsContracts'
 import type { CurrentIdentity, IdentityClient } from './features/identity/identityContracts'
 import { IdentityApiError } from './features/identity/identityClient'
 import type { IdentitySessionManager } from './features/identity/IdentityProvider'
@@ -64,6 +64,9 @@ function emptyAcademicOperationsClient(): AcademicOperationsClient {
     getStructure: async () => ({
       units: [], organizationRelations: [], sites: [], siteRelations: [], programAffiliations: [],
     }),
+    createOrganizationUnit: async (_command: AcademicOrganizationUnitCreateCommand) => {
+      throw new Error('Unexpected organization unit creation')
+    },
     getOpenPeriods: async () => [],
     getAdminPeriods: async () => [],
     openPeriod: async () => { throw new Error('Unexpected period opening') },

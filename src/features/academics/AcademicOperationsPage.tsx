@@ -17,6 +17,7 @@ import type {
 } from './academicOperationsContracts'
 import { AcademicOperationsApiError } from './academicOperationsClient'
 import { containsAsciiControlCharacters } from '../../shared/inputValidation'
+import { CreateFacultyForm } from './CreateFacultyForm'
 import './AcademicOperationsPage.scss'
 
 type RequestState = 'loading' | 'ready' | 'error'
@@ -234,6 +235,11 @@ export function AcademicOperationsPage({
     }
   }
 
+  async function refreshStructureAfterFacultyCreation(_unitId: string): Promise<void> {
+    const refreshed = await client.getStructure()
+    setRequestData((current) => current ? { ...current, structure: refreshed } : current)
+  }
+
   return (
     <div className="academic-operations">
       <section className="academic-operations-hero" aria-labelledby="academic-operations-title">
@@ -308,6 +314,14 @@ export function AcademicOperationsPage({
                     canChangeOrder={canChangeStructureOrder}
                     onSaveOrder={saveStructureOrder}
                   />}
+              {canChangeStructureOrder && structureAuthorization && (
+                <CreateFacultyForm
+                  client={client}
+                  authorization={structureAuthorization}
+                  onCreated={refreshStructureAfterFacultyCreation}
+                  onAuthorizationRejected={onAuthorizationRejected}
+                />
+              )}
               <p className="academic-panel-footnote">La jerarquía y el orden vienen de relaciones institucionales fechadas.</p>
             </section>
 
