@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
 import { academicCatalogClient } from './academicCatalogClient'
 import type { AcademicProgram } from './contracts'
@@ -38,7 +38,7 @@ interface AcademicOperationsPageProps {
   loadPrograms?: (signal?: AbortSignal) => Promise<AcademicProgram[]>
   authorization?: AcademicPeriodAuthorization | null
   structureAuthorization?: AcademicStructureAuthorization | null
-  onAuthorizationRejected?: () => Promise<void>
+  onAuthorizationRejected?: (accessToken: string) => Promise<void>
 }
 
 const defaultLoadPrograms = (signal?: AbortSignal) => academicCatalogClient.listPrograms(signal)
@@ -57,17 +57,7 @@ export function AcademicOperationsPage({
   const [pendingPeriodId, setPendingPeriodId] = useState<string | null>(null)
   const [periodActionMessage, setPeriodActionMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [structureOrderMessage, setStructureOrderMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
-  const [structureOrderAuthorizationRejected, setStructureOrderAuthorizationRejected] = useState(false)
-  const lastStructureAccessToken = useRef<string | null>(null)
-  const structureWriteToken = structureAuthorization?.accessToken ?? null
-  const canWriteStructure = structureAuthorization?.canWrite === true
-  const canChangeStructureOrder = canWriteStructure && !structureOrderAuthorizationRejected
-
-  useEffect(() => {
-    if (!canWriteStructure || structureWriteToken === lastStructureAccessToken.current) return
-    lastStructureAccessToken.current = structureWriteToken
-    setStructureOrderAuthorizationRejected(false)
-  }, [canWriteStructure, structureWriteToken])
+  const canChangeStructureOrder = structureAuthorization?.canWrite === true
 
   useEffect(() => {
     const controller = new AbortController()
@@ -156,7 +146,6 @@ export function AcademicOperationsPage({
       await submitStructureOrder(client, target, command, structureAuthorization.accessToken)
     } catch (error) {
       if (error instanceof AcademicOperationsApiError && (error.status === 401 || error.status === 403)) {
-        setStructureOrderAuthorizationRejected(true)
         setStructureOrderMessage({
           type: 'error',
           text: error.status === 401
@@ -164,7 +153,7 @@ export function AcademicOperationsPage({
             : 'El servidor negó el permiso para este cambio. Oculté los controles mientras vuelvo a comprobar los permisos.',
         })
         try {
-          await onAuthorizationRejected?.()
+          await onAuthorizationRejected?.(structureAuthorization.accessToken)
         } catch {
           setStructureOrderMessage({
             type: 'error',

@@ -66,6 +66,7 @@ function ApplicationShell({
   const { branding, status } = useBranding()
   const { state: identity, login, logout, retry, loginAvailable } = useIdentity()
   const [view, setView] = useState<ApplicationView>(() => readApplicationView())
+  const [rejectedStructureAccessToken, setRejectedStructureAccessToken] = useState<string | null>(null)
   useEffect(() => {
     const onHashChange = () => setView(readApplicationView())
     window.addEventListener('hashchange', onHashChange)
@@ -102,9 +103,14 @@ function ApplicationShell({
   const structureAuthorization: AcademicStructureAuthorization | null = authenticatedIdentity
     ? {
       accessToken: authenticatedIdentity.accessToken,
-      canWrite: authenticatedIdentity.permissions.includes('academic:structure:write'),
+      canWrite: authenticatedIdentity.permissions.includes('academic:structure:write')
+        && authenticatedIdentity.accessToken !== rejectedStructureAccessToken,
     }
     : null
+  async function revalidateRejectedStructureAccess(accessToken: string): Promise<void> {
+    setRejectedStructureAccessToken(accessToken)
+    await retry()
+  }
   const sessionLabel = identity.status === 'authenticated' ? 'Sesión institucional activa'
     : identity.status === 'loading' ? 'Verificando sesión…'
       : identity.status === 'unconfigured' ? 'Acceso institucional pendiente de configuración'
@@ -226,7 +232,7 @@ function ApplicationShell({
                 loadPrograms={catalogClient.listPrograms}
                 authorization={periodAuthorization}
                 structureAuthorization={structureAuthorization}
-                onAuthorizationRejected={retry}
+                onAuthorizationRejected={revalidateRejectedStructureAccess}
               />
               : <VisualIdentityCenter
                 key={identityCenterKey}

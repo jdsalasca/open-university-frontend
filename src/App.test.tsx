@@ -357,10 +357,12 @@ describe('App', () => {
   })
 
   it.each([
-    [401, new IdentityApiError(401)],
-    [403, { subject: 'synthetic-subject', permissions: [] } satisfies CurrentIdentity],
-    [403, { subject: 'synthetic-subject', permissions: ['academic:structure:write'] } satisfies CurrentIdentity],
-  ])('revalidates identity and hides the order editor after a PATCH %i response', async (status, revalidatedIdentity) => {
+    { status: 401, revalidatedIdentity: new IdentityApiError(401), scenario: 'an expired token' },
+    { status: 403, revalidatedIdentity: { subject: 'synthetic-subject', permissions: [] } satisfies CurrentIdentity,
+      scenario: 'a removed permission' },
+    { status: 403, revalidatedIdentity: { subject: 'synthetic-subject', permissions: ['academic:structure:write'] } satisfies CurrentIdentity,
+      scenario: 'a stale permission response' },
+  ])('revalidates identity and hides the order editor after a PATCH $status with $scenario', async ({ status, revalidatedIdentity }) => {
     // Arrange
     const user = userEvent.setup()
     const unitId = 'fae06170-9acf-4718-854e-92e945a7db17'
@@ -370,7 +372,7 @@ describe('App', () => {
         ? Promise.reject(revalidatedIdentity)
         : Promise.resolve(revalidatedIdentity))
     const operations = emptyAcademicOperationsClient()
-    operations.getStructure = vi.fn().mockResolvedValue({
+    const getStructure = vi.fn().mockResolvedValue({
       units: [{
         id: unitId,
         code: 'FAC-CIENCIAS',
@@ -386,6 +388,7 @@ describe('App', () => {
       siteRelations: [],
       programAffiliations: [],
     })
+    operations.getStructure = getStructure
     operations.changeOrganizationUnitOrder = vi.fn().mockRejectedValue(
       new AcademicOperationsApiError(status, 'Authorization rejected'),
     )
@@ -413,5 +416,13 @@ describe('App', () => {
     await waitFor(() => expect(identityCurrent).toHaveBeenCalledTimes(2))
     await waitFor(() => expect(screen.queryByLabelText('Nuevo orden de Facultad de Ciencias')).not.toBeInTheDocument())
     expect(operations.changeOrganizationUnitOrder).toHaveBeenCalledOnce()
+
+    // Act: return to the academic view after its page component has unmounted.
+    await user.click(screen.getByRole('link', { name: 'Programas · Vista previa' }))
+    await user.click(screen.getByRole('link', { name: 'Estructura y periodos · Vista previa' }))
+    await waitFor(() => expect(getStructure.mock.calls.length).toBeGreaterThanOrEqual(3))
+
+    // Assert: a denied token cannot regain its editor after route navigation.
+    expect(screen.queryByRole('button', { name: 'Cambiar orden de Facultad de Ciencias' })).not.toBeInTheDocument()
   })
 })
