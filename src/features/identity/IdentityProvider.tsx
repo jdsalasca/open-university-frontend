@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { PropsWithChildren } from 'react'
 import type { IdentityClient } from './identityContracts'
 import { identityClient as defaultIdentityClient, IdentityApiError } from './identityClient'
-import { createOidcUserManager } from './identitySessionManager'
 import type { OidcConfigurationResult, OidcSettings } from './oidcConfiguration'
 import { parseOidcConfiguration } from './oidcConfiguration'
 import { IdentityContext } from './identityContext'
@@ -158,13 +157,34 @@ export function IdentityProvider({
 }
 
 function createIdentitySessionManager(settings: OidcSettings): IdentitySessionManager {
-  const manager = createOidcUserManager(settings)
+  let managerPromise: Promise<IdentitySessionManager> | undefined
+  const loadManager = () => {
+    if (!managerPromise) {
+      managerPromise = import('./identitySessionManager')
+        .then(({ createOidcUserManager }) => {
+          const manager = createOidcUserManager(settings)
+          return {
+            getUser: () => manager.getUser(),
+            signinRedirect: (args: { state: unknown }) => manager.signinRedirect(args),
+            signinCallback: () => manager.signinCallback(),
+            signoutRedirect: () => manager.signoutRedirect(),
+            removeUser: () => manager.removeUser(),
+          }
+        })
+        .catch((error: unknown) => {
+          managerPromise = undefined
+          throw error
+        })
+    }
+    return managerPromise
+  }
+
   return {
-    getUser: () => manager.getUser(),
-    signinRedirect: (args) => manager.signinRedirect(args),
-    signinCallback: () => manager.signinCallback(),
-    signoutRedirect: () => manager.signoutRedirect(),
-    removeUser: () => manager.removeUser(),
+    getUser: async () => (await loadManager()).getUser(),
+    signinRedirect: async (args) => (await loadManager()).signinRedirect(args),
+    signinCallback: async () => (await loadManager()).signinCallback(),
+    signoutRedirect: async () => (await loadManager()).signoutRedirect(),
+    removeUser: async () => (await loadManager()).removeUser(),
   }
 }
 
