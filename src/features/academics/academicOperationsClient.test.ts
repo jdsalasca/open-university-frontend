@@ -455,6 +455,58 @@ describe('academic operations client', () => {
     })
   })
 
+  it('creates an authorized child unit through the atomic parent-child endpoint', async () => {
+    // Arrange
+    const { createAcademicOperationsClient } = await loadClient()
+    const parentId = 'A4A06170-9ACF-4718-854E-92E945A7DB17'
+    const childId = '94a06170-9acf-4718-854e-92e945a7db17'
+    const fetcher = vi.fn().mockResolvedValue(jsonResponse({ id: childId }, 201))
+    const client = createAcademicOperationsClient(fetcher)
+    const command: AcademicOrganizationUnitCreateCommand = {
+      code: ' school-ciencias ',
+      type: 'SCHOOL',
+      displayName: ' Escuela de Ciencias ',
+      displayOrder: 3,
+      validFrom: '2026-10-01',
+      validThrough: null,
+      sourceReference: ' Acuerdo institucional 2026 ',
+    }
+    const createChildUnit = Reflect.get(client, 'createChildUnit') as
+      ((parentUnitId: string, childCommand: AcademicOrganizationUnitCreateCommand, accessToken: string,
+        signal?: AbortSignal) => Promise<string>) | undefined
+    expect(createChildUnit).toBeTypeOf('function')
+    if (!createChildUnit) return
+    const signal = new AbortController().signal
+
+    // Act
+    const createdId = await createChildUnit.call(client, parentId, command, 'institutional-access-token', signal)
+
+    // Assert
+    expect(createdId).toBe(childId)
+    expect(fetcher).toHaveBeenCalledWith(
+      '/api/v1/admin/academic-structure/units/a4a06170-9acf-4718-854e-92e945a7db17/children',
+      {
+        credentials: 'omit',
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          Authorization: 'Bearer institutional-access-token',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          code: 'SCHOOL-CIENCIAS',
+          type: 'SCHOOL',
+          displayName: 'Escuela de Ciencias',
+          displayOrder: 3,
+          validFrom: '2026-10-01',
+          validThrough: null,
+          sourceReference: 'Acuerdo institucional 2026',
+        }),
+        signal,
+      },
+    )
+  })
+
   it('rejects invalid faculty data before sending a request', async () => {
     // Arrange
     const { createAcademicOperationsClient } = await loadClient()

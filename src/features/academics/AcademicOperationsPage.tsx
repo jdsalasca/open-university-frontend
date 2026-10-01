@@ -18,6 +18,7 @@ import type {
 import { AcademicOperationsApiError } from './academicOperationsClient'
 import { containsAsciiControlCharacters } from '../../shared/inputValidation'
 import { CreateFacultyForm, CreateSiteForm } from './CreateFacultyForm'
+import { CreateAcademicChildUnitForm } from './CreateAcademicChildUnitForm'
 import { CreateAcademicStructureRelationForm } from './CreateAcademicStructureRelationForm'
 import { CreateAcademicProgramAffiliationForm } from './CreateAcademicProgramAffiliationForm'
 import './AcademicOperationsPage.scss'
@@ -395,6 +396,16 @@ export function AcademicOperationsPage({
                   client={client}
                   authorization={structureAuthorization}
                   onCreated={refreshStructureAfterEntryCreation}
+                  onAuthorizationRejected={onAuthorizationRejected}
+                />
+              )}
+              {canManageStructure && structureAuthorization && (
+                <CreateAcademicChildUnitForm
+                  parents={sortedUnits}
+                  client={client}
+                  authorization={structureAuthorization}
+                  onCreated={refreshStructureAfterEntryCreation}
+                  onRefresh={refreshStructureAfterEntryCreation}
                   onAuthorizationRejected={onAuthorizationRejected}
                 />
               )}

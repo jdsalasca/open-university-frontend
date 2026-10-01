@@ -113,6 +113,8 @@ export interface AcademicOperationsClient {
   getAdminStructure(accessToken: string, signal?: AbortSignal): Promise<AcademicStructureSnapshot>
   createOrganizationUnit(command: AcademicOrganizationUnitCreateCommand, accessToken: string,
     signal?: AbortSignal): Promise<string>
+  createChildUnit(parentUnitId: string, command: AcademicOrganizationUnitCreateCommand, accessToken: string,
+    signal?: AbortSignal): Promise<string>
   createSite(command: AcademicSiteCreateCommand, accessToken: string, signal?: AbortSignal): Promise<string>
   relateOrganizationUnits(parentUnitId: string, childUnitId: string, command: AcademicStructureRelationCreateCommand,
     accessToken: string, signal?: AbortSignal): Promise<void>

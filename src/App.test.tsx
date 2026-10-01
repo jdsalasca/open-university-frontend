@@ -70,6 +70,7 @@ function emptyAcademicOperationsClient(): AcademicOperationsClient {
     createOrganizationUnit: async (_command: AcademicOrganizationUnitCreateCommand) => {
       throw new Error('Unexpected organization unit creation')
     },
+    createChildUnit: async () => { throw new Error('Unexpected child organization unit creation') },
     createSite: async () => { throw new Error('Unexpected site creation') },
     relateOrganizationUnits: async () => { throw new Error('Unexpected organization relation creation') },
     relateSites: async () => { throw new Error('Unexpected site relation creation') },

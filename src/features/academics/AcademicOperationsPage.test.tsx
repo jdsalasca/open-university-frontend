@@ -158,6 +158,7 @@ function createClient(overrides: Partial<AcademicOperationsClient> = {}): Academ
     getOpenPeriods: vi.fn().mockResolvedValue([regularPeriod, intersemester]),
     getAdminPeriods: vi.fn().mockResolvedValue([regularPeriod, intersemester]),
     createOrganizationUnit: vi.fn().mockResolvedValue('34a06170-9acf-4718-854e-92e945a7db17'),
+    createChildUnit: vi.fn().mockResolvedValue('94a06170-9acf-4718-854e-92e945a7db17'),
     createSite: vi.fn().mockResolvedValue('94a06170-9acf-4718-854e-92e945a7db17'),
     relateOrganizationUnits: vi.fn().mockResolvedValue(undefined),
     relateSites: vi.fn().mockResolvedValue(undefined),

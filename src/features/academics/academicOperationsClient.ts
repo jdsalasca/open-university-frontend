@@ -57,6 +57,15 @@ export function createAcademicOperationsClient(fetcher: typeof fetch = fetch): A
       return body.id
     },
 
+    async createChildUnit(parentUnitId, command, accessToken, signal) {
+      const path = childUnitPath(parentUnitId)
+      const response = await fetcher(path,
+        jsonPostRequestOptions(normalizeStructureEntryCommand(command, UNIT_TYPES), accessToken, signal))
+      const body = await responseBody(response)
+      if (!isRecord(body) || !isUuid(body.id)) throw malformedResponse()
+      return body.id
+    },
+
     async createSite(command, accessToken, signal) {
       const response = await fetcher('/api/v1/admin/academic-structure/sites',
         jsonPostRequestOptions(normalizeStructureEntryCommand(command, SITE_TYPES), accessToken, signal))
@@ -435,6 +444,11 @@ function structureRelationPath(kind: 'unit' | 'site', parentId: string, childId:
   }
   const resource = kind === 'unit' ? 'units' : 'sites'
   return `/api/v1/admin/academic-structure/${resource}/${canonicalParentId}/children/${canonicalChildId}`
+}
+
+function childUnitPath(parentId: string): string {
+  if (!isUuid(parentId)) throw new Error('The academic parent unit identifier is invalid.')
+  return `/api/v1/admin/academic-structure/units/${parentId.toLowerCase()}/children`
 }
 
 function programAffiliationPath(programId: string): string {
