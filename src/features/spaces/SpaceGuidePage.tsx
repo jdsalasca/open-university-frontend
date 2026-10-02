@@ -45,6 +45,7 @@ export function SpaceGuidePage({ client }: SpaceGuidePageProps) {
   const [state, setState] = useState<LoadState>({ status: 'loading', attempt: 0 })
   const [search, setSearch] = useState('')
   const [kind, setKind] = useState<SpaceLocationKind | 'ALL'>('ALL')
+  const [municipality, setMunicipality] = useState('ALL')
   const visibleState = useMemo(
     () => (state.attempt === attempt ? state : { status: 'loading' as const, attempt }),
     [attempt, state],
@@ -54,7 +55,13 @@ export function SpaceGuidePage({ client }: SpaceGuidePageProps) {
     const controller = new AbortController()
     let active = true
     client.listSpaces(controller.signal).then((snapshot) => {
-      if (active) setState({ status: 'ready', attempt, snapshot })
+      if (!active) return
+      const availableMunicipalities = new Set(
+        snapshot.locations.map((location) => normalizeForSearch(location.municipality)),
+      )
+      setMunicipality((current) => current === 'ALL'
+        || availableMunicipalities.has(normalizeForSearch(current)) ? current : 'ALL')
+      setState({ status: 'ready', attempt, snapshot })
     }).catch(() => {
       if (active && !controller.signal.aborted) setState({ status: 'error', attempt })
     })
@@ -64,15 +71,28 @@ export function SpaceGuidePage({ client }: SpaceGuidePageProps) {
     }
   }, [attempt, client])
 
+  const municipalityOptions = useMemo(() => {
+    if (visibleState.status !== 'ready') return []
+    const municipalities = new Map<string, string>()
+    for (const location of visibleState.snapshot.locations) {
+      const label = location.municipality.trim()
+      const normalized = normalizeForSearch(label)
+      if (normalized && !municipalities.has(normalized)) municipalities.set(normalized, label)
+    }
+    return [...municipalities.values()].sort((left, right) => left.localeCompare(right, 'es-CO', { sensitivity: 'base' }))
+  }, [visibleState])
+
   const visibleLocations = useMemo(() => {
     if (visibleState.status !== 'ready') return []
     const normalizedSearch = normalizeForSearch(search.trim())
     return visibleState.snapshot.locations.filter((location) => {
       if (kind !== 'ALL' && location.kind !== kind) return false
+      if (municipality !== 'ALL'
+        && normalizeForSearch(location.municipality) !== normalizeForSearch(municipality)) return false
       if (!normalizedSearch) return true
       return normalizeForSearch(searchableText(location)).includes(normalizedSearch)
     })
-  }, [kind, search, visibleState])
+  }, [kind, municipality, search, visibleState])
 
   return (
     <section className="spaces-page" aria-label="Guía pública de espacios UPTC">
@@ -125,6 +145,20 @@ export function SpaceGuidePage({ client }: SpaceGuidePageProps) {
             ))}
           </select>
         </label>
+        <label className="spaces-municipality-field">
+          <span>Municipio</span>
+          <select
+            aria-label="Filtrar por municipio"
+            disabled={visibleState.status !== 'ready'}
+            value={municipality}
+            onChange={(event) => setMunicipality(event.target.value)}
+          >
+            <option value="ALL">Todos los municipios</option>
+            {municipalityOptions.map((option) => (
+              <option key={normalizeForSearch(option)} value={option}>{option}</option>
+            ))}
+          </select>
+        </label>
         {visibleState.status === 'ready' && (
           <p className="spaces-result-count" role="status" aria-live="polite">
             {visibleLocations.length} de {visibleState.snapshot.locations.length} espacios
@@ -143,7 +177,9 @@ export function SpaceGuidePage({ client }: SpaceGuidePageProps) {
         <div className="spaces-empty-state">
           <span aria-hidden="true">⌕</span>
           <p>No encontramos espacios con esos filtros.</p>
-          <button type="button" onClick={() => { setSearch(''); setKind('ALL') }}>Limpiar filtros</button>
+          <button type="button" onClick={() => { setSearch(''); setKind('ALL'); setMunicipality('ALL') }}>
+            Limpiar filtros
+          </button>
         </div>
       )}
       {visibleState.status === 'ready' && visibleLocations.length > 0 && (

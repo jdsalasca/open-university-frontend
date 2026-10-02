@@ -130,11 +130,55 @@ describe('SpaceGuidePage', () => {
     expect(screen.getByRole('status')).toHaveTextContent('0 de 3 espacios')
   })
 
+  it('filters by distinct published municipalities and combines municipality, type and text', async () => {
+    // Arrange
+    const user = userEvent.setup()
+    render(<SpaceGuidePage client={clientReturning()} />)
+    await screen.findByRole('article', { name: /sede central tunja/i })
+    const municipalityFilter = screen.getByRole('combobox', { name: 'Filtrar por municipio' })
+
+    // Act
+    await user.selectOptions(municipalityFilter, 'Chiquinquirá')
+
+    // Assert
+    expect(within(municipalityFilter).getAllByRole('option').map((option) => option.textContent))
+      .toEqual(['Todos los municipios', 'Chiquinquirá', 'Tunja'])
+    expect(screen.getByRole('article', { name: /cread chiquinquirá/i })).toBeVisible()
+    expect(screen.queryByRole('article', { name: /sede central tunja/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('1 de 3 espacios')
+
+    await user.selectOptions(municipalityFilter, 'Tunja')
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Filtrar por tipo' }), 'SERVICE')
+    await user.type(screen.getByRole('searchbox', { name: 'Buscar espacios' }), 'acra')
+
+    expect(screen.getByRole('article', { name: /acra/i })).toBeVisible()
+    expect(screen.queryByRole('article', { name: /sede central tunja/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('1 de 3 espacios')
+  })
+
+  it('clears a municipality filter when a refreshed directory no longer contains that municipality', async () => {
+    // Arrange
+    const user = userEvent.setup()
+    const { rerender } = render(<SpaceGuidePage client={clientReturning()} />)
+    await screen.findByRole('article', { name: /cread chiquinquirá/i })
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Filtrar por municipio' }), 'Chiquinquirá')
+
+    // Act
+    rerender(<SpaceGuidePage client={clientReturning({ ...snapshot, locations: [locations[0], locations[2]] })} />)
+
+    // Assert
+    expect(await screen.findByRole('article', { name: /acra/i })).toBeVisible()
+    expect(screen.getByRole('status')).toHaveTextContent('2 de 2 espacios')
+    expect(screen.getByRole('combobox', { name: 'Filtrar por municipio' })).toHaveValue('ALL')
+  })
+
   it('shows an empty-search state and lets the visitor clear filters', async () => {
     // Arrange
     const user = userEvent.setup()
     render(<SpaceGuidePage client={clientReturning()} />)
     await screen.findByRole('article', { name: /sede central tunja/i })
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Filtrar por municipio' }), 'Chiquinquirá')
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Filtrar por tipo' }), 'SERVICE')
 
     // Act
     await user.type(screen.getByRole('searchbox', { name: 'Buscar espacios' }), 'lugar inexistente')
@@ -143,6 +187,8 @@ describe('SpaceGuidePage', () => {
     expect(screen.getByText('No encontramos espacios con esos filtros.')).toBeVisible()
     await user.click(screen.getByRole('button', { name: 'Limpiar filtros' }))
     expect(screen.getByRole('status')).toHaveTextContent('3 de 3 espacios')
+    expect(screen.getByRole('combobox', { name: 'Filtrar por municipio' })).toHaveValue('ALL')
+    expect(screen.getByRole('combobox', { name: 'Filtrar por tipo' })).toHaveValue('ALL')
   })
 
   it('reports a loading failure and retries the public catalog request', async () => {
