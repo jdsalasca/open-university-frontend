@@ -17,6 +17,7 @@ import { admissionsCallClient as defaultAdmissionsCallClient } from './features/
 import type { AdmissionsCalendarAuthorization, AdmissionsCallClient } from './features/admissions/admissionsCallContracts'
 import { IdentityProvider } from './features/identity/IdentityProvider'
 import type { IdentitySessionManager } from './features/identity/IdentityProvider'
+import type { LocalPreviewSessionClient } from './features/identity/localPreviewSessionClient'
 import { useIdentity } from './features/identity/identityContext'
 import type { IdentityClient } from './features/identity/identityContracts'
 import type { OidcConfigurationResult } from './features/identity/oidcConfiguration'
@@ -55,6 +56,7 @@ interface AppProps {
   oidcConfiguration?: OidcConfigurationResult
   identityManager?: IdentitySessionManager
   currentIdentityClient?: IdentityClient
+  localPreviewSessionClient?: LocalPreviewSessionClient | null
   roleAccessClient?: RoleAccessClient
   admissionsCallClient?: AdmissionsCallClient
 }
@@ -93,14 +95,31 @@ export function App({
   oidcConfiguration,
   identityManager,
   currentIdentityClient,
+  localPreviewSessionClient: providedLocalPreviewSessionClient,
   roleAccessClient = defaultRoleAccessClient,
   admissionsCallClient = defaultAdmissionsCallClient,
 }: AppProps = {}) {
+  const [loadedLocalPreviewSessionClient, setLoadedLocalPreviewSessionClient] = useState<LocalPreviewSessionClient | undefined>()
+  useEffect(() => {
+    if (providedLocalPreviewSessionClient !== undefined || !import.meta.env.DEV) return
+    let active = true
+    void import('./features/identity/localPreviewSessionClient')
+      .then(({ localPreviewSessionClient: client }) => {
+        if (active) setLoadedLocalPreviewSessionClient(client)
+      })
+      .catch(() => undefined)
+    return () => { active = false }
+  }, [providedLocalPreviewSessionClient])
+  const localPreviewSessionClient = providedLocalPreviewSessionClient === undefined
+    ? loadedLocalPreviewSessionClient
+    : providedLocalPreviewSessionClient ?? undefined
+
   return (
     <IdentityProvider
       configuration={oidcConfiguration}
       manager={identityManager}
       identityClient={currentIdentityClient}
+      localPreviewSessionClient={localPreviewSessionClient}
     >
       <ApplicationShell catalogClient={catalogClient} operationsClient={operationsClient}
         spaceGuideClient={guideClient} roleAccessClient={roleAccessClient} admissionsCallClient={admissionsCallClient} />
@@ -122,7 +141,8 @@ function ApplicationShell({
   admissionsCallClient: AdmissionsCallClient
 }) {
   const { branding, status } = useBranding()
-  const { state: identity, login, logout, retry, loginAvailable } = useIdentity()
+  const { state: identity, login, logout, retry, loginAvailable, localPreviewAvailable } = useIdentity()
+  const localPreviewEnabled = import.meta.env.DEV && localPreviewAvailable
   const [view, setView] = useState<ApplicationView>(() => readApplicationView())
   const [rejectedStructureAccessToken, setRejectedStructureAccessToken] = useState<string | null>(null)
   const [rejectedPeriodAccessToken, setRejectedPeriodAccessToken] = useState<string | null>(null)
@@ -153,8 +173,9 @@ function ApplicationShell({
   const isRoleAccessView = view === 'access'
   const isIdentityView = view === 'identity'
   const authenticatedIdentity = identity.status === 'authenticated' ? identity : null
-  const hasInstitutionalSession = authenticatedIdentity !== null
-  const canEndInstitutionalSession = hasInstitutionalSession || (identity.status === 'error' && loginAvailable)
+  const hasAuthenticatedSession = authenticatedIdentity !== null
+  const isLocalPreviewSession = import.meta.env.DEV && authenticatedIdentity?.sessionType === 'local-preview'
+  const canEndSession = hasAuthenticatedSession || (identity.status === 'error' && loginAvailable)
   const catalogAuthorization = authenticatedIdentity
     ? {
       accessToken: authenticatedIdentity.accessToken,
@@ -239,7 +260,8 @@ function ApplicationShell({
     }
     return []
   }, [catalogClient, operationsClient])
-  const sessionLabel = identity.status === 'authenticated' ? 'Sesión institucional activa'
+  const sessionLabel = isLocalPreviewSession ? 'Desarrollador local · preview activo'
+    : identity.status === 'authenticated' ? 'Sesión institucional activa'
     : identity.status === 'loading' ? 'Verificando sesión…'
       : identity.status === 'unconfigured' ? 'Acceso institucional pendiente de configuración'
         : identity.status === 'error' ? identity.message
@@ -350,7 +372,7 @@ function ApplicationShell({
                 ? <span className="revision-chip">ESTRUCTURA · PERIODOS</span>
                 : <span className="revision-chip">REV. {branding.revision.toString().padStart(2, '0')}</span>}
             <ThemeSelector />
-            <div className="identity-session-controls" aria-label="Sesión institucional">
+            <div className="identity-session-controls" aria-label={isLocalPreviewSession ? 'Sesión de desarrollador local' : 'Sesión institucional'}>
               <span className={`identity-session-status is-${identity.status}`}
                 role={identity.status === 'error' ? 'status' : undefined}
                 aria-live="polite">
@@ -365,10 +387,14 @@ function ApplicationShell({
                 className="identity-session-button"
                 type="button"
                 disabled={!loginAvailable || identity.status === 'loading'}
-                onClick={() => void (canEndInstitutionalSession ? logout() : login())}
-                title={!loginAvailable ? 'El inicio de sesión requiere configuración institucional aprobada' : undefined}
+                onClick={() => void (canEndSession ? logout() : login())}
+                title={!loginAvailable
+                  ? 'El inicio de sesión requiere configuración institucional aprobada'
+                  : localPreviewEnabled ? 'Sesión local temporal para revisar datos sintéticos' : undefined}
               >
-                {canEndInstitutionalSession ? 'Cerrar sesión' : 'Iniciar sesión'}
+                {isLocalPreviewSession
+                  ? 'Salir del preview local'
+                  : canEndSession ? 'Cerrar sesión' : localPreviewEnabled ? 'Entrar al preview local' : 'Iniciar sesión'}
               </button>
             </div>
           </div>
@@ -376,6 +402,12 @@ function ApplicationShell({
 
         <main id={view === 'identity' ? 'inicio' : view === 'programs' ? 'programas' : isAdmissionsView ? 'admisiones' : isSpacesView ? 'espacios' : isRoleAccessView ? 'accesos' : 'academia'}
           className={isRoleAccessView ? 'role-access-page-content' : isAdmissionsView ? 'admissions-page-content' : isSpacesView ? 'spaces-page-content' : isProgramsView ? 'catalog-page-content' : isAcademicOperationsView ? 'academic-page-content' : 'page-content identity-page-content'}>
+          {isLocalPreviewSession && (
+            <aside className="local-preview-session-banner" role="status">
+              <strong>Desarrollador local · modo preview</strong>
+              <span>Permisos de demostración en este entorno; usa únicamente datos sintéticos. Esta sesión no es institucional.</span>
+            </aside>
+          )}
           {isIdentityView && status === 'fallback' && (
             <div className="status-banner" role="status">
               <span className="status-banner-icon" aria-hidden="true">i</span>

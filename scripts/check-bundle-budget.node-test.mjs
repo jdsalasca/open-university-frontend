@@ -9,6 +9,8 @@ const ENTRY = 'index.html'
 const CATALOG = 'src/features/academics/AcademicCatalogPage.tsx'
 const OIDC = 'src/features/identity/identitySessionManager.ts'
 const ADMISSIONS_DEMO = 'src/features/admissions/demo/AdmissionsWorkflowLab.tsx'
+const LOCAL_PREVIEW_CLIENT = 'src/features/identity/localPreviewSessionClient.ts'
+const LOCAL_PREVIEW_IDENTITY = 'src/features/identity/localPreviewIdentity.ts'
 
 function createManifest() {
   return {
@@ -113,4 +115,32 @@ test('rechaza que el laboratorio local de admisiones aparezca en el manifest de 
 
   // Assert
   assert.deepEqual(result.violations, ['El laboratorio de admisiones de desarrollo no debe entrar al build de producción'])
+})
+
+test('rechaza que el cliente de sesión de desarrollador aparezca en el manifest de producción', () => {
+  // Arrange
+  const manifest = createManifest()
+  manifest[LOCAL_PREVIEW_CLIENT] = { file: 'assets/local-preview-session.js' }
+
+  // Act
+  const result = inspectBundleBudget(manifest, sizeOfSyntheticAsset)
+
+  // Assert
+  assert.deepEqual(result.violations, [
+    'El cliente de sesión de desarrollador local no debe entrar al build de producción',
+  ])
+})
+
+test('rechaza que la lógica de sesión de desarrollador aparezca en el manifest de producción', () => {
+  // Arrange
+  const manifest = createManifest()
+  manifest[LOCAL_PREVIEW_IDENTITY] = { file: 'assets/local-preview-identity.js' }
+
+  // Act
+  const result = inspectBundleBudget(manifest, sizeOfSyntheticAsset)
+
+  // Assert
+  assert.deepEqual(result.violations, [
+    'La lógica de sesión de desarrollador local no debe entrar al build de producción',
+  ])
 })

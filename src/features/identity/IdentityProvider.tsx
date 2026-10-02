@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { PropsWithChildren } from 'react'
 import type { IdentityClient } from './identityContracts'
 import { identityClient as defaultIdentityClient, IdentityApiError } from './identityClient'
+import type { LocalPreviewSessionClient } from './localPreviewSessionClient'
 import type { OidcConfigurationResult, OidcSettings } from './oidcConfiguration'
 import { parseOidcConfiguration } from './oidcConfiguration'
 import { IdentityContext } from './identityContext'
@@ -26,6 +27,7 @@ interface IdentityProviderProps extends PropsWithChildren {
   configuration?: OidcConfigurationResult
   manager?: IdentitySessionManager
   identityClient?: IdentityClient
+  localPreviewSessionClient?: LocalPreviewSessionClient
 }
 
 const KNOWN_RETURN_HASHES = new Set(['#inicio', '#programas', '#academia'])
@@ -44,6 +46,7 @@ export function IdentityProvider({
   configuration = DEFAULT_CONFIGURATION,
   manager: providedManager,
   identityClient = defaultIdentityClient,
+  localPreviewSessionClient,
 }: IdentityProviderProps) {
   const manager = useMemo(() => {
     if (configuration.status !== 'configured') return null
@@ -54,6 +57,10 @@ export function IdentityProvider({
   const initializationRef = useRef<Promise<IdentitySessionState> | null>(null)
   const activeRequestRef = useRef<AbortController | null>(null)
   const generationRef = useRef(0)
+  const localPreviewAccessTokenRef = useRef<string | null>(null)
+  const localPreviewAvailable = import.meta.env.DEV
+    && configuration.status === 'unconfigured'
+    && localPreviewSessionClient !== undefined
 
   const startInitialization = useCallback(() => {
     if (!manager || configuration.status !== 'configured') {
@@ -84,7 +91,7 @@ export function IdentityProvider({
   }, [configuration, manager, startInitialization])
 
   useEffect(() => {
-    if (!manager || state.status !== 'authenticated') return
+    if (state.status !== 'authenticated') return
     let timer: number
     const expireWhenDue = () => {
       const remainingMilliseconds = state.expiresAt * 1000 - Date.now()
@@ -95,7 +102,12 @@ export function IdentityProvider({
 
       generationRef.current += 1
       activeRequestRef.current?.abort()
-      void removeCurrentUser(manager)
+      if (import.meta.env.DEV && state.sessionType === 'local-preview') {
+        void import('./localPreviewIdentity').then(({ revokeLocalPreviewIdentity }) =>
+          revokeLocalPreviewIdentity(localPreviewSessionClient, state.accessToken))
+      } else if (manager) {
+        void removeCurrentUser(manager)
+      }
       setState((current) => current.status === 'authenticated'
         && current.accessToken === state.accessToken
         ? { status: 'anonymous', reason: 'expired' }
@@ -104,9 +116,43 @@ export function IdentityProvider({
     timer = window.setTimeout(expireWhenDue,
       Math.min(Math.max(0, state.expiresAt * 1000 - Date.now()), 2_147_483_647))
     return () => window.clearTimeout(timer)
-  }, [manager, state])
+  }, [localPreviewSessionClient, manager, state])
 
   const login = useCallback(async () => {
+    if (localPreviewAvailable && localPreviewSessionClient) {
+      activeRequestRef.current?.abort()
+      const previousToken = localPreviewAccessTokenRef.current
+      if (previousToken) {
+        const { revokeLocalPreviewIdentity } = await import('./localPreviewIdentity')
+        await revokeLocalPreviewIdentity(localPreviewSessionClient, previousToken)
+      }
+      const request = new AbortController()
+      activeRequestRef.current = request
+      const generation = ++generationRef.current
+      setState({ status: 'loading' })
+      let issuedToken: string | undefined
+      try {
+        const { createLocalPreviewIdentity, revokeLocalPreviewIdentity } = await import('./localPreviewIdentity')
+        const session = await createLocalPreviewIdentity(localPreviewSessionClient, identityClient, request.signal)
+        issuedToken = session.accessToken
+        localPreviewAccessTokenRef.current = issuedToken
+        if (request.signal.aborted || generationRef.current !== generation) {
+          void revokeLocalPreviewIdentity(localPreviewSessionClient, issuedToken)
+          return
+        }
+        setState(session.state)
+      } catch {
+        if (issuedToken) {
+          void import('./localPreviewIdentity').then(({ revokeLocalPreviewIdentity }) =>
+            revokeLocalPreviewIdentity(localPreviewSessionClient, issuedToken!))
+        }
+        if (request.signal.aborted || generationRef.current !== generation) return
+        setState({ status: 'error', message: 'No se pudo iniciar el preview local. Verifica que el backend de desarrollo esté disponible.' })
+      } finally {
+        if (activeRequestRef.current === request) activeRequestRef.current = null
+      }
+      return
+    }
     if (!manager || configuration.status !== 'configured') return
     activeRequestRef.current?.abort()
     generationRef.current += 1
@@ -117,10 +163,19 @@ export function IdentityProvider({
       await removeCurrentUser(manager)
       setState({ status: 'error', message: 'No se pudo iniciar la autenticación institucional.' })
     }
-  }, [configuration, manager])
+  }, [configuration, identityClient, localPreviewAvailable, localPreviewSessionClient, manager])
 
   const logout = useCallback(async () => {
     if (!manager) {
+      activeRequestRef.current?.abort()
+      generationRef.current += 1
+      if (import.meta.env.DEV) {
+        const localToken = localPreviewAccessTokenRef.current
+        if (localToken) {
+          const { revokeLocalPreviewIdentity } = await import('./localPreviewIdentity')
+          await revokeLocalPreviewIdentity(localPreviewSessionClient, localToken)
+        }
+      }
       setState({ status: 'anonymous', reason: 'signed-out' })
       return
     }
@@ -134,9 +189,13 @@ export function IdentityProvider({
       await removeCurrentUser(manager)
       setState({ status: 'error', message: 'La sesión local terminó; el proveedor no confirmó el cierre global.' })
     }
-  }, [manager])
+  }, [localPreviewSessionClient, manager])
 
   const retry = useCallback(async () => {
+    if (localPreviewAvailable && localPreviewSessionClient) {
+      await login()
+      return
+    }
     if (!manager || configuration.status !== 'configured') return
     activeRequestRef.current?.abort()
     generationRef.current += 1
@@ -145,14 +204,14 @@ export function IdentityProvider({
     const generation = generationRef.current
     const nextState = await pending
     if (generationRef.current === generation) setState(nextState)
-  }, [configuration, manager, startInitialization])
+  }, [configuration, localPreviewAvailable, localPreviewSessionClient, login, manager, startInitialization])
 
-  const visibleState = manager && configuration.status === 'configured'
+  const visibleState = (manager && configuration.status === 'configured') || localPreviewAvailable
     ? state
     : stateForConfiguration(configuration)
-  const loginAvailable = configuration.status === 'configured'
-  const value = useMemo(() => ({ state: visibleState, loginAvailable, login, logout, retry }),
-    [login, loginAvailable, logout, retry, visibleState])
+  const loginAvailable = configuration.status === 'configured' || localPreviewAvailable
+  const value = useMemo(() => ({ state: visibleState, loginAvailable, localPreviewAvailable, login, logout, retry }),
+    [login, loginAvailable, localPreviewAvailable, logout, retry, visibleState])
   return <IdentityContext.Provider value={value}>{children}</IdentityContext.Provider>
 }
 
@@ -235,6 +294,7 @@ async function initializeIdentitySession(
       expiresAt: user.expires_at!,
       subject: current.subject,
       permissions: [...current.permissions],
+      sessionType: 'institutional',
     }
   } catch (error) {
     if (error instanceof IdentityApiError && error.status === 401) {
@@ -291,4 +351,3 @@ async function removeCurrentUser(manager: IdentitySessionManager): Promise<void>
     // Local state still fails closed if the storage adapter is unavailable.
   }
 }
-

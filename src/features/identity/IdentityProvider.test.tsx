@@ -1,6 +1,7 @@
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { ReactNode } from 'react'
 import type { CurrentIdentity, IdentityClient } from './identityContracts'
 import { IdentityApiError } from './identityClient'
 import type { OidcConfigurationResult } from './oidcConfiguration'
@@ -54,6 +55,17 @@ function makeIdentityClient(result: CurrentIdentity | Error = identity): Identit
   }
 }
 
+function makeLocalPreviewClient(overrides: Record<string, unknown> = {}) {
+  return {
+    create: vi.fn().mockResolvedValue({
+      accessToken: 'ephemeral-local-preview-token',
+      expiresAt: Math.floor(Date.now() / 1000) + 3600,
+    }),
+    revoke: vi.fn().mockResolvedValue(undefined),
+    ...overrides,
+  }
+}
+
 function ProviderHarness() {
   return <IdentityStateView />
 }
@@ -71,10 +83,25 @@ function IdentityStateView() {
   )
 }
 
+function LocalPreviewStateView() {
+  const { state, localPreviewAvailable, login, logout } = useIdentity()
+  return (
+    <div>
+      <p role="status">{state.status}{state.status === 'authenticated' ? `:${state.sessionType ?? 'institutional'}` : ''}</p>
+      <p>{localPreviewAvailable ? 'Preview local disponible' : 'Preview local cerrado'}</p>
+      {state.status === 'authenticated' && state.sessionType === 'local-preview'
+        ? <button type="button" onClick={() => void logout()}>Salir del preview local</button>
+        : <button type="button" disabled={!localPreviewAvailable || state.status === 'loading'} onClick={() => void login()}>Entrar al preview local</button>}
+    </div>
+  )
+}
+
 async function renderProvider(options: {
   configuration?: OidcConfigurationResult
   manager?: ReturnType<typeof makeManager>
   identityClient?: IdentityClient
+  localPreviewSessionClient?: ReturnType<typeof makeLocalPreviewClient>
+  children?: ReactNode
 } = {}) {
   const provider = await loadProvider()
   render(
@@ -82,8 +109,9 @@ async function renderProvider(options: {
       configuration={options.configuration ?? configuration}
       manager={options.manager as never}
       identityClient={options.identityClient ?? makeIdentityClient()}
+      localPreviewSessionClient={options.localPreviewSessionClient as never}
     >
-      <ProviderHarness />
+      {options.children ?? <ProviderHarness />}
     </provider.IdentityProvider>,
   )
   return provider
@@ -111,6 +139,82 @@ describe('IdentityProvider', () => {
     // Assert
     expect(screen.getByRole('status')).toHaveTextContent('unconfigured')
     expect(manager.signinRedirect).not.toHaveBeenCalled()
+  })
+
+  it('starts local preview only after a click and trusts permissions returned by the identity API', async () => {
+    // Arrange
+    const localPreviewSessionClient = makeLocalPreviewClient()
+    const api = makeIdentityClient(identity)
+    const user = userEvent.setup()
+    const provider = await loadProvider()
+    render(
+      <provider.IdentityProvider
+        configuration={{ status: 'unconfigured' }}
+        localPreviewSessionClient={localPreviewSessionClient as never}
+        identityClient={api}
+      >
+        <LocalPreviewStateView />
+      </provider.IdentityProvider>,
+    )
+
+    // Act
+    expect(screen.getByRole('status')).toHaveTextContent('unconfigured')
+    expect(localPreviewSessionClient.create).not.toHaveBeenCalled()
+    await user.click(screen.getByRole('button', { name: 'Entrar al preview local' }))
+
+    // Assert
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('authenticated:local-preview'))
+    expect(api.current).toHaveBeenCalledWith('ephemeral-local-preview-token', expect.any(AbortSignal))
+    expect(screen.getByText('Preview local disponible')).toBeInTheDocument()
+    expect(localPreviewSessionClient.create).toHaveBeenCalledOnce()
+    expect(window.localStorage.length).toBe(0)
+    expect([...Array(window.sessionStorage.length)].map((_, index) => window.sessionStorage.key(index)))
+      .not.toContain('ephemeral-local-preview-token')
+  })
+
+  it('does not let local preview override invalid institutional OIDC configuration', async () => {
+    // Arrange
+    const localPreviewSessionClient = makeLocalPreviewClient()
+    const provider = await loadProvider()
+    render(
+      <provider.IdentityProvider
+        configuration={{ status: 'invalid' }}
+        localPreviewSessionClient={localPreviewSessionClient as never}
+        identityClient={makeIdentityClient(identity)}
+      >
+        <LocalPreviewStateView />
+      </provider.IdentityProvider>,
+    )
+
+    // Act + Assert
+    expect(screen.getByText('Preview local cerrado')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Entrar al preview local' })).toBeDisabled()
+    expect(localPreviewSessionClient.create).not.toHaveBeenCalled()
+  })
+
+  it('revokes a local preview session and clears local permissions when signing out', async () => {
+    // Arrange
+    const localPreviewSessionClient = makeLocalPreviewClient()
+    const user = userEvent.setup()
+    const provider = await loadProvider()
+    render(
+      <provider.IdentityProvider
+        configuration={{ status: 'unconfigured' }}
+        localPreviewSessionClient={localPreviewSessionClient as never}
+        identityClient={makeIdentityClient(identity)}
+      >
+        <LocalPreviewStateView />
+      </provider.IdentityProvider>,
+    )
+
+    // Act
+    await user.click(screen.getByRole('button', { name: 'Entrar al preview local' }))
+    await screen.findByText('authenticated:local-preview')
+    await user.click(screen.getByRole('button', { name: 'Salir del preview local' }))
+
+    // Assert
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('anonymous'))
+    expect(localPreviewSessionClient.revoke).toHaveBeenCalledWith('ephemeral-local-preview-token')
   })
 
   it('shows a safe configuration error and starts no session for invalid settings', async () => {

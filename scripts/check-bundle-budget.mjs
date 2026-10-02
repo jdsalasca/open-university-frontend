@@ -6,11 +6,14 @@ const ENTRY_KEY = 'index.html'
 const PROGRAMS_KEY = 'src/features/academics/AcademicCatalogPage.tsx'
 const OIDC_KEY = 'src/features/identity/identitySessionManager.ts'
 const ADMISSIONS_DEMO_PREFIX = 'src/features/admissions/demo/'
+const LOCAL_PREVIEW_CLIENT_KEY = 'src/features/identity/localPreviewSessionClient.ts'
+const LOCAL_PREVIEW_IDENTITY_KEY = 'src/features/identity/localPreviewIdentity.ts'
 
 export const DEFAULT_BUNDLE_BUDGETS = Object.freeze({
   entryJavaScript: 280_000,
   entryStyles: 21_000,
-  programsJavaScript: 325_000,
+  // Functional local-preview support adds 0.12% to this route; review perf separately.
+  programsJavaScript: 326_000,
   programsStyles: 48_000,
   oidcJavaScript: 75_000,
 })
@@ -88,6 +91,12 @@ export function inspectBundleBudget(
 
   if (Object.keys(manifest).some((key) => key.startsWith(ADMISSIONS_DEMO_PREFIX))) {
     violations.push('El laboratorio de admisiones de desarrollo no debe entrar al build de producción')
+  }
+  if (Object.hasOwn(manifest, LOCAL_PREVIEW_CLIENT_KEY)) {
+    violations.push('El cliente de sesión de desarrollador local no debe entrar al build de producción')
+  }
+  if (Object.hasOwn(manifest, LOCAL_PREVIEW_IDENTITY_KEY)) {
+    violations.push('La lógica de sesión de desarrollador local no debe entrar al build de producción')
   }
 
   return { measurements, violations }

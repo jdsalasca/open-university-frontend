@@ -5,12 +5,13 @@ export type IdentitySessionState =
   | { status: 'unconfigured' }
   | { status: 'loading' }
   | { status: 'anonymous'; reason: 'signed-out' | 'expired' }
-  | { status: 'authenticated'; accessToken: string; expiresAt: number; subject: string; permissions: ApplicationPermission[] }
+  | { status: 'authenticated'; accessToken: string; expiresAt: number; subject: string; permissions: ApplicationPermission[]; sessionType?: 'institutional' | 'local-preview' }
   | { status: 'error'; message: string }
 
 export interface IdentityContextValue {
   state: IdentitySessionState
   loginAvailable: boolean
+  localPreviewAvailable: boolean
   login(): Promise<void>
   logout(): Promise<void>
   retry(): Promise<void>

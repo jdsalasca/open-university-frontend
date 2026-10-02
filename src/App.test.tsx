@@ -8,6 +8,7 @@ import { DEFAULT_BRANDING } from './features/branding/contracts'
 import type { AcademicCatalogClient } from './features/academics/contracts'
 import type { AcademicOperationsClient, AcademicOrganizationUnitCreateCommand, AcademicPeriod } from './features/academics/academicOperationsContracts'
 import type { SpaceGuideClient } from './features/spaces/spaceGuideClient'
+import { APPLICATION_PERMISSIONS } from './features/identity/identityContracts'
 import type { CurrentIdentity, IdentityClient } from './features/identity/identityContracts'
 import { IdentityApiError } from './features/identity/identityClient'
 import type { IdentitySessionManager } from './features/identity/IdentityProvider'
@@ -160,6 +161,47 @@ function publicSpaceGuideClient(): SpaceGuideClient {
 }
 
 describe('App', () => {
+  it('labels local developer access and opens only modules returned by the current-identity API', async () => {
+    // Arrange
+    const user = userEvent.setup()
+    const localPreviewSessionClient = {
+      create: vi.fn().mockResolvedValue({
+        accessToken: 'synthetic-local-preview-token',
+        expiresAt: Math.floor(Date.now() / 1000) + 3600,
+      }),
+      revoke: vi.fn().mockResolvedValue(undefined),
+    }
+    const getStructureAuditEvents = vi.fn().mockResolvedValue({ events: [], nextCursor: null })
+    const academicOperationsClient: AcademicOperationsClient = {
+      ...emptyAcademicOperationsClient(),
+      getStructureAuditEvents,
+    }
+    window.history.replaceState(null, '', '#academia')
+    render(
+      <BrandingProvider loader={async () => DEFAULT_BRANDING}>
+        <App
+          oidcConfiguration={{ status: 'unconfigured' }}
+          localPreviewSessionClient={localPreviewSessionClient}
+          currentIdentityClient={identityClientWithPermissions([...APPLICATION_PERMISSIONS])}
+          academicOperationsClient={academicOperationsClient}
+          catalogClient={emptyAcademicCatalogClient()}
+        />
+      </BrandingProvider>,
+    )
+
+    // Act
+    await user.click(await screen.findByRole('button', { name: 'Entrar al preview local' }))
+
+    // Assert
+    expect(await screen.findByText('Desarrollador local · modo preview')).toBeVisible()
+    expect(screen.getByText(/Esta sesión no es institucional/i)).toBeVisible()
+    expect(await screen.findByRole('heading', { name: /bitácora de estructura académica/i })).toBeVisible()
+    expect(getStructureAuditEvents).toHaveBeenCalledWith(
+      { limit: 50 }, 'synthetic-local-preview-token', expect.any(AbortSignal),
+    )
+    expect(localPreviewSessionClient.create).toHaveBeenCalledOnce()
+  })
+
   it('keeps the access route closed when the current identity has no read permission', async () => {
     // Arrange
     const roleAccessClient: RoleAccessClient = {
