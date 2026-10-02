@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import type {
   TerritorialCatalogSource,
   TerritorialDepartment,
@@ -29,6 +29,10 @@ const TYPE_LABELS: Record<TerritorialEntityType, string> = {
 }
 
 export function TerritorialCatalogSelector({ client = territorialCatalogClient }: TerritorialCatalogSelectorProps) {
+  const idPrefix = useId()
+  const departmentFieldId = `territorial-department-${idPrefix}`
+  const entityFieldId = `territorial-entity-${idPrefix}`
+  const searchFieldId = `territorial-entity-search-${idPrefix}`
   const [departmentAttempt, setDepartmentAttempt] = useState(0)
   const [departmentState, setDepartmentState] = useState<DepartmentLoadState | null>(null)
   const [selectedDepartmentCode, setSelectedDepartmentCode] = useState('')
@@ -113,10 +117,10 @@ export function TerritorialCatalogSelector({ client = territorialCatalogClient }
   return (
     <section className="territorial-catalog-selector" aria-label="Selector territorial de referencia">
       <div className="territorial-selector-fields">
-        <label className="territorial-selector-field" htmlFor="territorial-department-select">
+        <label className="territorial-selector-field" htmlFor={departmentFieldId}>
           <span>Departamento de referencia</span>
           <select
-            id="territorial-department-select"
+            id={departmentFieldId}
             value={selectedDepartmentCode}
             onChange={(event) => changeDepartment(event.target.value)}
             disabled={currentDepartmentState.status !== 'ready'}
@@ -128,10 +132,10 @@ export function TerritorialCatalogSelector({ client = territorialCatalogClient }
           </select>
         </label>
 
-        <label className="territorial-selector-field" htmlFor="territorial-entity-select">
+        <label className="territorial-selector-field" htmlFor={entityFieldId}>
           <span>Entidad territorial</span>
           <select
-            id="territorial-entity-select"
+            id={entityFieldId}
             value={selectedEntityCode}
             onChange={(event) => setSelectedEntityCode(event.target.value)}
             disabled={!selectedDepartmentCode || currentEntityStatus !== 'ready'}
@@ -165,10 +169,10 @@ export function TerritorialCatalogSelector({ client = territorialCatalogClient }
         </div>
       )}
       {currentEntityStatus === 'ready' && entityState.status === 'ready' && entityState.entities.length > 0 && (
-        <label className="territorial-selector-search" htmlFor="territorial-entity-search">
+        <label className="territorial-selector-search" htmlFor={searchFieldId}>
           <span>Buscar entidad territorial</span>
           <input
-            id="territorial-entity-search"
+            id={searchFieldId}
             type="search"
             value={entitySearch}
             onChange={(event) => setEntitySearch(event.target.value)}

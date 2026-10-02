@@ -67,6 +67,31 @@ function createClient(): TerritorialCatalogClient {
 }
 
 describe('TerritorialCatalogSelector', () => {
+  it('keeps labels associated with unique field IDs across selector instances', async () => {
+    // Arrange
+    const user = userEvent.setup()
+    const client = createClient()
+    render(
+      <>
+        <TerritorialCatalogSelector client={client} />
+        <TerritorialCatalogSelector client={client} />
+      </>,
+    )
+
+    // Act
+    const departmentFields = await screen.findAllByLabelText('Departamento de referencia')
+    await user.selectOptions(departmentFields[0]!, '05')
+    await user.selectOptions(departmentFields[1]!, '15')
+    await screen.findAllByLabelText('Buscar entidad territorial')
+    const entityFields = screen.getAllByLabelText('Entidad territorial')
+    const searchFields = screen.getAllByLabelText('Buscar entidad territorial')
+    const fieldIds = [...departmentFields, ...entityFields, ...searchFields].map((field) => field.id)
+
+    // Assert
+    expect(fieldIds).toHaveLength(6)
+    expect(new Set(fieldIds).size).toBe(6)
+  })
+
   it('loads only the selected department, normalizes search, and clears its previous entity after a change', async () => {
     // Arrange
     const user = userEvent.setup()
