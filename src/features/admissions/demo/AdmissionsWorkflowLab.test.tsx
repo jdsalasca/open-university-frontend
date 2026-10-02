@@ -7,6 +7,24 @@ import { createTerritorialCatalogClient } from '../../territorial-catalog/territ
 afterEach(cleanup)
 
 describe('AdmissionsWorkflowLab', () => {
+  it('presents aspirant and admissions-team journeys as clear, selectable entry cards', async () => {
+    // Arrange
+    const user = userEvent.setup()
+    render(<AdmissionsWorkflowLab calendar={<p>Calendario público conservado</p>} />)
+    const applicantTab = screen.getByRole('tab', { name: /aspirante.*demo/i })
+    const staffTab = screen.getByRole('tab', { name: /equipo de admisiones.*demo/i })
+
+    // Act
+    await user.click(staffTab)
+
+    // Assert
+    expect(applicantTab).toBeVisible()
+    expect(applicantTab).toHaveAccessibleDescription(/completa una ficha ficticia y sigue su estado/i)
+    expect(staffTab).toHaveAccessibleDescription(/revisa la bandeja y solicita un ajuste de ejemplo/i)
+    expect(staffTab).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('region', { name: /bandeja ficticia/i })).toBeVisible()
+  })
+
   it('starts in the applicant demo and keeps a created synthetic case available to the admin view', async () => {
     // Arrange
     const user = userEvent.setup()

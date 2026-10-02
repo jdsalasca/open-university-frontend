@@ -169,6 +169,9 @@ function ApplicationShell({
   const identityLabel = identityModule?.label ?? 'Identidad visual'
   const programsLabel = programsModule?.label ?? 'Programas'
   const admissionsLabel = admissionsModule?.label ?? 'Admisiones'
+  const admissionsNavigationPurpose = import.meta.env.DEV
+    ? 'Aspirante y equipo · demo'
+    : 'Información pública'
   const spacesLabel = spacesModule?.label ?? 'Guía de espacios'
   const isProgramsView = view === 'programs'
   const isAcademicOperationsView = view === 'academia'
@@ -322,7 +325,7 @@ function ApplicationShell({
             {admissionsModule?.available && admissionsModule.visible && (
               <a className={`nav-item${isAdmissionsView ? ' active' : ''}`} href="#admisiones" aria-current={isAdmissionsView ? 'page' : undefined}>
                 <span className="nav-glyph" aria-hidden="true">{MODULE_SYMBOLS.admissions}</span>
-                <span>{admissionsLabel} · Información pública</span>
+                <span>{admissionsLabel} · {admissionsNavigationPurpose}</span>
                 {isAdmissionsView && <span className="nav-status" aria-hidden="true" />}
               </a>
             )}

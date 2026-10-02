@@ -403,6 +403,7 @@ describe('App', () => {
 
     // Act
     const link = await screen.findByRole('link', { name: /admisiones/i })
+    expect(link).toHaveAccessibleName(/admisiones.*aspirante y equipo.*demo/i)
     await user.click(link)
     expect(await screen.findByRole('tab', { name: /aspirante · demo/i })).toHaveAttribute('aria-selected', 'true')
     await user.click(screen.getByRole('tab', { name: /calendario público/i }))

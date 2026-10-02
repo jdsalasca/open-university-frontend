@@ -15,11 +15,27 @@ interface AdmissionsWorkflowLabProps {
   territorialCatalogClient?: TerritorialCatalogClient
 }
 
-const TABS: { id: AdmissionsPerspective; label: string }[] = [
-  { id: 'applicant', label: 'Aspirante · demo' },
-  { id: 'admin', label: 'Equipo de admisiones · demo' },
-  { id: 'calendar', label: 'Calendario público' },
-  { id: 'territories', label: 'Catálogo territorial · demo' },
+const TABS: { id: AdmissionsPerspective; label: string; description: string }[] = [
+  {
+    id: 'applicant',
+    label: 'Aspirante · demo',
+    description: 'Completa una ficha ficticia y sigue su estado.',
+  },
+  {
+    id: 'admin',
+    label: 'Equipo de admisiones · demo',
+    description: 'Revisa la bandeja y solicita un ajuste de ejemplo.',
+  },
+  {
+    id: 'calendar',
+    label: 'Calendario público',
+    description: 'Consulta fechas y convocatorias publicadas.',
+  },
+  {
+    id: 'territories',
+    label: 'Catálogo territorial · demo',
+    description: 'Explora DIVIPOLA sin asociarlo a una ficha.',
+  },
 ]
 
 function panelId(perspective: AdmissionsPerspective) {
@@ -28,6 +44,10 @@ function panelId(perspective: AdmissionsPerspective) {
 
 function tabId(perspective: AdmissionsPerspective) {
   return `admissions-lab-tab-${perspective}`
+}
+
+function descriptionId(perspective: AdmissionsPerspective) {
+  return `${tabId(perspective)}-description`
 }
 
 export function AdmissionsWorkflowLab({
@@ -79,6 +99,8 @@ export function AdmissionsWorkflowLab({
           {TABS.map((tab, index) => (
             <button
               aria-controls={panelId(tab.id)}
+              aria-describedby={descriptionId(tab.id)}
+              aria-label={tab.label}
               aria-selected={activePerspective === tab.id}
               className={`admissions-lab-tab${activePerspective === tab.id ? ' is-active' : ''}`}
               id={tabId(tab.id)}
@@ -90,7 +112,11 @@ export function AdmissionsWorkflowLab({
               type="button"
             >
               <span className="admissions-lab-tab-index">0{index + 1}</span>
-              {tab.label}
+              <span className="admissions-lab-tab-copy">
+                <strong>{tab.label}</strong>
+                <small id={descriptionId(tab.id)}>{tab.description}</small>
+              </span>
+              <span className="admissions-lab-tab-arrow" aria-hidden="true">↗</span>
             </button>
           ))}
         </div>
