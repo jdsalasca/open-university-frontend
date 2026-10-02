@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { AdmissionsMilestone, PublicAdmissionsCalendar } from './admissionsContracts'
 import { downloadAdmissionsCalendar } from './admissionsCalendarIcs'
 import { OFFICIAL_ADMISSIONS_CALENDAR_2027_I } from './official2027ICalendar'
@@ -17,6 +18,16 @@ export function AdmissionsCalendarPage({
   calendar = OFFICIAL_ADMISSIONS_CALENDAR_2027_I,
 }: AdmissionsCalendarPageProps) {
   const isPublishedCall = calendar.revisionNumber !== undefined
+  const [downloadFailed, setDownloadFailed] = useState(false)
+
+  function handleDownload() {
+    try {
+      setDownloadFailed(false)
+      downloadAdmissionsCalendar(calendar)
+    } catch {
+      setDownloadFailed(true)
+    }
+  }
 
   return (
     <section className="admissions-page" aria-label="Admisiones de pregrado presencial">
@@ -35,10 +46,15 @@ export function AdmissionsCalendarPage({
             <button
               className="admissions-calendar-download"
               type="button"
-              onClick={() => downloadAdmissionsCalendar(calendar)}
+              onClick={handleDownload}
             >
               Descargar fechas oficiales (.ics)
             </button>
+            {downloadFailed && (
+              <p className="admissions-download-note" role="status">
+                No fue posible generar el archivo del calendario. Verifica la convocatoria publicada e inténtalo de nuevo.
+              </p>
+            )}
             <a className="admissions-primary-link" href={calendar.source.url} target="_blank" rel="noreferrer">
               Consultar {calendar.source.label} <span aria-hidden="true">↗</span>
             </a>
