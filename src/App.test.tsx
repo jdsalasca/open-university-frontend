@@ -213,6 +213,32 @@ describe('App', () => {
     expect(window.location.hash).toBe('#calificaciones-demo')
   })
 
+  it('opens the room-allocation preview in development without sending a request before local preview access', async () => {
+    // Arrange
+    const user = userEvent.setup()
+    window.history.replaceState(null, '', '#inicio')
+    render(
+      <BrandingProvider loader={async () => DEFAULT_BRANDING}>
+        <App
+          oidcConfiguration={{ status: 'unconfigured' }}
+          currentIdentityClient={identityClientWithPermissions([])}
+          localPreviewSessionClient={null}
+        />
+      </BrandingProvider>,
+    )
+
+    // Act
+    const roomAllocationLink = await screen.findByRole('link', { name: 'Asignación de aulas · demo' })
+    await user.click(roomAllocationLink)
+
+    // Assert
+    expect(await screen.findByRole('heading', { name: 'Asignación de aulas · demo' })).toBeVisible()
+    expect(screen.getByText(/escenarios totalmente sintéticos/i)).toBeVisible()
+    expect(screen.getByRole('button', { name: /calcular propuesta/i })).toBeDisabled()
+    expect(roomAllocationLink).toHaveAttribute('aria-current', 'page')
+    expect(window.location.hash).toBe('#aulas-demo')
+  })
+
   it('labels local developer access and opens only modules returned by the current-identity API', async () => {
     // Arrange
     const user = userEvent.setup()

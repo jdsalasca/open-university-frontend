@@ -170,6 +170,8 @@
 .role-access-page-content > .page-footer { width: min(calc(100% - clamp(36px, 6.4vw, 96px)), 1510px); margin: 0 auto 18px; }
 .grade-entry-page-content { min-width: 0; min-height: calc(100vh - 69px); padding: 0; }
 .grade-entry-page-content > .page-footer { width: min(calc(100% - clamp(36px, 6.4vw, 96px)), 1510px); margin: 0 auto 18px; }
+.room-allocation-page-content { min-width: 0; min-height: calc(100vh - 69px); padding: 28px clamp(17px, 3.4vw, 42px) 20px; }
+.room-allocation-page-content > .page-footer { width: min(100%, 1180px); margin: 18px auto 0; }
 
 @media (min-width: 1500px) {
   .page-content { padding-top: 42px; }

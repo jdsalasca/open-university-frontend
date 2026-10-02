@@ -11,6 +11,7 @@ const OIDC = 'src/features/identity/identitySessionManager.ts'
 const ADMISSIONS_DEMO = 'src/features/admissions/demo/AdmissionsWorkflowLab.tsx'
 const STUDENT_DEMO = 'src/features/students/demo/MyAcademicWeekDemo.tsx'
 const GRADEBOOK_DEMO = 'src/features/gradebook/demo/GradeEntryDemo.tsx'
+const ROOM_PLANNING_DEMO = 'src/features/room-planning/demo/RoomAllocationDemo.tsx'
 const LOCAL_PREVIEW_CLIENT = 'src/features/identity/localPreviewSessionClient.ts'
 const LOCAL_PREVIEW_IDENTITY = 'src/features/identity/localPreviewIdentity.ts'
 
@@ -141,6 +142,18 @@ test('rechaza que el laboratorio local de calificaciones aparezca en el manifest
 
   // Assert
   assert.deepEqual(result.violations, ['El laboratorio de calificaciones de desarrollo no debe entrar al build de producción'])
+})
+
+test('rechaza que el laboratorio de asignación de aulas aparezca en el manifest de producción', () => {
+  // Arrange
+  const manifest = createManifest()
+  manifest[ROOM_PLANNING_DEMO] = { file: 'assets/room-allocation-demo.js' }
+
+  // Act
+  const result = inspectBundleBudget(manifest, sizeOfSyntheticAsset)
+
+  // Assert
+  assert.ok(result.violations.some((violation) => /asignación de aulas/i.test(violation)))
 })
 
 test('rechaza que el cliente de sesión de desarrollador aparezca en el manifest de producción', () => {
