@@ -336,6 +336,8 @@ describe('App', () => {
     // Act
     const link = await screen.findByRole('link', { name: /admisiones/i })
     await user.click(link)
+    expect(await screen.findByRole('tab', { name: /aspirante · demo/i })).toHaveAttribute('aria-selected', 'true')
+    await user.click(screen.getByRole('tab', { name: /calendario público/i }))
 
     // Assert
     expect(await screen.findByRole('heading', { name: /pregrado presencial.*2027-i/i })).toBeVisible()
@@ -345,6 +347,7 @@ describe('App', () => {
 
   it('hides admissions from navigation when branding disables visibility but keeps its public route accessible', async () => {
     // Arrange
+    const user = userEvent.setup()
     const branding = {
       ...DEFAULT_BRANDING,
       modules: DEFAULT_BRANDING.modules.map((module) => module.key === 'admissions'
@@ -359,6 +362,8 @@ describe('App', () => {
     )
 
     // Act
+    const calendarTab = await screen.findByRole('tab', { name: /calendario público/i })
+    await user.click(calendarTab)
     const pageHeading = await screen.findByRole('heading', { name: /pregrado presencial.*2027-i/i })
 
     // Assert

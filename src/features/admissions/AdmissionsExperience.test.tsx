@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { AdmissionsExperience } from './AdmissionsExperience'
+import { AdmissionsCalendarExperience as AdmissionsExperience } from './AdmissionsExperience'
 import { AdmissionsCallApiError } from './admissionsCallContracts'
 import type {
   AdmissionsCallAdmin,

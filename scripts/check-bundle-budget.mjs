@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url'
 const ENTRY_KEY = 'index.html'
 const PROGRAMS_KEY = 'src/features/academics/AcademicCatalogPage.tsx'
 const OIDC_KEY = 'src/features/identity/identitySessionManager.ts'
+const ADMISSIONS_DEMO_PREFIX = 'src/features/admissions/demo/'
 
 export const DEFAULT_BUNDLE_BUDGETS = Object.freeze({
   entryJavaScript: 280_000,
@@ -83,6 +84,10 @@ export function inspectBundleBudget(
     || oidcAssets.javascript.some((asset) => entryAssets.javascript.includes(asset))
   ) {
     violations.push('OIDC debe permanecer en un chunk dinámico separado')
+  }
+
+  if (Object.keys(manifest).some((key) => key.startsWith(ADMISSIONS_DEMO_PREFIX))) {
+    violations.push('El laboratorio de admisiones de desarrollo no debe entrar al build de producción')
   }
 
   return { measurements, violations }

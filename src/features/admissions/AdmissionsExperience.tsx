@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import type { AdmissionsCalendarAuthorization, AdmissionsCallClient, PublicAdmissionsCall } from './admissionsCallContracts'
 import { admissionsCallClient } from './admissionsCallClient'
 import { AdmissionsCallManagementPanel } from './AdmissionsCallManagementPanel'
@@ -12,6 +12,39 @@ interface AdmissionsExperienceProps {
 }
 
 export function AdmissionsExperience({
+  client = admissionsCallClient,
+  authorization = null,
+  onAuthorizationRejected,
+}: AdmissionsExperienceProps) {
+  if (import.meta.env.DEV) {
+    return <DevelopmentAdmissionsExperience
+      client={client}
+      authorization={authorization}
+      onAuthorizationRejected={onAuthorizationRejected}
+    />
+  }
+
+  return (
+    <AdmissionsCalendarExperience
+      client={client}
+      authorization={authorization}
+      onAuthorizationRejected={onAuthorizationRejected}
+    />
+  )
+}
+
+function DevelopmentAdmissionsExperience(props: AdmissionsExperienceProps) {
+  const [AdmissionsWorkflowLab] = useState(() => lazy(() => import('./demo/AdmissionsWorkflowLab')
+    .then(({ AdmissionsWorkflowLab: page }) => ({ default: page }))))
+
+  return (
+    <Suspense fallback={<p role="status">Cargando la demostración local de admisiones…</p>}>
+      <AdmissionsWorkflowLab calendar={<AdmissionsCalendarExperience {...props} />} />
+    </Suspense>
+  )
+}
+
+export function AdmissionsCalendarExperience({
   client = admissionsCallClient,
   authorization = null,
   onAuthorizationRejected,

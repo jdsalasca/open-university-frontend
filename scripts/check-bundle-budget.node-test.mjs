@@ -8,6 +8,7 @@ import {
 const ENTRY = 'index.html'
 const CATALOG = 'src/features/academics/AcademicCatalogPage.tsx'
 const OIDC = 'src/features/identity/identitySessionManager.ts'
+const ADMISSIONS_DEMO = 'src/features/admissions/demo/AdmissionsWorkflowLab.tsx'
 
 function createManifest() {
   return {
@@ -100,4 +101,16 @@ test('falla si la implementación OIDC deja de ser una importación dinámica de
 
   // Assert
   assert.ok(result.violations.includes('OIDC debe permanecer en un chunk dinámico separado'))
+})
+
+test('rechaza que el laboratorio local de admisiones aparezca en el manifest de producción', () => {
+  // Arrange
+  const manifest = createManifest()
+  manifest[ADMISSIONS_DEMO] = { file: 'assets/admissions-demo.js' }
+
+  // Act
+  const result = inspectBundleBudget(manifest, sizeOfSyntheticAsset)
+
+  // Assert
+  assert.deepEqual(result.violations, ['El laboratorio de admisiones de desarrollo no debe entrar al build de producción'])
 })
