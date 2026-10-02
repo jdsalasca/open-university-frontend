@@ -210,6 +210,18 @@
   color: #f0dfa0;
 }
 
+:root[data-theme='dark'] .workspace main .visual-identity-center .identity-status {
+  border-color: #665a33;
+  background: #332e1d;
+  color: #f0dfa0;
+}
+
+:root[data-theme='dark'] .workspace main .visual-identity-center .identity-alert {
+  border-color: #71413c;
+  background: #352320;
+  color: #ffc0b7;
+}
+
 :root[data-theme='dark'] .workspace main :is(a, button):focus-visible,
 :root[data-theme='dark'] button:focus-visible,
 :root[data-theme='dark'] input:focus-visible,
