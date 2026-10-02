@@ -6,8 +6,6 @@ const MILESTONE_CATEGORIES: Record<AdmissionsMilestone['kind'], string> = {
   enrollment: 'Registro y matrícula',
 }
 
-const FILENAME = 'uptc-pregrado-presencial-2027-i.ics'
-
 export function createAdmissionsCalendarIcs(
   calendar: PublicAdmissionsCalendar,
   generatedAt: Date = new Date(),
@@ -21,7 +19,7 @@ export function createAdmissionsCalendarIcs(
   const lines = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
-    'PRODID:-//Universiry//Agenda pública UPTC 2027-I//ES',
+    `PRODID:-//Universiry//Agenda pública UPTC ${escapeText(calendar.callName)}//ES`,
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
     `X-WR-CALNAME:${escapeText(`UPTC · ${calendar.callName}`)}`,
@@ -65,12 +63,13 @@ export function createAdmissionsCalendarIcs(
 }
 
 export function downloadAdmissionsCalendar(calendar: PublicAdmissionsCalendar): void {
+  const filename = createAdmissionsCalendarFilename(calendar)
   const content = createAdmissionsCalendarIcs(calendar)
   const blob = new Blob([content], { type: 'text/calendar;charset=utf-8' })
   const objectUrl = URL.createObjectURL(blob)
   const link = document.createElement('a')
   link.href = objectUrl
-  link.download = FILENAME
+  link.download = filename
   link.hidden = true
   document.body.append(link)
 
@@ -80,6 +79,22 @@ export function downloadAdmissionsCalendar(calendar: PublicAdmissionsCalendar): 
     link.remove()
     window.setTimeout(() => URL.revokeObjectURL(objectUrl), 0)
   }
+}
+
+function createAdmissionsCalendarFilename(calendar: PublicAdmissionsCalendar): string {
+  const calendarName = calendar.title?.trim() || calendar.callName.trim()
+  const slug = calendarName
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+
+  if (!slug) {
+    throw new RangeError('La convocatoria necesita un nombre para generar el archivo ICS.')
+  }
+
+  return `uptc-${slug}.ics`
 }
 
 function parseCalendarDate(value: string): Date {
