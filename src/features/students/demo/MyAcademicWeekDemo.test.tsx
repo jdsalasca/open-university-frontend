@@ -22,11 +22,72 @@ describe('MyAcademicWeekDemo', () => {
 
     // Assert
     expect(screen.getByRole('heading', { name: 'Mi semana académica' })).toBeVisible()
-    expect(screen.getByText(/agenda ficticia/i)).toBeVisible()
-    expect(screen.getByText(/no refleja una matrícula real/i)).toBeVisible()
-    expect(screen.getAllByRole('article')).toHaveLength(6)
+    expect(screen.getByText(/datos ficticios/i)).toBeVisible()
+    expect(screen.getByText(/no reflejan matrícula/i)).toBeVisible()
+    expect(screen.getAllByRole('article')).toHaveLength(7)
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /inscrib|cancelar|nota|calificar/i })).not.toBeInTheDocument()
+  })
+
+  it('groups repeated meetings under one sample subject and shows every meeting in its detail', async () => {
+    // Arrange
+    const { MyAcademicWeekDemo } = await loadDemo()
+    const user = userEvent.setup()
+    render(<MyAcademicWeekDemo />)
+
+    // Act
+    await user.click(screen.getByRole('button', { name: 'Mis asignaturas' }))
+    expect(screen.getByRole('heading', { level: 1, name: 'Mis asignaturas' })).toBeVisible()
+    const subjects = screen.getByRole('region', { name: 'Asignaturas de ejemplo' })
+
+    // Assert
+    expect(within(subjects).getAllByRole('button', { name: /ver asignatura/i })).toHaveLength(6)
+
+    // Act
+    await user.click(within(subjects).getByRole('button', { name: /diseño de sistemas de muestra/i }))
+
+    // Assert
+    const details = screen.getByRole('region', { name: 'Detalle de la asignatura seleccionada' })
+    expect(within(details).getByText('Diseño de sistemas de muestra')).toBeVisible()
+    const meetings = within(details).getAllByRole('listitem')
+    expect(meetings).toHaveLength(2)
+    expect(meetings[0]).toHaveTextContent('Jueves10:00–11:30Aula de muestra 05')
+    expect(meetings[1]).toHaveTextContent('Viernes12:00–13:30Laboratorio de muestra 07')
+    expect(within(details).getByText('Docente de ejemplo 5')).toBeVisible()
+  })
+
+  it('clears the selected subject when returning to the week view', async () => {
+    // Arrange
+    const { MyAcademicWeekDemo } = await loadDemo()
+    const user = userEvent.setup()
+    render(<MyAcademicWeekDemo />)
+
+    // Act
+    await user.click(screen.getByRole('button', { name: 'Mis asignaturas' }))
+    await user.click(screen.getByRole('button', { name: /ver asignatura.*diseño de sistemas de muestra/i }))
+    expect(screen.getByRole('region', { name: 'Detalle de la asignatura seleccionada' })).toBeVisible()
+    await user.click(screen.getByRole('button', { name: 'Mi semana' }))
+
+    // Assert
+    expect(screen.queryByRole('region', { name: 'Detalle de la asignatura seleccionada' })).not.toBeInTheDocument()
+    expect(screen.getByText(/elige una sesión para consultar sus detalles de ejemplo/i)).toBeVisible()
+  })
+
+  it('keeps the selected subject when its active view is selected again', async () => {
+    // Arrange
+    const { MyAcademicWeekDemo } = await loadDemo()
+    const user = userEvent.setup()
+    render(<MyAcademicWeekDemo />)
+
+    // Act
+    await user.click(screen.getByRole('button', { name: 'Mis asignaturas' }))
+    await user.click(screen.getByRole('button', { name: /ver asignatura.*diseño de sistemas de muestra/i }))
+    await user.click(screen.getByRole('button', { name: 'Mis asignaturas' }))
+
+    // Assert
+    const details = screen.getByRole('region', { name: 'Detalle de la asignatura seleccionada' })
+    expect(within(details).getByRole('heading', { name: 'Diseño de sistemas de muestra' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Mis asignaturas' })).toHaveAttribute('aria-pressed', 'true')
   })
 
   it('filters sessions by selected weekday without changing the agenda data', async () => {

@@ -274,7 +274,7 @@ function ApplicationShell({
             : 'Sin sesión institucional'
   const identityCenterKey = `${branding.revision}:${authenticatedIdentity?.subject ?? 'anonymous'}`
   const currentPageLabel = isRoleAccessView ? 'Accesos y perfiles'
-    : isStudentDemoView ? 'Mi semana · demo'
+    : isStudentDemoView ? 'Vida académica · demo'
     : isAdmissionsView ? admissionsLabel
     : isSpacesView ? spacesLabel
     : isProgramsView ? programsLabel
@@ -342,7 +342,7 @@ function ApplicationShell({
               <a className={`nav-item${isStudentDemoView ? ' active' : ''}`} href="#estudiante-demo"
                 aria-current={isStudentDemoView ? 'page' : undefined}>
                 <span className="nav-glyph" aria-hidden="true">▦</span>
-                <span>Mi semana · demo</span>
+                <span>Vida académica · demo</span>
                 {isStudentDemoView && <span className="nav-status" aria-hidden="true" />}
               </a>
             )}
@@ -375,7 +375,7 @@ function ApplicationShell({
             <span className="autosave-indicator"><span aria-hidden="true" />{isStudentDemoView ? 'Experiencia de muestra' : isRoleAccessView ? 'Control administrativo' : isAdmissionsView ? 'Consulta de admisiones' : isSpacesView ? 'Consulta de espacios' : isProgramsView ? 'Consulta de programas' : isAcademicOperationsView ? 'Consulta académica' : status === 'ready' ? 'Identidad sincronizada' : 'Identidad de respaldo'}</span>
             <span className="topbar-divider" aria-hidden="true" />
             {isStudentDemoView
-              ? <span className="revision-chip">AGENDA · DEMO</span>
+              ? <span className="revision-chip">VIDA ACADÉMICA · DEMO</span>
               : isRoleAccessView
               ? <span className="revision-chip">PERFILES · IDENTIDAD</span>
               : isAdmissionsView
@@ -435,7 +435,7 @@ function ApplicationShell({
           <ModuleLoadBoundary
             key={view}
             fallback={<ModuleLoadFailure label={isStudentDemoView
-              ? 'la agenda académica de ejemplo'
+              ? 'la experiencia académica de ejemplo'
               : isAdmissionsView
               ? 'la agenda de admisiones'
               : isSpacesView
@@ -447,7 +447,7 @@ function ApplicationShell({
                 : 'el centro de identidad visual'} />}
           >
             <Suspense fallback={<p className="module-loading" role="status" aria-live="polite">
-              Cargando {isStudentDemoView ? 'agenda académica de ejemplo' : isRoleAccessView ? 'consola de accesos' : isAdmissionsView ? 'agenda de admisiones' : isSpacesView ? 'guía de espacios' : isProgramsView || isAcademicOperationsView ? 'módulo académico' : 'centro de identidad visual'}…
+              Cargando {isStudentDemoView ? 'experiencia académica de ejemplo' : isRoleAccessView ? 'consola de accesos' : isAdmissionsView ? 'agenda de admisiones' : isSpacesView ? 'guía de espacios' : isProgramsView || isAcademicOperationsView ? 'módulo académico' : 'centro de identidad visual'}…
             </p>}>
               {isStudentDemoView && StudentAcademicWeekDemo
                 ? <StudentAcademicWeekDemo />
@@ -484,7 +484,7 @@ function ApplicationShell({
               ? 'Gestión de perfiles · permisos asignados y auditados en el servidor'
               : 'Consulta de perfiles · escritura requiere autorización institucional'
             : isStudentDemoView
-              ? 'Agenda ficticia · Sin matrícula institucional ni consulta de datos personales'
+              ? 'Semana y asignaturas ficticias · Sin matrícula institucional ni consulta de datos personales'
             : isAdmissionsView
             ? admissionsAuthorization?.canRead && admissionsAuthorization.canWrite
               ? 'Calendario versionado · Publicación protegida y auditada'

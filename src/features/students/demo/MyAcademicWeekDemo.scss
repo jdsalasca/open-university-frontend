@@ -43,6 +43,12 @@
 .student-week-notice-icon { display: grid; width: 21px; height: 21px; flex: 0 0 auto; place-items: center; border-radius: 50%; background: var(--week-accent); font-family: Georgia, serif; font-size: 13px; font-weight: 800; }
 .student-week-notice strong { font-weight: 820; }
 
+.student-week-view-switcher { display: flex; width: fit-content; max-width: 100%; gap: 4px; margin: 20px 0 17px; padding: 4px; overflow-x: auto; border: 1px solid var(--week-line); border-radius: 999px; background: var(--week-soft); }
+.student-week-view-switcher button { min-height: 42px; flex: 0 0 auto; padding: 0 17px; border: 1px solid transparent; border-radius: 999px; background: transparent; color: var(--week-muted); cursor: pointer; font: inherit; font-size: 11px; font-weight: 750; transition: background .16s ease, color .16s ease, border-color .16s ease; }
+.student-week-view-switcher button:hover { color: var(--week-ink); }
+.student-week-view-switcher button.is-active { border-color: var(--week-ink); background: var(--week-ink); color: var(--week-surface); }
+.student-week-view-switcher button:focus-visible, .student-subject-card:focus-visible { @include tokens.focus-ring(3px); }
+
 .student-week-overview { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 13px; }
 .student-week-overview > div { display: grid; gap: 5px; }
 .student-week-overview-label { color: var(--week-muted); font-size: 9px; font-weight: 800; letter-spacing: .14em; }
@@ -95,6 +101,19 @@
 .student-week-detail-placeholder > span { color: var(--week-accent); font-family: Georgia, serif; font-size: 32px; }
 .student-week-detail-placeholder p { max-width: 220px; margin: 8px 0 0; color: var(--week-muted); font-size: 11px; line-height: 1.55; }
 
+.student-subject-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 0; padding: 12px 0 0; list-style: none; }
+.student-subject-list > li { min-width: 0; }
+.student-subject-card { display: grid; width: 100%; min-height: 126px; align-content: start; justify-items: start; gap: 7px; padding: 13px; border: 1px solid var(--week-line); border-radius: 11px; background: var(--week-surface); color: var(--week-ink); cursor: pointer; text-align: left; transition: border-color .16s ease, background .16s ease, transform .16s ease; }
+.student-subject-card:hover { transform: translateY(-1px); border-color: color-mix(in srgb, var(--week-accent) 58%, var(--week-line)); }
+.student-subject-card.is-active { border-color: var(--week-ink); background: color-mix(in srgb, var(--week-accent) 11%, var(--week-surface)); }
+.student-subject-card > strong { font-size: 12px; line-height: 1.4; }
+.student-subject-card > span:not(.student-week-session-code) { color: var(--week-muted); font-size: 10px; line-height: 1.4; }
+.student-subject-meetings-heading { margin: 19px 0 8px; font-size: 10px; font-weight: 820; letter-spacing: .1em; text-transform: uppercase; }
+.student-subject-meetings { display: grid; gap: 7px; margin: 0; padding: 0; list-style: none; }
+.student-subject-meetings > li { display: grid; grid-template-columns: auto auto minmax(0, 1fr); align-items: center; gap: 7px; padding: 9px; border: 1px solid var(--week-line); border-radius: 9px; background: var(--week-soft); font-size: 10px; }
+.student-subject-meetings > li > strong { font-weight: 800; }
+.student-subject-meetings > li > span:last-child { min-width: 0; overflow-wrap: anywhere; color: var(--week-muted); text-align: right; }
+
 @media (min-width: 900px) {
   .student-week-layout { grid-template-columns: minmax(0, 1.45fr) minmax(260px, .75fr); }
   .student-week-detail { position: sticky; top: 20px; }
@@ -107,9 +126,13 @@
   .student-week-demo-mark span { font-size: 12px; }
   .student-week-session-card { grid-template-columns: 49px minmax(0, 1fr) 32px; gap: 8px; padding: 11px 8px; }
   .student-week-detail dl { gap: 11px; }
+  .student-subject-list { grid-template-columns: 1fr; }
+  .student-subject-card { min-height: 108px; }
+  .student-subject-meetings > li { grid-template-columns: auto auto; }
+  .student-subject-meetings > li > span:last-child { grid-column: 1 / -1; text-align: left; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .student-week-session-card, .student-week-detail-button, .student-week-filters button { transition: none; }
-  .student-week-session-card:hover, .student-week-detail-button:hover { transform: none; }
+  .student-week-session-card, .student-week-detail-button, .student-week-filters button, .student-week-view-switcher button, .student-subject-card { transition: none; }
+  .student-week-session-card:hover, .student-week-detail-button:hover, .student-subject-card:hover { transform: none; }
 }

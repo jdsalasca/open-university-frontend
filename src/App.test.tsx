@@ -176,11 +176,13 @@ describe('App', () => {
     )
 
     // Act
-    const studentPreviewLink = await screen.findByRole('link', { name: 'Mi semana · demo' })
+    const studentPreviewLink = await screen.findByRole('link', { name: 'Vida académica · demo' })
     await user.click(studentPreviewLink)
 
     // Assert
     expect(await screen.findByRole('heading', { name: 'Mi semana académica' })).toBeVisible()
+    expect(screen.getAllByText('Vida académica · demo')).toHaveLength(2)
+    expect(screen.getByText('VIDA ACADÉMICA · DEMO')).toBeVisible()
     expect(studentPreviewLink).toHaveAttribute('aria-current', 'page')
     expect(window.location.hash).toBe('#estudiante-demo')
   })
