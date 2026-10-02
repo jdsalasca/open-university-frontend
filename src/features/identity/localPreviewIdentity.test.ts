@@ -42,4 +42,21 @@ describe('createLocalPreviewIdentity', () => {
     await expect(attempt).rejects.toThrow('identity unavailable')
     expect(sessionClient.revoke).toHaveBeenCalledWith('opaque-local-token')
   })
+
+  it('revokes an already-expired session without requesting the current identity', async () => {
+    // Arrange
+    const sessionClient: LocalPreviewSessionClient = {
+      create: vi.fn().mockResolvedValue({ accessToken: 'expired-local-token', expiresAt: Math.floor(Date.now() / 1000) - 1 }),
+      revoke: vi.fn().mockResolvedValue(undefined),
+    }
+    const identityClient: IdentityClient = { current: vi.fn() }
+
+    // Act
+    const attempt = createLocalPreviewIdentity(sessionClient, identityClient, new AbortController().signal)
+
+    // Assert
+    await expect(attempt).rejects.toThrow('The local preview session has expired.')
+    expect(identityClient.current).not.toHaveBeenCalled()
+    expect(sessionClient.revoke).toHaveBeenCalledWith('expired-local-token')
+  })
 })

@@ -217,6 +217,39 @@ describe('IdentityProvider', () => {
     expect(localPreviewSessionClient.revoke).toHaveBeenCalledWith('ephemeral-local-preview-token')
   })
 
+  it('forgets a revoked local bearer before the next login', async () => {
+    // Arrange
+    const localPreviewSessionClient = makeLocalPreviewClient({
+      create: vi.fn()
+        .mockResolvedValueOnce({ accessToken: 'first-local-token', expiresAt: Math.floor(Date.now() / 1000) + 3600 })
+        .mockResolvedValueOnce({ accessToken: 'second-local-token', expiresAt: Math.floor(Date.now() / 1000) + 3600 }),
+    })
+    const user = userEvent.setup()
+    const provider = await loadProvider()
+    render(
+      <provider.IdentityProvider
+        configuration={{ status: 'unconfigured' }}
+        localPreviewSessionClient={localPreviewSessionClient as never}
+        identityClient={makeIdentityClient(identity)}
+      >
+        <LocalPreviewStateView />
+      </provider.IdentityProvider>,
+    )
+
+    // Act
+    await user.click(screen.getByRole('button', { name: 'Entrar al preview local' }))
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('authenticated:local-preview'))
+    await user.click(screen.getByRole('button', { name: 'Salir del preview local' }))
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('anonymous'))
+    await user.click(screen.getByRole('button', { name: 'Entrar al preview local' }))
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('authenticated:local-preview'))
+
+    // Assert
+    expect(localPreviewSessionClient.create).toHaveBeenCalledTimes(2)
+    expect(localPreviewSessionClient.revoke).toHaveBeenCalledTimes(1)
+    expect(localPreviewSessionClient.revoke).toHaveBeenCalledWith('first-local-token')
+  })
+
   it('shows a safe configuration error and starts no session for invalid settings', async () => {
     // Arrange
     const manager = makeManager()

@@ -103,6 +103,7 @@ export function IdentityProvider({
       generationRef.current += 1
       activeRequestRef.current?.abort()
       if (import.meta.env.DEV && state.sessionType === 'local-preview') {
+        forgetLocalPreviewToken(localPreviewAccessTokenRef, state.accessToken)
         void import('./localPreviewIdentity').then(({ revokeLocalPreviewIdentity }) =>
           revokeLocalPreviewIdentity(localPreviewSessionClient, state.accessToken))
       } else if (manager) {
@@ -123,6 +124,7 @@ export function IdentityProvider({
       activeRequestRef.current?.abort()
       const previousToken = localPreviewAccessTokenRef.current
       if (previousToken) {
+        forgetLocalPreviewToken(localPreviewAccessTokenRef, previousToken)
         const { revokeLocalPreviewIdentity } = await import('./localPreviewIdentity')
         await revokeLocalPreviewIdentity(localPreviewSessionClient, previousToken)
       }
@@ -137,12 +139,14 @@ export function IdentityProvider({
         issuedToken = session.accessToken
         localPreviewAccessTokenRef.current = issuedToken
         if (request.signal.aborted || generationRef.current !== generation) {
+          forgetLocalPreviewToken(localPreviewAccessTokenRef, issuedToken)
           void revokeLocalPreviewIdentity(localPreviewSessionClient, issuedToken)
           return
         }
         setState(session.state)
       } catch {
         if (issuedToken) {
+          forgetLocalPreviewToken(localPreviewAccessTokenRef, issuedToken)
           void import('./localPreviewIdentity').then(({ revokeLocalPreviewIdentity }) =>
             revokeLocalPreviewIdentity(localPreviewSessionClient, issuedToken!))
         }
@@ -172,6 +176,7 @@ export function IdentityProvider({
       if (import.meta.env.DEV) {
         const localToken = localPreviewAccessTokenRef.current
         if (localToken) {
+          forgetLocalPreviewToken(localPreviewAccessTokenRef, localToken)
           const { revokeLocalPreviewIdentity } = await import('./localPreviewIdentity')
           await revokeLocalPreviewIdentity(localPreviewSessionClient, localToken)
         }
@@ -350,4 +355,8 @@ async function removeCurrentUser(manager: IdentitySessionManager): Promise<void>
   } catch {
     // Local state still fails closed if the storage adapter is unavailable.
   }
+}
+
+function forgetLocalPreviewToken(tokenRef: { current: string | null }, accessToken: string): void {
+  if (tokenRef.current === accessToken) tokenRef.current = null
 }
