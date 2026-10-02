@@ -1,0 +1,224 @@
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --ui-canvas: #151814;
+  --ui-surface: #1e231e;
+  --ui-surface-raised: #252b25;
+  --ui-surface-subtle: #292f29;
+  --ui-text-primary: #f0f2eb;
+  --ui-text-secondary: #d0d4ca;
+  --ui-text-muted: #a8aea2;
+  --ui-border: #3c443b;
+  --ui-border-strong: #566253;
+  --ui-input-surface: #202620;
+  --ui-focus: #f6d66b;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    color-scheme: dark;
+    --ui-canvas: #151814;
+    --ui-surface: #1e231e;
+    --ui-surface-raised: #252b25;
+    --ui-surface-subtle: #292f29;
+    --ui-text-primary: #f0f2eb;
+    --ui-text-secondary: #d0d4ca;
+    --ui-text-muted: #a8aea2;
+    --ui-border: #3c443b;
+    --ui-border-strong: #566253;
+    --ui-input-surface: #202620;
+    --ui-focus: #f6d66b;
+  }
+}
+
+:root[data-theme='dark'] body,
+:root[data-theme='dark'] #root,
+:root[data-theme='dark'] .platform-shell,
+:root[data-theme='dark'] .workspace {
+  background: var(--ui-canvas);
+  color: var(--ui-text-primary);
+}
+
+:root[data-theme='dark'] .sidebar {
+  border-color: #343b33;
+  background: #111410;
+}
+
+:root[data-theme='dark'] .nav-item.active {
+  border-color: #465044;
+  background: #252d25;
+}
+
+:root[data-theme='dark'] .topbar {
+  border-color: var(--ui-border);
+  background: rgb(30 35 30 / 94%);
+}
+
+:root[data-theme='dark'] .breadcrumbs,
+:root[data-theme='dark'] .topbar-meta,
+:root[data-theme='dark'] .identity-session-status {
+  color: var(--ui-text-muted);
+}
+
+:root[data-theme='dark'] .breadcrumbs strong,
+:root[data-theme='dark'] .revision-chip {
+  color: var(--ui-text-primary);
+}
+
+:root[data-theme='dark'] .topbar-divider {
+  background: var(--ui-border);
+}
+
+:root[data-theme='dark'] .identity-session-button.secondary {
+  border-color: var(--ui-border-strong);
+  background: var(--ui-surface);
+  color: var(--ui-text-primary);
+}
+
+:root[data-theme='dark'] .identity-session-button:disabled {
+  border-color: var(--ui-border);
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text-muted);
+}
+
+:root[data-theme='dark'] .theme-selector {
+  border-color: var(--ui-border);
+  background: var(--ui-surface-subtle);
+}
+
+:root[data-theme='dark'] .theme-selector-choice:has(input:checked) {
+  background: var(--ui-surface-raised);
+  color: var(--ui-text-primary);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 35%);
+}
+
+:root[data-theme='dark'] .theme-selector-choice:hover {
+  color: var(--ui-text-primary);
+}
+
+:root[data-theme='dark'] .workspace main :not(.identity-preview-surface):not(.identity-preview-surface *) {
+  color: var(--ui-text-primary);
+}
+
+:root[data-theme='dark'] .workspace main :is(
+  .surface-card,
+  .card,
+  [class*='-card'],
+  [class*='-panel'],
+  [class*='-form'],
+  [class*='-dialog'],
+  [class*='-confirmation'],
+  [class*='-empty'],
+  [class*='-list'],
+  [class*='-table-wrap'],
+  [class*='-history'],
+  [class*='-audit'],
+  [class*='-events'],
+  [class*='-results'],
+  [class*='-preview'],
+  .catalog-admin,
+  .catalog-admin-locked
+):not(.identity-preview-surface):not(.identity-preview-surface *) {
+  border-color: var(--ui-border);
+  background: var(--ui-surface);
+  box-shadow: none;
+}
+
+:root[data-theme='dark'] .workspace main :is(
+  .brand-hero,
+  .academic-operations-hero,
+  .admissions-hero,
+  .role-access-hero,
+  .spaces-hero
+):not(.identity-preview-surface *) {
+  border-color: var(--ui-border);
+  background: linear-gradient(135deg, #252b25, #191e19 78%);
+}
+
+:root[data-theme='dark'] .workspace main :is(
+  [class*='-intro'],
+  [class*='-kicker'],
+  [class*='-eyebrow'],
+  [class*='-caption'],
+  [class*='-hint'],
+  [class*='-footnote'],
+  [class*='-note'],
+  [class*='-meta'],
+  [class*='-date'],
+  [class*='-kind'],
+  [class*='-count'],
+  [class*='-badge'],
+  [class*='-status'],
+  [class*='-muted'],
+  [class*='-arrow'],
+  [class*='-empty']
+):not([class*='-error']):not([class*='-success']):not(.identity-preview-surface *) {
+  color: var(--ui-text-muted);
+}
+
+:root[data-theme='dark'] .workspace main :is(
+  input:not([type='checkbox']):not([type='radio']):not([type='color']),
+  select,
+  textarea
+) {
+  border-color: var(--ui-border-strong);
+  background-color: var(--ui-input-surface);
+  color: var(--ui-text-primary);
+  color-scheme: dark;
+}
+
+:root[data-theme='dark'] .workspace main :is(input, textarea)::placeholder {
+  color: var(--ui-text-muted);
+  opacity: 1;
+}
+
+:root[data-theme='dark'] .workspace main table {
+  color: var(--ui-text-primary);
+}
+
+:root[data-theme='dark'] .workspace main :is(th, td) {
+  border-color: var(--ui-border);
+}
+
+:root[data-theme='dark'] .workspace main :is(
+  [class*='-error'],
+  [class*='-invalid'],
+  [aria-invalid='true']
+):not(.identity-preview-surface *) {
+  border-color: #71413c;
+  background-color: #352320;
+  color: #ffc0b7;
+}
+
+:root[data-theme='dark'] .workspace main :is(
+  [class*='-success'],
+  [class*='-feedback']:not([class*='-error'])
+):not(.identity-preview-surface *) {
+  border-color: #426047;
+  background-color: #202e23;
+  color: #b9e0bd;
+}
+
+:root[data-theme='dark'] .workspace main :is(
+  .status-banner,
+  .academic-operations-note,
+  .admissions-operation-note,
+  .role-access-readonly-note,
+  .spaces-source-note
+):not(.identity-preview-surface *) {
+  border-color: #665a33;
+  background: #332e1d;
+  color: #f0dfa0;
+}
+
+:root[data-theme='dark'] .workspace main :is(a, button):focus-visible,
+:root[data-theme='dark'] button:focus-visible,
+:root[data-theme='dark'] input:focus-visible,
+:root[data-theme='dark'] select:focus-visible,
+:root[data-theme='dark'] textarea:focus-visible {
+  outline-color: var(--ui-focus);
+}
+
+:root[data-theme='dark'] ::selection {
+  background: #79691f;
+  color: #fffbed;
+}

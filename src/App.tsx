@@ -20,6 +20,7 @@ import type { IdentitySessionManager } from './features/identity/IdentityProvide
 import { useIdentity } from './features/identity/identityContext'
 import type { IdentityClient } from './features/identity/identityContracts'
 import type { OidcConfigurationResult } from './features/identity/oidcConfiguration'
+import { ThemeSelector } from './features/theme/ThemeSelector'
 import './App.scss'
 
 const AcademicCatalogPage = lazy(() =>
@@ -348,6 +349,7 @@ function ApplicationShell({
               : isAcademicOperationsView
                 ? <span className="revision-chip">ESTRUCTURA · PERIODOS</span>
                 : <span className="revision-chip">REV. {branding.revision.toString().padStart(2, '0')}</span>}
+            <ThemeSelector />
             <div className="identity-session-controls" aria-label="Sesión institucional">
               <span className={`identity-session-status is-${identity.status}`}
                 role={identity.status === 'error' ? 'status' : undefined}

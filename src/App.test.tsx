@@ -237,6 +237,8 @@ describe('App', () => {
     expect(lockup.querySelector('img')).toHaveAttribute('src', '/assets/a7e7f06b-09a7-43db-a468-4c7b8ee3d301')
     expect(screen.getByRole('link', { name: 'Marca institucional' })).toBeVisible()
     expect(screen.getByText('Marca institucional', { selector: '.breadcrumbs strong' })).toBeVisible()
+    expect(screen.getByRole('group', { name: 'Tema visual' })).toBeVisible()
+    expect(screen.getByRole('radio', { name: 'Automático' })).toBeChecked()
   })
 
   it('opens the visual identity control center and keeps publication closed without institutional access', async () => {

@@ -5,6 +5,6 @@ $identity-muted: #77786f;
 $identity-border: #e7e8e1;
 
 @mixin focus-ring($offset: 2px) {
-  outline: 3px solid var(--brand-focus, #1a1a1a);
+  outline: 3px solid var(--ui-focus, var(--brand-focus, #1a1a1a));
   outline-offset: $offset;
 }
