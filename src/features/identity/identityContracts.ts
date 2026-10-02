@@ -1,19 +1,29 @@
-export const APPLICATION_PERMISSIONS = [
+type AcademicPermissionArea = 'catalog' | 'structure' | 'period' | 'offerings'
+type PermissionAction = 'read' | 'write'
+
+export type ApplicationPermission =
+  | 'branding:read'
+  | 'branding:write'
+  | `academic:${AcademicPermissionArea}:${PermissionAction}`
+  | 'admissions:calendar:read'
+  | 'admissions:calendar:write'
+  | 'identity:roles:read'
+  | 'identity:roles:write'
+
+const academicPermissionAreas: readonly AcademicPermissionArea[] = ['catalog', 'structure', 'period', 'offerings']
+const permissionActions: readonly PermissionAction[] = ['read', 'write']
+const academicPermissions: ApplicationPermission[] = academicPermissionAreas.flatMap((area) =>
+  permissionActions.map((action) => `academic:${area}:${action}` as ApplicationPermission))
+
+export const APPLICATION_PERMISSIONS: readonly ApplicationPermission[] = [
   'branding:read',
   'branding:write',
-  'academic:catalog:read',
-  'academic:catalog:write',
-  'academic:structure:read',
-  'academic:structure:write',
-  'academic:period:read',
-  'academic:period:write',
+  ...academicPermissions,
   'admissions:calendar:read',
   'admissions:calendar:write',
   'identity:roles:read',
   'identity:roles:write',
-] as const
-
-export type ApplicationPermission = (typeof APPLICATION_PERMISSIONS)[number]
+]
 
 export interface CurrentIdentity {
   userId: string

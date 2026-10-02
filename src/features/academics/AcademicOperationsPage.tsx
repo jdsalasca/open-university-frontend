@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
 import { academicCatalogClient } from './academicCatalogClient'
 import type { AcademicProgram } from './contracts'
+import type { AcademicOfferingAuthorization } from './academicOfferingDraftContracts'
 import { academicOperationsClient } from './academicOperationsClient'
 import type {
   AcademicDisplayOrderCommand,
@@ -28,6 +29,9 @@ import { AcademicStructureAuditPanel } from './AcademicStructureAuditPanel'
 import { CreateAcademicPeriodForm } from './AcademicPeriodForms'
 import './AcademicOperationsPage.scss'
 
+const AcademicOfferingDraftPanel = lazy(() => import('./AcademicOfferingDraftPanel')
+  .then(({ AcademicOfferingDraftPanel: panel }) => ({ default: panel })))
+
 type RequestState = 'loading' | 'ready' | 'error'
 type RequestData = {
   structure: AcademicStructureSnapshot
@@ -51,6 +55,8 @@ interface AcademicOperationsPageProps {
   structureAuthorization?: AcademicStructureAuthorization | null
   onStructureAuthorizationRejected?: (accessToken: string) => Promise<void>
   onPeriodAuthorizationRejected?: (accessToken: string) => Promise<void>
+  offeringAuthorization?: AcademicOfferingAuthorization | null
+  onOfferingAuthorizationRejected?: (accessToken: string) => Promise<void>
 }
 
 const defaultLoadPrograms = (signal?: AbortSignal) => academicCatalogClient.listPrograms(signal)
@@ -62,6 +68,8 @@ export function AcademicOperationsPage({
   structureAuthorization = null,
   onStructureAuthorizationRejected,
   onPeriodAuthorizationRejected,
+  offeringAuthorization = null,
+  onOfferingAuthorizationRejected,
 }: AcademicOperationsPageProps) {
   const [requestState, setRequestState] = useState<RequestState>('loading')
   const [requestData, setRequestData] = useState<RequestData | null>(null)
@@ -547,6 +555,18 @@ export function AcademicOperationsPage({
               client={client}
               onAuthorizationRejected={onStructureAuthorizationRejected}
             />
+          )}
+
+          {offeringAuthorization?.canRead === true && (
+            <Suspense fallback={<p className="academic-offering-inline-status" role="status">Cargando borradores de oferta…</p>}>
+              <AcademicOfferingDraftPanel
+                key={`${offeringAuthorization.accessToken}:${offeringAuthorization.canWrite}`}
+                periods={visibleRequestData.periods}
+                programs={visibleRequestData.programs}
+                authorization={offeringAuthorization}
+                onAuthorizationRejected={onOfferingAuthorizationRejected}
+              />
+            </Suspense>
           )}
 
           <section className="academic-panel academic-periods-panel" aria-labelledby="academic-periods-title">

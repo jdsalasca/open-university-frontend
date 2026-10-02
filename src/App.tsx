@@ -7,6 +7,7 @@ import type {
   AcademicPeriodAuthorization,
   AcademicStructureAuthorization,
 } from './features/academics/academicOperationsContracts'
+import type { AcademicOfferingAuthorization } from './features/academics/academicOfferingDraftContracts'
 import { useBranding } from './features/branding/useBranding'
 import { spaceGuideClient as defaultSpaceGuideClient } from './features/spaces/spaceGuideClient'
 import type { SpaceGuideClient } from './features/spaces/spaceGuideClient'
@@ -159,6 +160,7 @@ function ApplicationShell({
   const [view, setView] = useState<ApplicationView>(() => readApplicationView())
   const [rejectedStructureAccessToken, setRejectedStructureAccessToken] = useState<string | null>(null)
   const [rejectedPeriodAccessToken, setRejectedPeriodAccessToken] = useState<string | null>(null)
+  const [rejectedOfferingAccessToken, setRejectedOfferingAccessToken] = useState<string | null>(null)
   const [rejectedRoleAccessToken, setRejectedRoleAccessToken] = useState<string | null>(null)
   const [rejectedAdmissionsAccessToken, setRejectedAdmissionsAccessToken] = useState<string | null>(null)
   useEffect(() => {
@@ -219,6 +221,15 @@ function ApplicationShell({
         && authenticatedIdentity.accessToken !== rejectedStructureAccessToken,
     }
     : null
+  const offeringAuthorization: AcademicOfferingAuthorization | null = authenticatedIdentity
+    ? {
+      accessToken: authenticatedIdentity.accessToken,
+      canRead: authenticatedIdentity.permissions.includes('academic:offerings:read')
+        && authenticatedIdentity.accessToken !== rejectedOfferingAccessToken,
+      canWrite: authenticatedIdentity.permissions.includes('academic:offerings:write')
+        && authenticatedIdentity.accessToken !== rejectedOfferingAccessToken,
+    }
+    : null
   const roleAccessAuthorization = authenticatedIdentity
     ? {
       accessToken: authenticatedIdentity.accessToken,
@@ -243,6 +254,10 @@ function ApplicationShell({
   }, [retry])
   const revalidateRejectedPeriodAccess = useCallback(async (accessToken: string): Promise<void> => {
     setRejectedPeriodAccessToken(accessToken)
+    await retry()
+  }, [retry])
+  const revalidateRejectedOfferingAccess = useCallback(async (accessToken: string): Promise<void> => {
+    setRejectedOfferingAccessToken(accessToken)
     await retry()
   }, [retry])
   const revalidateRejectedRoleAccess = useCallback(async (accessToken: string): Promise<void> => {
@@ -508,8 +523,10 @@ function ApplicationShell({
                     loadPrograms={catalogClient.listPrograms}
                     authorization={periodAuthorization}
                     structureAuthorization={structureAuthorization}
+                    offeringAuthorization={offeringAuthorization}
                     onStructureAuthorizationRejected={revalidateRejectedStructureAccess}
                     onPeriodAuthorizationRejected={revalidateRejectedPeriodAccess}
+                    onOfferingAuthorizationRejected={revalidateRejectedOfferingAccess}
                   />
                   : isAdmissionsView
                     ? <AdmissionsExperience client={admissionsCallClient} authorization={admissionsAuthorization}
