@@ -25,8 +25,15 @@ function contrastRatio(textColor, backgroundColor) {
 }
 
 function assertReadableContrast(declarations) {
-  const textColor = declarations.match(/(?:^|\s)color:\s*(#[0-9a-f]{6});/i)?.[1]
-  const backgroundColor = declarations.match(/(?:^|\s)background:\s*(#[0-9a-f]{6});/i)?.[1]
+  const themeDeclarations = darkRule(':root[data-theme=dark]')
+  const resolveColor = (property) => {
+    const color = declarations.match(new RegExp(`(?:^|\\s)${property}:\\s*(#[0-9a-f]{6}|var\\(--([\\w-]+)\\));`, 'i'))
+    if (!color) return undefined
+    if (color[1].startsWith('#')) return color[1]
+    return themeDeclarations?.match(new RegExp(`--${color[2]}:\\s*(#[0-9a-f]{6});`, 'i'))?.[1]
+  }
+  const textColor = resolveColor('color')
+  const backgroundColor = resolveColor('background')
   assert.ok(textColor && backgroundColor, 'text and background colors must be explicit')
   assert.ok(contrastRatio(textColor, backgroundColor) >= 4.5, 'feedback text must meet WCAG AA contrast')
 }
@@ -56,5 +63,19 @@ test('dark theme gives identity errors a readable dark error surface', () => {
   assert.ok(declarations, 'dark identity error rule must be present')
   assert.match(declarations, /background: #352320;/)
   assert.match(declarations, /color: #ffc0b7;/)
+  assertReadableContrast(declarations)
+})
+
+test('dark theme gives structure audit events a readable raised surface', () => {
+  // Arrange
+  const selector = ':root[data-theme=dark] .workspace main .academic-structure-audit-events > li'
+
+  // Act
+  const declarations = darkRule(selector)
+
+  // Assert
+  assert.ok(declarations, 'dark academic audit event rule must be present')
+  assert.match(declarations, /background:\s*var\(--ui-surface-raised\);/)
+  assert.match(declarations, /color:\s*var\(--ui-text-primary\);/)
   assertReadableContrast(declarations)
 })

@@ -123,6 +123,12 @@
   box-shadow: none;
 }
 
+:root[data-theme='dark'] .workspace main .academic-structure-audit-events > li {
+  border-color: var(--ui-border);
+  background: var(--ui-surface-raised);
+  color: var(--ui-text-primary);
+}
+
 :root[data-theme='dark'] .workspace main :is(
   .brand-hero,
   .academic-operations-hero,
