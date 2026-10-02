@@ -16,7 +16,10 @@ export interface AdmissionsMilestone {
 }
 
 export interface PublicAdmissionsCalendar {
+  title?: string
   callName: string
+  revisionNumber?: number
+  officialReference?: string
   updatedAt: string
   checkedAt: string
   source: AdmissionsCalendarSource

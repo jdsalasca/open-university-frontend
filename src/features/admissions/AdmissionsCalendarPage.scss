@@ -7,6 +7,20 @@
   color: var(--brand-text, #1a1a1a);
 }
 
+.admissions-call-picker {
+  display: grid;
+  width: min(calc(100% - clamp(36px, 6.4vw, 96px)), 1510px);
+  gap: 5px;
+  margin: 14px auto 0;
+  color: #55564d;
+  font-size: 11px;
+}
+
+.admissions-call-picker label { font-weight: 750; }
+.admissions-call-picker select { width: min(100%, 560px); min-height: 40px; padding: 8px 11px; border: 1px solid #d9d6c8; border-radius: 8px; background: #fffef8; color: #272820; font: inherit; }
+.admissions-call-picker select:focus-visible { @include tokens.focus-ring; }
+.admissions-call-picker span { color: #828175; font-size: 9px; }
+
 .admissions-hero {
   position: relative;
   display: grid;
@@ -102,6 +116,7 @@
 }
 
 @media (max-width: 650px) {
+  .admissions-call-picker { width: min(calc(100% - 28px), 1510px); }
   .admissions-page { width: min(calc(100% - 28px), 1510px); padding-top: 17px; }
   .admissions-hero { grid-template-columns: minmax(0, 1fr); gap: 19px; padding: 24px 19px 21px; }
   .admissions-hero h1 { font-size: clamp(36px, 10vw, 49px); }

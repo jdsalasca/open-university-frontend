@@ -44,7 +44,7 @@ describe('AdmissionsCalendarPage', () => {
     )
     expect(officialCalendar).toHaveAttribute('target', '_blank')
     expect(officialCalendar).toHaveAttribute('rel', 'noreferrer')
-    expect(screen.getByText(/fuente acra.*actualizada el 15 de septiembre de 2026/i)).toBeVisible()
+    expect(screen.getByText(/fuente.*acra.*actualizada el 15 de septiembre de 2026/i)).toBeVisible()
     expect(screen.getByRole('link', { name: /comunicado institucional.*2027-i/i })).toHaveAttribute(
       'href',
       'https://dsp.uptc.edu.co/sitio/portal/cal_not_eve/noticias/det/UPTC-abre-inscripciones-para-estudiar-un-pregrado-presencial-a-distancia-o-virtual-el-proximo-semestre/',

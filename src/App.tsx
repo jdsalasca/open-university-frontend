@@ -13,6 +13,8 @@ import type { SpaceGuideClient } from './features/spaces/spaceGuideClient'
 import { roleAccessClient as defaultRoleAccessClient } from './features/access/roleAccessClient'
 import type { RoleAccessClient, RoleScopeKind } from './features/access/roleAccessContracts'
 import type { RoleAccessScopeOption } from './features/access/RoleAccessPage'
+import { admissionsCallClient as defaultAdmissionsCallClient } from './features/admissions/admissionsCallClient'
+import type { AdmissionsCalendarAuthorization, AdmissionsCallClient } from './features/admissions/admissionsCallContracts'
 import { IdentityProvider } from './features/identity/IdentityProvider'
 import type { IdentitySessionManager } from './features/identity/IdentityProvider'
 import { useIdentity } from './features/identity/identityContext'
@@ -28,9 +30,9 @@ const AcademicOperationsPage = lazy(() =>
   import('./features/academics/AcademicOperationsPage')
     .then(({ AcademicOperationsPage: page }) => ({ default: page })),
 )
-const AdmissionsCalendarPage = lazy(() =>
-  import('./features/admissions/AdmissionsCalendarPage')
-    .then(({ AdmissionsCalendarPage: page }) => ({ default: page })),
+const AdmissionsExperience = lazy(() =>
+  import('./features/admissions/AdmissionsExperience')
+    .then(({ AdmissionsExperience: page }) => ({ default: page })),
 )
 const SpaceGuidePage = lazy(() =>
   import('./features/spaces/SpaceGuidePage')
@@ -53,6 +55,7 @@ interface AppProps {
   identityManager?: IdentitySessionManager
   currentIdentityClient?: IdentityClient
   roleAccessClient?: RoleAccessClient
+  admissionsCallClient?: AdmissionsCallClient
 }
 
 let academicOperationsClientPromise: Promise<AcademicOperationsClient> | null = null
@@ -90,6 +93,7 @@ export function App({
   identityManager,
   currentIdentityClient,
   roleAccessClient = defaultRoleAccessClient,
+  admissionsCallClient = defaultAdmissionsCallClient,
 }: AppProps = {}) {
   return (
     <IdentityProvider
@@ -98,7 +102,7 @@ export function App({
       identityClient={currentIdentityClient}
     >
       <ApplicationShell catalogClient={catalogClient} operationsClient={operationsClient}
-        spaceGuideClient={guideClient} roleAccessClient={roleAccessClient} />
+        spaceGuideClient={guideClient} roleAccessClient={roleAccessClient} admissionsCallClient={admissionsCallClient} />
     </IdentityProvider>
   )
 }
@@ -108,11 +112,13 @@ function ApplicationShell({
   operationsClient,
   spaceGuideClient,
   roleAccessClient,
+  admissionsCallClient,
 }: {
   catalogClient: AcademicCatalogClient
   operationsClient?: AcademicOperationsClient
   spaceGuideClient: SpaceGuideClient
   roleAccessClient: RoleAccessClient
+  admissionsCallClient: AdmissionsCallClient
 }) {
   const { branding, status } = useBranding()
   const { state: identity, login, logout, retry, loginAvailable } = useIdentity()
@@ -120,6 +126,7 @@ function ApplicationShell({
   const [rejectedStructureAccessToken, setRejectedStructureAccessToken] = useState<string | null>(null)
   const [rejectedPeriodAccessToken, setRejectedPeriodAccessToken] = useState<string | null>(null)
   const [rejectedRoleAccessToken, setRejectedRoleAccessToken] = useState<string | null>(null)
+  const [rejectedAdmissionsAccessToken, setRejectedAdmissionsAccessToken] = useState<string | null>(null)
   useEffect(() => {
     const onHashChange = () => setView(readApplicationView())
     window.addEventListener('hashchange', onHashChange)
@@ -180,6 +187,15 @@ function ApplicationShell({
         && authenticatedIdentity.accessToken !== rejectedRoleAccessToken,
     }
     : null
+  const admissionsAuthorization: AdmissionsCalendarAuthorization | null = authenticatedIdentity
+    ? {
+      accessToken: authenticatedIdentity.accessToken,
+      canRead: authenticatedIdentity.permissions.includes('admissions:calendar:read')
+        && authenticatedIdentity.accessToken !== rejectedAdmissionsAccessToken,
+      canWrite: authenticatedIdentity.permissions.includes('admissions:calendar:write')
+        && authenticatedIdentity.accessToken !== rejectedAdmissionsAccessToken,
+    }
+    : null
   const revalidateRejectedStructureAccess = useCallback(async (accessToken: string): Promise<void> => {
     setRejectedStructureAccessToken(accessToken)
     await retry()
@@ -190,6 +206,10 @@ function ApplicationShell({
   }, [retry])
   const revalidateRejectedRoleAccess = useCallback(async (accessToken: string): Promise<void> => {
     setRejectedRoleAccessToken(accessToken)
+    await retry()
+  }, [retry])
+  const revalidateRejectedAdmissionsAccess = useCallback(async (accessToken: string): Promise<void> => {
+    setRejectedAdmissionsAccessToken(accessToken)
     await retry()
   }, [retry])
   const loadRoleScopeOptions = useCallback(async (
@@ -320,7 +340,7 @@ function ApplicationShell({
             {isRoleAccessView
               ? <span className="revision-chip">PERFILES · IDENTIDAD</span>
               : isAdmissionsView
-              ? <span className="revision-chip">PREGRADO · 2027-I</span>
+              ? <span className="revision-chip">ADMISIONES · PREGRADO</span>
               : isSpacesView
                 ? <span className="revision-chip">SEDES · CREAD</span>
               : isProgramsView
@@ -392,7 +412,8 @@ function ApplicationShell({
                     onPeriodAuthorizationRejected={revalidateRejectedPeriodAccess}
                   />
                   : isAdmissionsView
-                    ? <AdmissionsCalendarPage />
+                    ? <AdmissionsExperience client={admissionsCallClient} authorization={admissionsAuthorization}
+                      onAuthorizationRejected={revalidateRejectedAdmissionsAccess} />
                     : isSpacesView
                       ? <SpaceGuidePage client={spaceGuideClient} />
                     : <VisualIdentityCenter
@@ -409,7 +430,9 @@ function ApplicationShell({
               ? 'Gestión de perfiles · permisos asignados y auditados en el servidor'
               : 'Consulta de perfiles · escritura requiere autorización institucional'
             : isAdmissionsView
-            ? 'Calendario público de admisiones · Información de ACRA'
+            ? admissionsAuthorization?.canRead && admissionsAuthorization.canWrite
+              ? 'Calendario versionado · Publicación protegida y auditada'
+              : 'Calendario público de admisiones · Información de referencia UPTC'
             : isSpacesView
               ? 'Guía pública de ubicaciones · Consulta la fuente oficial antes de desplazarte'
             : isProgramsView

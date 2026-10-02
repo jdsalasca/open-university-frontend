@@ -16,18 +16,20 @@ const KIND_LABELS: Record<AdmissionsMilestone['kind'], string> = {
 export function AdmissionsCalendarPage({
   calendar = OFFICIAL_ADMISSIONS_CALENDAR_2027_I,
 }: AdmissionsCalendarPageProps) {
+  const isPublishedCall = calendar.revisionNumber !== undefined
+
   return (
     <section className="admissions-page" aria-label="Admisiones de pregrado presencial">
       <div className="admissions-hero">
         <div className="admissions-hero-copy">
-          <p className="admissions-eyebrow"><span aria-hidden="true" /> INFORMACIÓN PÚBLICA · ACRA</p>
-          <h1>Pregrado presencial <em>2027-I</em></h1>
+          <p className="admissions-eyebrow"><span aria-hidden="true" /> INFORMACIÓN PÚBLICA · UPTC</p>
+          <h1>{calendar.title ?? 'Pregrado presencial 2027-I'}</h1>
           <p className="admissions-intro">
             Una guía de fechas para seguir la convocatoria de la UPTC. Confirma requisitos y novedades directamente con ACRA antes de cada paso.
           </p>
           <div className="admissions-source-stamp">
             <span className="admissions-source-dot" aria-hidden="true" />
-            <span>Fuente ACRA · actualizada el {calendar.updatedAt} · consultada el {calendar.checkedAt}</span>
+            <span>Fuente {calendar.source.label} · actualizada el {calendar.updatedAt} · consultada el {calendar.checkedAt}</span>
           </div>
           <div className="admissions-hero-actions">
             <button
@@ -44,9 +46,9 @@ export function AdmissionsCalendarPage({
           <p className="admissions-download-note">Copia personal de las fechas publicadas. Verifica cambios en ACRA.</p>
         </div>
 
-        <aside className="admissions-call-card" aria-label="Convocatoria vigente">
+        <aside className="admissions-call-card" aria-label={isPublishedCall ? 'Convocatoria publicada' : 'Convocatoria vigente'}>
           <span className="admissions-call-card-label">CONVOCATORIA · PREGRADO PRESENCIAL</span>
-          <strong>2027<span>—</span>I</strong>
+          <strong>{isPublishedCall ? 'Publicada' : <>2027<span>—</span>I</>}</strong>
           <span className="admissions-call-card-name">{calendar.callName}</span>
           <span className="admissions-call-card-rule" aria-hidden="true" />
           <span className="admissions-call-card-note">Calendario publicado por la Universidad</span>

@@ -7,6 +7,8 @@ export const APPLICATION_PERMISSIONS = [
   'academic:structure:write',
   'academic:period:read',
   'academic:period:write',
+  'admissions:calendar:read',
+  'admissions:calendar:write',
   'identity:roles:read',
   'identity:roles:write',
 ] as const
