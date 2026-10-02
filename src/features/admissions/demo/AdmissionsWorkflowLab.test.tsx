@@ -22,7 +22,7 @@ describe('AdmissionsWorkflowLab', () => {
 
     // Assert
     const inbox = screen.getByRole('region', { name: /bandeja ficticia/i })
-    expect(within(inbox).getByText('DEMO-0003')).toBeVisible()
+    expect(within(inbox).getByRole('article', { name: /ficha demo-0003/i })).toBeVisible()
     expect(screen.getByText(/demostración local · datos sintéticos/i)).toBeVisible()
   })
 
@@ -47,10 +47,10 @@ describe('AdmissionsWorkflowLab', () => {
     const user = userEvent.setup()
     const view = render(<AdmissionsWorkflowLab calendar={<p>Calendario público conservado</p>} />)
     await user.click(screen.getByRole('tab', { name: /equipo de admisiones/i }))
-    const firstCase = screen.getByRole('article', { name: /DEMO-0001/i })
+    const detail = screen.getByRole('region', { name: /detalle de ficha DEMO-0001/i })
 
     // Act
-    await user.click(within(firstCase).getByRole('button', { name: /iniciar revisión demo/i }))
+    await user.click(within(detail).getByRole('button', { name: /iniciar revisión demo/i }))
     await user.click(screen.getByRole('tab', { name: /aspirante/i }))
     expect(screen.getByText(/2 fichas sintéticas/i)).toBeVisible()
     await user.click(screen.getByRole('tab', { name: /equipo de admisiones/i }))

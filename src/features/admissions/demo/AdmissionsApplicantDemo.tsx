@@ -3,11 +3,16 @@ import { useForm } from 'react-hook-form'
 import { useStore } from 'zustand'
 import type { StoreApi } from 'zustand/vanilla'
 import type {
+  AdmissionsDemoCorrectionReason,
   AdmissionsDemoProgramId,
+  AdmissionsDemoReviewStatus,
   AdmissionsDemoState,
   NewAdmissionsDemoApplication,
 } from './admissionsDemoStore'
-import { ADMISSIONS_DEMO_PROGRAM_OPTIONS } from './admissionsDemoStore'
+import {
+  ADMISSIONS_DEMO_PROGRAM_OPTIONS,
+  getAdmissionsDemoCorrectionReasonLabel,
+} from './admissionsDemoStore'
 
 interface ApplicantFormValues {
   firstChoiceId: AdmissionsDemoProgramId | ''
@@ -25,6 +30,18 @@ const DEFAULT_VALUES: ApplicantFormValues = {
   secondChoiceId: '',
   hasReviewedDemoNotice: false,
   confirmedSyntheticOptions: false,
+}
+
+const STATUS_LABELS: Record<AdmissionsDemoReviewStatus, string> = {
+  DEMO_RECEIVED: 'Recibida · ejemplo',
+  DEMO_REVIEWING: 'En revisión · ejemplo',
+  DEMO_CORRECTION_REQUESTED: 'Ajuste solicitado · demo',
+  DEMO_CORRECTION_SUBMITTED: 'Respuesta enviada · demo',
+  DEMO_REVIEW_COMPLETE: 'Revisión finalizada · demo',
+}
+
+function isCorrectionReason(reason: string | undefined): reason is AdmissionsDemoCorrectionReason {
+  return reason === 'DEMO_CONFIRM_CHOICES' || reason === 'DEMO_COMPLETE_CHECKLIST'
 }
 
 export function AdmissionsApplicantDemo({ store }: AdmissionsApplicantDemoProps) {
@@ -151,6 +168,70 @@ export function AdmissionsApplicantDemo({ store }: AdmissionsApplicantDemoProps)
           </button>
         </div>
       </form>
+
+      <section className="admissions-lab-applicant-tracking" aria-label="Seguimiento de fichas demo">
+        <div className="admissions-lab-section-heading">
+          <div>
+            <p className="admissions-lab-eyebrow">SEGUIMIENTO · SOLO DEMO</p>
+            <h3>El estado de tus fichas de ejemplo</h3>
+          </div>
+          <span>{applications.length} casos ficticios</span>
+        </div>
+
+        {applications.length === 0 ? (
+          <div className="admissions-lab-empty-state" role="status">
+            <h3>Aún no hay fichas de ejemplo</h3>
+            <p>Crea una ficha sintética para ver aquí el seguimiento.</p>
+          </div>
+        ) : (
+          <div className="admissions-lab-applicant-case-list">
+            {applications.map((application) => (
+              <article
+                className="admissions-lab-applicant-case"
+                key={application.reference}
+                aria-label={`Ficha ${application.reference}`}
+              >
+                <div className="admissions-lab-case-topline">
+                  <span className="admissions-lab-case-reference">{application.reference}</span>
+                  <span className={`admissions-lab-status admissions-lab-status-${application.status.toLowerCase()}`}>
+                    <span aria-hidden="true" />{STATUS_LABELS[application.status]}
+                  </span>
+                </div>
+                <div className="admissions-lab-applicant-choices">
+                  <span>{ADMISSIONS_DEMO_PROGRAM_OPTIONS.find((option) => option.id === application.firstChoiceId)?.label}</span>
+                  <span aria-hidden="true">→</span>
+                  <span>{ADMISSIONS_DEMO_PROGRAM_OPTIONS.find((option) => option.id === application.secondChoiceId)?.label}</span>
+                </div>
+
+                {application.status === 'DEMO_CORRECTION_REQUESTED' && isCorrectionReason(application.correctionReason) ? (
+                  <div className="admissions-lab-correction-panel">
+                    <div>
+                      <strong>El equipo dejó un ajuste para este ejercicio</strong>
+                      <p>{getAdmissionsDemoCorrectionReasonLabel(application.correctionReason)}</p>
+                    </div>
+                    <button
+                      className="admissions-lab-secondary-button"
+                      type="button"
+                      onClick={() => store.getState().acknowledgeCorrection(application.reference)}
+                    >
+                      Confirmo la respuesta demo
+                    </button>
+                    <small>Solo cambia el estado ficticio; no se envían documentos ni datos.</small>
+                  </div>
+                ) : application.status === 'DEMO_CORRECTION_SUBMITTED' ? (
+                  <p className="admissions-lab-feedback" role="status">Respuesta demo enviada al equipo para continuar la revisión.</p>
+                ) : (
+                  <p className="admissions-lab-applicant-case-note">
+                    {application.status === 'DEMO_REVIEW_COMPLETE'
+                      ? 'La revisión del ejemplo terminó. No existe una decisión de admisión.'
+                      : 'Ficha ficticia · sin datos personales ni soportes reales.'}
+                  </p>
+                )}
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
     </section>
   )
 }

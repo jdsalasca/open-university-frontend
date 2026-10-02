@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it } from 'vitest'
 import { AdmissionsApplicantDemo } from './AdmissionsApplicantDemo'
@@ -70,5 +70,22 @@ describe('AdmissionsApplicantDemo', () => {
       status: 'DEMO_RECEIVED',
     })
     expect(screen.queryByLabelText(/nombre|documento|correo|teléfono|archivo/i)).not.toBeInTheDocument()
+  })
+
+  it('shows a correction request and sends a synthetic response into the shared inbox', async () => {
+    // Arrange
+    const user = userEvent.setup()
+    const store = createAdmissionsDemoStore()
+    render(<AdmissionsApplicantDemo store={store} />)
+
+    // Act
+    const correctionCard = screen.getByRole('article', { name: /ficha demo-0002/i })
+    expect(within(correctionCard).getByText(/confirmar que las opciones de ejemplo son distintas/i)).toBeVisible()
+    await user.click(within(correctionCard).getByRole('button', { name: /confirmo la respuesta demo/i }))
+
+    // Assert
+    expect(store.getState().applications.find((application) => application.reference === 'DEMO-0002')?.status)
+      .toBe('DEMO_CORRECTION_SUBMITTED')
+    expect(within(correctionCard).getByText(/respuesta demo enviada/i)).toBeVisible()
   })
 })
