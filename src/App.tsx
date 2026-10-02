@@ -48,6 +48,10 @@ const RoleAccessPage = lazy(() =>
   import('./features/access/RoleAccessPage')
     .then(({ RoleAccessPage: page }) => ({ default: page })),
 )
+const StudentAcademicWeekDemo = import.meta.env.DEV
+  ? lazy(() => import('./features/students/demo/MyAcademicWeekDemo')
+    .then(({ MyAcademicWeekDemo: page }) => ({ default: page })))
+  : null
 
 interface AppProps {
   catalogClient?: AcademicCatalogClient
@@ -74,7 +78,7 @@ function resolveAcademicOperationsClient(client?: AcademicOperationsClient): Pro
   return academicOperationsClientPromise
 }
 
-type ApplicationView = 'identity' | 'programs' | 'academia' | 'admissions' | 'spaces' | 'access'
+type ApplicationView = 'identity' | 'programs' | 'academia' | 'admissions' | 'spaces' | 'access' | 'student-demo'
 
 const MODULE_SYMBOLS: Record<string, string> = {
   home: '⌂',
@@ -171,6 +175,7 @@ function ApplicationShell({
   const isAdmissionsView = view === 'admissions'
   const isSpacesView = view === 'spaces'
   const isRoleAccessView = view === 'access'
+  const isStudentDemoView = view === 'student-demo'
   const isIdentityView = view === 'identity'
   const authenticatedIdentity = identity.status === 'authenticated' ? identity : null
   const hasAuthenticatedSession = authenticatedIdentity !== null
@@ -269,6 +274,7 @@ function ApplicationShell({
             : 'Sin sesión institucional'
   const identityCenterKey = `${branding.revision}:${authenticatedIdentity?.subject ?? 'anonymous'}`
   const currentPageLabel = isRoleAccessView ? 'Accesos y perfiles'
+    : isStudentDemoView ? 'Mi semana · demo'
     : isAdmissionsView ? admissionsLabel
     : isSpacesView ? spacesLabel
     : isProgramsView ? programsLabel
@@ -332,6 +338,14 @@ function ApplicationShell({
               <span>Estructura y periodos · Vista previa</span>
               {isAcademicOperationsView && <span className="nav-status" aria-hidden="true" />}
             </a>
+            {import.meta.env.DEV && (
+              <a className={`nav-item${isStudentDemoView ? ' active' : ''}`} href="#estudiante-demo"
+                aria-current={isStudentDemoView ? 'page' : undefined}>
+                <span className="nav-glyph" aria-hidden="true">▦</span>
+                <span>Mi semana · demo</span>
+                {isStudentDemoView && <span className="nav-status" aria-hidden="true" />}
+              </a>
+            )}
           </nav>
         </div>
 
@@ -356,11 +370,13 @@ function ApplicationShell({
 
       <div className="workspace">
         <header className="topbar">
-          <div className="breadcrumbs"><span>{isProgramsView || isAcademicOperationsView || isAdmissionsView || isSpacesView ? 'Vida universitaria' : 'Administración'}</span><span aria-hidden="true">/</span><strong>{currentPageLabel}</strong></div>
+          <div className="breadcrumbs"><span>{isProgramsView || isAcademicOperationsView || isAdmissionsView || isSpacesView || isStudentDemoView ? 'Vida universitaria' : 'Administración'}</span><span aria-hidden="true">/</span><strong>{currentPageLabel}</strong></div>
           <div className="topbar-meta">
-            <span className="autosave-indicator"><span aria-hidden="true" />{isRoleAccessView ? 'Control administrativo' : isAdmissionsView ? 'Consulta de admisiones' : isSpacesView ? 'Consulta de espacios' : isProgramsView ? 'Consulta de programas' : isAcademicOperationsView ? 'Consulta académica' : status === 'ready' ? 'Identidad sincronizada' : 'Identidad de respaldo'}</span>
+            <span className="autosave-indicator"><span aria-hidden="true" />{isStudentDemoView ? 'Experiencia de muestra' : isRoleAccessView ? 'Control administrativo' : isAdmissionsView ? 'Consulta de admisiones' : isSpacesView ? 'Consulta de espacios' : isProgramsView ? 'Consulta de programas' : isAcademicOperationsView ? 'Consulta académica' : status === 'ready' ? 'Identidad sincronizada' : 'Identidad de respaldo'}</span>
             <span className="topbar-divider" aria-hidden="true" />
-            {isRoleAccessView
+            {isStudentDemoView
+              ? <span className="revision-chip">AGENDA · DEMO</span>
+              : isRoleAccessView
               ? <span className="revision-chip">PERFILES · IDENTIDAD</span>
               : isAdmissionsView
               ? <span className="revision-chip">ADMISIONES · PREGRADO</span>
@@ -400,8 +416,8 @@ function ApplicationShell({
           </div>
         </header>
 
-        <main id={view === 'identity' ? 'inicio' : view === 'programs' ? 'programas' : isAdmissionsView ? 'admisiones' : isSpacesView ? 'espacios' : isRoleAccessView ? 'accesos' : 'academia'}
-          className={isRoleAccessView ? 'role-access-page-content' : isAdmissionsView ? 'admissions-page-content' : isSpacesView ? 'spaces-page-content' : isProgramsView ? 'catalog-page-content' : isAcademicOperationsView ? 'academic-page-content' : 'page-content identity-page-content'}>
+        <main id={isStudentDemoView ? 'estudiante-demo' : view === 'identity' ? 'inicio' : view === 'programs' ? 'programas' : isAdmissionsView ? 'admisiones' : isSpacesView ? 'espacios' : isRoleAccessView ? 'accesos' : 'academia'}
+          className={isStudentDemoView ? 'student-week-page-content' : isRoleAccessView ? 'role-access-page-content' : isAdmissionsView ? 'admissions-page-content' : isSpacesView ? 'spaces-page-content' : isProgramsView ? 'catalog-page-content' : isAcademicOperationsView ? 'academic-page-content' : 'page-content identity-page-content'}>
           {isLocalPreviewSession && (
             <aside className="local-preview-session-banner" role="status">
               <strong>Desarrollador local · modo preview</strong>
@@ -418,7 +434,9 @@ function ApplicationShell({
 
           <ModuleLoadBoundary
             key={view}
-            fallback={<ModuleLoadFailure label={isAdmissionsView
+            fallback={<ModuleLoadFailure label={isStudentDemoView
+              ? 'la agenda académica de ejemplo'
+              : isAdmissionsView
               ? 'la agenda de admisiones'
               : isSpacesView
                 ? 'la guía de espacios'
@@ -429,9 +447,11 @@ function ApplicationShell({
                 : 'el centro de identidad visual'} />}
           >
             <Suspense fallback={<p className="module-loading" role="status" aria-live="polite">
-              Cargando {isRoleAccessView ? 'consola de accesos' : isAdmissionsView ? 'agenda de admisiones' : isSpacesView ? 'guía de espacios' : isProgramsView || isAcademicOperationsView ? 'módulo académico' : 'centro de identidad visual'}…
+              Cargando {isStudentDemoView ? 'agenda académica de ejemplo' : isRoleAccessView ? 'consola de accesos' : isAdmissionsView ? 'agenda de admisiones' : isSpacesView ? 'guía de espacios' : isProgramsView || isAcademicOperationsView ? 'módulo académico' : 'centro de identidad visual'}…
             </p>}>
-              {isRoleAccessView
+              {isStudentDemoView && StudentAcademicWeekDemo
+                ? <StudentAcademicWeekDemo />
+                : isRoleAccessView
                 ? <RoleAccessPage client={roleAccessClient} authorization={roleAccessAuthorization}
                   loadScopeOptions={loadRoleScopeOptions} onAuthorizationRejected={revalidateRejectedRoleAccess} />
                 : isProgramsView
@@ -463,6 +483,8 @@ function ApplicationShell({
             ? roleAccessAuthorization?.canWrite
               ? 'Gestión de perfiles · permisos asignados y auditados en el servidor'
               : 'Consulta de perfiles · escritura requiere autorización institucional'
+            : isStudentDemoView
+              ? 'Agenda ficticia · Sin matrícula institucional ni consulta de datos personales'
             : isAdmissionsView
             ? admissionsAuthorization?.canRead && admissionsAuthorization.canWrite
               ? 'Calendario versionado · Publicación protegida y auditada'
@@ -486,6 +508,7 @@ export default App
 
 function readApplicationView(): ApplicationView {
   if (typeof window === 'undefined') return 'identity'
+  if (import.meta.env.DEV && window.location.hash === '#estudiante-demo') return 'student-demo'
   if (window.location.hash === '#programas') return 'programs'
   if (window.location.hash === '#academia') return 'academia'
   if (window.location.hash === '#admisiones') return 'admissions'

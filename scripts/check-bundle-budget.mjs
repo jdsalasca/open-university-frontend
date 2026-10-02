@@ -6,6 +6,7 @@ const ENTRY_KEY = 'index.html'
 const PROGRAMS_KEY = 'src/features/academics/AcademicCatalogPage.tsx'
 const OIDC_KEY = 'src/features/identity/identitySessionManager.ts'
 const ADMISSIONS_DEMO_PREFIX = 'src/features/admissions/demo/'
+const STUDENT_DEMO_PREFIX = 'src/features/students/demo/'
 const LOCAL_PREVIEW_CLIENT_KEY = 'src/features/identity/localPreviewSessionClient.ts'
 const LOCAL_PREVIEW_IDENTITY_KEY = 'src/features/identity/localPreviewIdentity.ts'
 
@@ -91,6 +92,9 @@ export function inspectBundleBudget(
 
   if (Object.keys(manifest).some((key) => key.startsWith(ADMISSIONS_DEMO_PREFIX))) {
     violations.push('El laboratorio de admisiones de desarrollo no debe entrar al build de producción')
+  }
+  if (Object.keys(manifest).some((key) => key.startsWith(STUDENT_DEMO_PREFIX))) {
+    violations.push('La experiencia estudiantil de desarrollo no debe entrar al build de producción')
   }
   if (Object.hasOwn(manifest, LOCAL_PREVIEW_CLIENT_KEY)) {
     violations.push('El cliente de sesión de desarrollador local no debe entrar al build de producción')

@@ -161,6 +161,30 @@ function publicSpaceGuideClient(): SpaceGuideClient {
 }
 
 describe('App', () => {
+  it('opens the local student week experience from development navigation', async () => {
+    // Arrange
+    const user = userEvent.setup()
+    window.history.replaceState(null, '', '#inicio')
+    render(
+      <BrandingProvider loader={async () => DEFAULT_BRANDING}>
+        <App
+          oidcConfiguration={{ status: 'unconfigured' }}
+          currentIdentityClient={identityClientWithPermissions([])}
+          localPreviewSessionClient={null}
+        />
+      </BrandingProvider>,
+    )
+
+    // Act
+    const studentPreviewLink = await screen.findByRole('link', { name: 'Mi semana · demo' })
+    await user.click(studentPreviewLink)
+
+    // Assert
+    expect(await screen.findByRole('heading', { name: 'Mi semana académica' })).toBeVisible()
+    expect(studentPreviewLink).toHaveAttribute('aria-current', 'page')
+    expect(window.location.hash).toBe('#estudiante-demo')
+  })
+
   it('labels local developer access and opens only modules returned by the current-identity API', async () => {
     // Arrange
     const user = userEvent.setup()

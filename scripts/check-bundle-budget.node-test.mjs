@@ -9,6 +9,7 @@ const ENTRY = 'index.html'
 const CATALOG = 'src/features/academics/AcademicCatalogPage.tsx'
 const OIDC = 'src/features/identity/identitySessionManager.ts'
 const ADMISSIONS_DEMO = 'src/features/admissions/demo/AdmissionsWorkflowLab.tsx'
+const STUDENT_DEMO = 'src/features/students/demo/MyAcademicWeekDemo.tsx'
 const LOCAL_PREVIEW_CLIENT = 'src/features/identity/localPreviewSessionClient.ts'
 const LOCAL_PREVIEW_IDENTITY = 'src/features/identity/localPreviewIdentity.ts'
 
@@ -115,6 +116,18 @@ test('rechaza que el laboratorio local de admisiones aparezca en el manifest de 
 
   // Assert
   assert.deepEqual(result.violations, ['El laboratorio de admisiones de desarrollo no debe entrar al build de producción'])
+})
+
+test('rechaza que la experiencia estudiantil de ejemplo aparezca en el manifest de producción', () => {
+  // Arrange
+  const manifest = createManifest()
+  manifest[STUDENT_DEMO] = { file: 'assets/student-week-demo.js' }
+
+  // Act
+  const result = inspectBundleBudget(manifest, sizeOfSyntheticAsset)
+
+  // Assert
+  assert.deepEqual(result.violations, ['La experiencia estudiantil de desarrollo no debe entrar al build de producción'])
 })
 
 test('rechaza que el cliente de sesión de desarrollador aparezca en el manifest de producción', () => {
