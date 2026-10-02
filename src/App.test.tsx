@@ -187,6 +187,32 @@ describe('App', () => {
     expect(window.location.hash).toBe('#estudiante-demo')
   })
 
+  it('opens the local grade-entry prototype from development navigation', async () => {
+    // Arrange
+    const user = userEvent.setup()
+    window.history.replaceState(null, '', '#inicio')
+    render(
+      <BrandingProvider loader={async () => DEFAULT_BRANDING}>
+        <App
+          oidcConfiguration={{ status: 'unconfigured' }}
+          currentIdentityClient={identityClientWithPermissions([])}
+          localPreviewSessionClient={null}
+        />
+      </BrandingProvider>,
+    )
+
+    // Act
+    const gradeEntryLink = await screen.findByRole('link', { name: 'Registro de calificaciones · demo' })
+    await user.click(gradeEntryLink)
+
+    // Assert
+    expect(await screen.findByRole('heading', { name: 'Registro de calificaciones · demo' })).toBeVisible()
+    expect(screen.getByText('DEMO-ALU-001')).toBeVisible()
+    expect(screen.getByText(/borrador solo se guarda en memoria/i)).toBeVisible()
+    expect(gradeEntryLink).toHaveAttribute('aria-current', 'page')
+    expect(window.location.hash).toBe('#calificaciones-demo')
+  })
+
   it('labels local developer access and opens only modules returned by the current-identity API', async () => {
     // Arrange
     const user = userEvent.setup()
