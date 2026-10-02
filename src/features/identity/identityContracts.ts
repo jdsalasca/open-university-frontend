@@ -14,6 +14,7 @@ export const APPLICATION_PERMISSIONS = [
 export type ApplicationPermission = (typeof APPLICATION_PERMISSIONS)[number]
 
 export interface CurrentIdentity {
+  userId: string
   subject: string
   permissions: ApplicationPermission[]
 }

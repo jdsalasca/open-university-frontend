@@ -3,6 +3,7 @@ import type { ApplicationPermission, CurrentIdentity, IdentityClient } from './i
 import { containsAsciiControlCharacters } from '../../shared/inputValidation'
 
 const ALLOWED_PERMISSIONS = new Set<string>(APPLICATION_PERMISSIONS)
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 export class IdentityApiError extends Error {
   readonly status: number
@@ -44,6 +45,7 @@ export function createIdentityClient(fetcher: typeof fetch = fetch): IdentityCli
 
 export function parseCurrentIdentity(value: unknown): CurrentIdentity {
   if (!isRecord(value)
+    || !isUuid(value.userId)
     || !isBoundedSubject(value.subject)
     || !Array.isArray(value.permissions)
     || value.permissions.some((permission) => typeof permission !== 'string' || !ALLOWED_PERMISSIONS.has(permission))
@@ -52,9 +54,14 @@ export function parseCurrentIdentity(value: unknown): CurrentIdentity {
   }
 
   return {
+    userId: value.userId,
     subject: value.subject,
     permissions: value.permissions as ApplicationPermission[],
   }
+}
+
+function isUuid(value: unknown): value is string {
+  return typeof value === 'string' && UUID_PATTERN.test(value)
 }
 
 export const identityClient = createIdentityClient()

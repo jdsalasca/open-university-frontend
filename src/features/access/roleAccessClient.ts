@@ -42,16 +42,18 @@ export function createRoleAccessClient(fetcher: typeof fetch = fetch): RoleAcces
       return parseIdentityDirectory(await responseBody(response), subjectPrefix)
     },
 
-    async assignments(issuer, subject, accessToken, signal) {
-      const query = new URLSearchParams({ issuer, subject })
+    async assignments(userId, accessToken, signal) {
+      if (!isUuid(userId)) throw malformedResponse()
+      const query = new URLSearchParams({ userId })
       const response = await fetcher(`/api/v1/admin/access/assignments?${query}`, authorizedOptions(accessToken, signal))
-      return parseAssignments(await responseBody(response), { issuer, subject })
+      return parseAssignments(await responseBody(response), userId)
     },
 
     async assign(command, accessToken, signal) {
+      if (!isUuid(command.targetUserId)) throw malformedResponse()
       const response = await fetcher('/api/v1/admin/access/assignments', jsonOptions('POST', command, accessToken, signal))
       const result = parseRoleAssignment(await responseBody(response))
-      if (result.targetIssuer !== command.targetIssuer || result.targetSubject !== command.targetSubject
+      if (result.targetUserId.toLowerCase() !== command.targetUserId.toLowerCase()
         || result.profileKey !== command.profileKey) {
         throw malformedResponse()
       }
@@ -112,25 +114,32 @@ function parseRoleProfile(value: unknown): RoleProfile {
 
 function parseIdentityDirectory(value: unknown, prefix: string): IdentityDirectoryEntry[] {
   if (!Array.isArray(value)) throw malformedResponse()
-  return value.map((entry) => {
-    if (!isRecord(entry) || !isIssuer(entry.issuer) || !isSubject(entry.subject) || !entry.subject.startsWith(prefix)) {
+  const seenUsers = new Set<string>()
+  const identities: IdentityDirectoryEntry[] = []
+  for (const entry of value) {
+    if (!isRecord(entry) || !isUuid(entry.userId) || !isIssuer(entry.issuer)
+      || !isSubject(entry.subject) || !entry.subject.startsWith(prefix)) {
       throw malformedResponse()
     }
-    return { issuer: entry.issuer, subject: entry.subject }
-  })
+    const key = entry.userId.toLowerCase()
+    if (seenUsers.has(key)) continue
+    seenUsers.add(key)
+    identities.push({ userId: entry.userId, issuer: entry.issuer, subject: entry.subject })
+  }
+  return identities
 }
 
-function parseAssignments(value: unknown, target: { issuer: string; subject: string }): RoleAssignment[] {
+function parseAssignments(value: unknown, targetUserId: string): RoleAssignment[] {
   if (!Array.isArray(value)) throw malformedResponse()
   return value.map((assignment) => {
     const parsed = parseRoleAssignment(assignment)
-    if (parsed.targetIssuer !== target.issuer || parsed.targetSubject !== target.subject) throw malformedResponse()
+    if (parsed.targetUserId.toLowerCase() !== targetUserId.toLowerCase()) throw malformedResponse()
     return parsed
   })
 }
 
 function parseRoleAssignment(value: unknown): RoleAssignment {
-  if (!isRecord(value) || !isUuid(value.assignmentId) || !isIssuer(value.targetIssuer) || !isSubject(value.targetSubject)
+  if (!isRecord(value) || !isUuid(value.assignmentId) || !isUuid(value.targetUserId)
     || typeof value.profileKey !== 'string' || !ROLE_KEYS.has(value.profileKey)
     || !Array.isArray(value.scopes) || value.scopes.length === 0
     || !isRoleAssignmentStatus(value.status) || !isIsoDate(value.validFrom)
@@ -145,8 +154,7 @@ function parseRoleAssignment(value: unknown): RoleAssignment {
   if (scopeKinds.size !== scopes.length) throw malformedResponse()
   return {
     assignmentId: value.assignmentId,
-    targetIssuer: value.targetIssuer,
-    targetSubject: value.targetSubject,
+    targetUserId: value.targetUserId,
     profileKey: value.profileKey as RoleProfileKey,
     scopes,
     status: value.status,

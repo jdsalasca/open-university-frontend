@@ -26,6 +26,7 @@ const configuration: OidcConfigurationResult = {
 }
 
 const identity: CurrentIdentity = {
+  userId: '7b717347-ae70-4a76-9a1d-01b9f178c0d2',
   subject: 'subject-42',
   permissions: ['branding:read'],
 }

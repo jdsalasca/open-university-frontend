@@ -30,8 +30,7 @@ const profiles = [
 function assignment(overrides: Record<string, unknown> = {}) {
   return {
     assignmentId: 'a7e7f06b-09a7-43db-a468-4c7b8ee3d301',
-    targetIssuer: 'https://identity.example.edu',
-    targetSubject: 'teacher-17',
+    targetUserId: '7b717347-ae70-4a76-9a1d-01b9f178c0d2',
     profileKey: 'TEACHER',
     scopes: [{ kind: 'UNIVERSITY', stableReference: null }],
     status: 'ACTIVE',
@@ -67,6 +66,7 @@ describe('role access client', () => {
   it('encodes identity search and keeps the user signal on the request', async () => {
     // Arrange
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse([{
+      userId: '7b717347-ae70-4a76-9a1d-01b9f178c0d2',
       issuer: 'https://identity.example.edu',
       subject: 'teacher +17',
     }]))
@@ -79,8 +79,27 @@ describe('role access client', () => {
 
     // Assert
     expect(result[0].subject).toBe('teacher +17')
+    expect(result[0].userId).toBe('7b717347-ae70-4a76-9a1d-01b9f178c0d2')
     expect(fetcher.mock.calls[0][0]).toContain('subjectPrefix=teacher+%2B')
     expect(fetcher.mock.calls[0][1]).toMatchObject({ signal: controller.signal })
+  })
+
+  it('returns one selectable entry when search contains multiple bindings for one canonical user', async () => {
+    // Arrange
+    const userId = '7b717347-ae70-4a76-9a1d-01b9f178c0d2'
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse([
+      { userId, issuer: 'https://identity.example.edu', subject: 'teacher-alpha' },
+      { userId: userId.toUpperCase(), issuer: 'https://alternate-id.example.edu', subject: 'teacher-beta' },
+    ]))
+    const { createRoleAccessClient } = await loadClientModule()
+    const client = createRoleAccessClient(fetcher)
+
+    // Act
+    const result = await client.searchIdentities('teacher-', 25, 'synthetic-token')
+
+    // Assert
+    expect(result).toHaveLength(1)
+    expect(result[0].userId).toBe(userId)
   })
 
   it('sends an audited assignment command once and parses the created assignment', async () => {
@@ -89,8 +108,7 @@ describe('role access client', () => {
     const { createRoleAccessClient } = await loadClientModule()
     const client = createRoleAccessClient(fetcher)
     const command = {
-      targetIssuer: 'https://identity.example.edu',
-      targetSubject: 'teacher-17',
+      targetUserId: '7b717347-ae70-4a76-9a1d-01b9f178c0d2',
       profileKey: 'TEACHER' as const,
       scopes: [{ kind: 'UNIVERSITY' as const, reference: null }],
       validFrom: '2026-10-01',
@@ -103,6 +121,7 @@ describe('role access client', () => {
 
     // Assert
     expect(result.assignmentId).toBe('a7e7f06b-09a7-43db-a468-4c7b8ee3d301')
+    expect(result.targetUserId).toBe(command.targetUserId)
     expect(fetcher).toHaveBeenCalledTimes(1)
     expect(fetcher).toHaveBeenCalledWith('/api/v1/admin/access/assignments', expect.objectContaining({
       method: 'POST',
@@ -110,6 +129,26 @@ describe('role access client', () => {
       cache: 'no-store',
       body: JSON.stringify(command),
     }))
+  })
+
+  it('queries assignments by canonical user id and rejects a response for another user', async () => {
+    // Arrange
+    const userId = '7b717347-ae70-4a76-9a1d-01b9f178c0d2'
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse([assignment()]))
+    const { createRoleAccessClient } = await loadClientModule()
+    const client = createRoleAccessClient(fetcher)
+
+    // Act
+    const result = await client.assignments(userId, 'synthetic-token')
+
+    // Assert
+    expect(result).toHaveLength(1)
+    expect(fetcher.mock.calls[0][0]).toBe(`/api/v1/admin/access/assignments?userId=${userId}`)
+
+    fetcher.mockResolvedValueOnce(jsonResponse([assignment({
+      targetUserId: '8b717347-ae70-4a76-9a1d-01b9f178c0d2',
+    })]))
+    await expect(client.assignments(userId, 'synthetic-token')).rejects.toThrow('malformed')
   })
 
   it('rejects unknown profiles and repeated scope kinds in server responses', async () => {
@@ -121,7 +160,7 @@ describe('role access client', () => {
     const client = createRoleAccessClient(fetcher)
 
     // Act / Assert
-    await expect(client.assignments('https://identity.example.edu', 'teacher-17', 'synthetic-token'))
+    await expect(client.assignments('7b717347-ae70-4a76-9a1d-01b9f178c0d2', 'synthetic-token'))
       .rejects.toThrow('malformed')
 
     fetcher.mockResolvedValueOnce(jsonResponse([assignment({
@@ -130,7 +169,7 @@ describe('role access client', () => {
         { kind: 'PROGRAM', stableReference: 'b7e7f06b-09a7-43db-a468-4c7b8ee3d301' },
       ],
     })]))
-    await expect(client.assignments('https://identity.example.edu', 'teacher-17', 'synthetic-token'))
+    await expect(client.assignments('7b717347-ae70-4a76-9a1d-01b9f178c0d2', 'synthetic-token'))
       .rejects.toThrow('malformed')
   })
 

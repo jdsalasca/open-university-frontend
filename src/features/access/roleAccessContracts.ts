@@ -26,6 +26,7 @@ export interface RoleProfile {
 }
 
 export interface IdentityDirectoryEntry {
+  userId: string
   issuer: string
   subject: string
 }
@@ -42,8 +43,7 @@ export interface StoredRoleScope {
 
 export interface RoleAssignment {
   assignmentId: string
-  targetIssuer: string
-  targetSubject: string
+  targetUserId: string
   profileKey: RoleProfileKey
   scopes: StoredRoleScope[]
   status: RoleAssignmentStatus
@@ -55,8 +55,7 @@ export interface RoleAssignment {
 }
 
 export interface CreateRoleAssignmentCommand {
-  targetIssuer: string
-  targetSubject: string
+  targetUserId: string
   profileKey: RoleProfileKey
   scopes: RoleScope[]
   validFrom: string
@@ -72,7 +71,7 @@ export interface RevokeRoleAssignmentCommand {
 export interface RoleAccessClient {
   roleProfiles(accessToken: string, signal?: AbortSignal): Promise<RoleProfile[]>
   searchIdentities(subjectPrefix: string, limit: number, accessToken: string, signal?: AbortSignal): Promise<IdentityDirectoryEntry[]>
-  assignments(issuer: string, subject: string, accessToken: string, signal?: AbortSignal): Promise<RoleAssignment[]>
+  assignments(userId: string, accessToken: string, signal?: AbortSignal): Promise<RoleAssignment[]>
   assign(command: CreateRoleAssignmentCommand, accessToken: string, signal?: AbortSignal): Promise<RoleAssignment>
   revoke(assignmentId: string, command: RevokeRoleAssignmentCommand, accessToken: string, signal?: AbortSignal): Promise<RoleAssignment>
 }

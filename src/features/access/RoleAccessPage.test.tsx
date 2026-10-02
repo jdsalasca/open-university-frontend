@@ -21,14 +21,14 @@ const profileCatalog: RoleProfile[] = [
 ]
 
 const selectedIdentity = {
+  userId: '7b717347-ae70-4a76-9a1d-01b9f178c0d2',
   issuer: 'https://identity.example.edu',
   subject: 'teacher-17',
 }
 
 const assignment = {
   assignmentId: 'a7e7f06b-09a7-43db-a468-4c7b8ee3d301',
-  targetIssuer: selectedIdentity.issuer,
-  targetSubject: selectedIdentity.subject,
+  targetUserId: selectedIdentity.userId,
   profileKey: 'TEACHER' as const,
   scopes: [{ kind: 'UNIVERSITY' as const, stableReference: null }],
   status: 'ACTIVE' as const,
@@ -114,12 +114,13 @@ describe('RoleAccessPage', () => {
     // Assert
     await waitFor(() => expect(client.assign).toHaveBeenCalledOnce())
     expect(client.assign).toHaveBeenCalledWith(expect.objectContaining({
-      targetIssuer: selectedIdentity.issuer,
-      targetSubject: selectedIdentity.subject,
+      targetUserId: selectedIdentity.userId,
       profileKey: 'TEACHER',
       scopes: [{ kind: 'UNIVERSITY', reference: null }],
       sourceReference: 'Acta sintética 2026-42',
     }), 'synthetic-token', expect.any(AbortSignal))
+    expect(client.assignments).toHaveBeenNthCalledWith(
+      1, selectedIdentity.userId, 'synthetic-token', expect.any(AbortSignal))
     expect(client.assignments).toHaveBeenCalledTimes(2)
     expect(await screen.findByRole('status')).toHaveTextContent('Perfil asignado')
   })

@@ -20,6 +20,7 @@ describe('identity client', () => {
     // Arrange
     const { createIdentityClient } = await loadClient()
     const fetcher = vi.fn().mockResolvedValue(jsonResponse({
+      userId: '7b717347-ae70-4a76-9a1d-01b9f178c0d2',
       subject: 'subject-42',
       permissions: ['branding:read', 'academic:period:write'],
     }))
@@ -31,6 +32,7 @@ describe('identity client', () => {
 
     // Assert
     expect(result).toEqual({
+      userId: '7b717347-ae70-4a76-9a1d-01b9f178c0d2',
       subject: 'subject-42',
       permissions: ['branding:read', 'academic:period:write'],
     })
@@ -61,9 +63,11 @@ describe('identity client', () => {
     const fetcher = vi.fn()
       .mockResolvedValueOnce(jsonResponse({ subject: '', permissions: [] }))
       .mockResolvedValueOnce(jsonResponse({ subject: 'subject-42', permissions: ['academic:student:admin'] }))
+      .mockResolvedValueOnce(jsonResponse({ userId: 'not-a-uuid', subject: 'subject-42', permissions: [] }))
     const client = createIdentityClient(fetcher)
 
     // Act + Assert
+    await expect(client.current('synthetic-access-token')).rejects.toThrow(/malformed/i)
     await expect(client.current('synthetic-access-token')).rejects.toThrow(/malformed/i)
     await expect(client.current('synthetic-access-token')).rejects.toThrow(/malformed/i)
   })

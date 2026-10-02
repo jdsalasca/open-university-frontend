@@ -160,7 +160,7 @@ export function RoleAccessPage({
   ) {
     setAssignmentsLoading(true)
     try {
-      const result = await client.assignments(identity.issuer, identity.subject, accessToken, signal)
+      const result = await client.assignments(identity.userId, accessToken, signal)
       if (signal?.aborted) return
       setAssignments(result)
     } catch (error) {
@@ -176,8 +176,7 @@ export function RoleAccessPage({
     if (!currentToken || !canWrite || !selectedIdentity || !selectedProfile) return
     const reference = selectedScopeKind === 'UNIVERSITY' ? null : scopeReference
     const command: CreateRoleAssignmentCommand = {
-      targetIssuer: selectedIdentity.issuer,
-      targetSubject: selectedIdentity.subject,
+      targetUserId: selectedIdentity.userId,
       profileKey: selectedProfile.key,
       scopes: [{ kind: selectedScopeKind, reference }],
       validFrom,
@@ -308,9 +307,9 @@ export function RoleAccessPage({
             {searchResults.length > 0 && (
               <ul className="role-access-identity-results" aria-label="Resultados de identidad">
                 {searchResults.map((identity) => {
-                  const selected = selectedIdentity?.issuer === identity.issuer && selectedIdentity.subject === identity.subject
+                  const selected = selectedIdentity?.userId.toLowerCase() === identity.userId.toLowerCase()
                   return (
-                    <li key={`${identity.issuer}\u0000${identity.subject}`}>
+                    <li key={identity.userId.toLowerCase()}>
                       <button
                         type="button"
                         className={selected ? 'is-selected' : ''}

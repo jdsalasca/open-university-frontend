@@ -39,7 +39,9 @@ function authenticatedSessionManager(): IdentitySessionManager {
 }
 
 function identityClientWithPermissions(permissions: CurrentIdentity['permissions']): IdentityClient {
-  return { current: async () => ({ subject: 'synthetic-subject', permissions }) }
+  return { current: async () => ({
+    userId: '7b717347-ae70-4a76-9a1d-01b9f178c0d2', subject: 'synthetic-subject', permissions,
+  }) }
 }
 
 function readOnlyRoleAccessClient(): RoleAccessClient {
@@ -568,8 +570,8 @@ describe('App', () => {
     }
     const permissions: CurrentIdentity['permissions'] = ['academic:period:read', 'academic:period:write']
     const identityCurrent = vi.fn()
-      .mockResolvedValueOnce({ subject: 'synthetic-subject', permissions })
-      .mockResolvedValueOnce({ subject: 'synthetic-subject', permissions })
+      .mockResolvedValueOnce({ userId: '7b717347-ae70-4a76-9a1d-01b9f178c0d2', subject: 'synthetic-subject', permissions })
+      .mockResolvedValueOnce({ userId: '7b717347-ae70-4a76-9a1d-01b9f178c0d2', subject: 'synthetic-subject', permissions })
     const operations = emptyAcademicOperationsClient()
     operations.getAdminPeriods = vi.fn().mockResolvedValue([period])
     const openPeriod = vi.fn().mockRejectedValue(new AcademicOperationsApiError(403, 'Permission rejected'))
@@ -660,16 +662,16 @@ describe('App', () => {
 
   it.each([
     { status: 401, revalidatedIdentity: new IdentityApiError(401), scenario: 'an expired token' },
-    { status: 403, revalidatedIdentity: { subject: 'synthetic-subject', permissions: [] } satisfies CurrentIdentity,
+    { status: 403, revalidatedIdentity: { userId: '7b717347-ae70-4a76-9a1d-01b9f178c0d2', subject: 'synthetic-subject', permissions: [] } satisfies CurrentIdentity,
       scenario: 'a removed permission' },
-    { status: 403, revalidatedIdentity: { subject: 'synthetic-subject', permissions: ['academic:structure:write'] } satisfies CurrentIdentity,
+    { status: 403, revalidatedIdentity: { userId: '7b717347-ae70-4a76-9a1d-01b9f178c0d2', subject: 'synthetic-subject', permissions: ['academic:structure:write'] } satisfies CurrentIdentity,
       scenario: 'a stale permission response' },
   ])('revalidates identity and hides the order editor after a PATCH $status with $scenario', async ({ status, revalidatedIdentity }) => {
     // Arrange
     const user = userEvent.setup()
     const unitId = 'fae06170-9acf-4718-854e-92e945a7db17'
     const identityCurrent = vi.fn()
-      .mockResolvedValueOnce({ subject: 'synthetic-subject', permissions: ['academic:structure:read', 'academic:structure:write'] })
+      .mockResolvedValueOnce({ userId: '7b717347-ae70-4a76-9a1d-01b9f178c0d2', subject: 'synthetic-subject', permissions: ['academic:structure:read', 'academic:structure:write'] })
       .mockImplementationOnce(() => revalidatedIdentity instanceof Error
         ? Promise.reject(revalidatedIdentity)
         : Promise.resolve(revalidatedIdentity))
