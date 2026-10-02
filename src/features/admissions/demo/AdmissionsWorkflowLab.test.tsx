@@ -1,7 +1,8 @@
 import { cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AdmissionsWorkflowLab } from './AdmissionsWorkflowLab'
+import { createTerritorialCatalogClient } from '../../territorial-catalog/territorialCatalogClient'
 
 afterEach(cleanup)
 
@@ -61,5 +62,47 @@ describe('AdmissionsWorkflowLab', () => {
     // Assert
     expect(screen.getByRole('article', { name: /DEMO-0001/i })).toHaveTextContent(/pendiente de revisión demo/i)
     expect(screen.queryByText('DEMO-0003')).not.toBeInTheDocument()
+  })
+
+  it('offers a reference-only territorial selector that does not create an admissions case', async () => {
+    // Arrange
+    const user = userEvent.setup()
+    const source = {
+      publisher: 'DANE',
+      datasetName: 'DIVIPOLA según Marco Geoestadístico Nacional',
+      datasetVersion: 'MGN 2025',
+      snapshotRetrievedAt: '2026-10-02',
+      serviceUrl: 'https://geoportal.dane.gov.co/mparcgis/rest/services/Divipola/Serv_DIVIPOLA_MGN_2025/FeatureServer',
+      documentationUrl: 'https://www.dane.gov.co/index.php/sistema-estadistico-nacional-sen/normas-y-estandares/nomenclaturas-y-clasificaciones/nomenclaturas/codificacion-de-la-division-politica-administrativa-de-colombia-divipola',
+    }
+    const fetcher = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ source, departments: [
+        { code: '05', name: 'ANTIOQUIA' }, { code: '15', name: 'BOYACÁ' },
+      ] }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ source, department: { code: '15', name: 'BOYACÁ' },
+        entities: [{ code: '15001', departmentCode: '15', localCode: '001', name: 'TUNJA',
+          type: 'MUNICIPIO', dataYear: 2025 }] }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+    const territorialClient = createTerritorialCatalogClient(fetcher)
+    render(<AdmissionsWorkflowLab calendar={<p>Calendario público conservado</p>}
+      territorialCatalogClient={territorialClient} />)
+
+    // Act
+    const territorialTab = screen.queryByRole('tab', { name: /catálogo territorial/i })
+
+    // Assert the missing feature as a normal assertion failure during RED.
+    expect(territorialTab).toBeInTheDocument()
+    if (!territorialTab) return
+
+    await user.click(territorialTab)
+    await user.selectOptions(await screen.findByLabelText(/departamento de referencia/i), '15')
+    await user.selectOptions(await screen.findByLabelText(/^entidad territorial$/i), '15001')
+
+    expect(await screen.findByText('15001', { selector: 'strong' })).toBeVisible()
+    expect(fetcher).toHaveBeenNthCalledWith(1, '/api/v1/territorial-catalog/departments',
+      expect.objectContaining({ method: 'GET', credentials: 'omit' }))
+    expect(fetcher).toHaveBeenNthCalledWith(2, '/api/v1/territorial-catalog/departments/15/entities',
+      expect.objectContaining({ method: 'GET', credentials: 'omit' }))
+    expect(fetcher.mock.calls.every(([, options]) => options?.method === 'GET')).toBe(true)
+    expect(screen.queryByRole('button', { name: /crear ficha sintética/i })).not.toBeInTheDocument()
   })
 })

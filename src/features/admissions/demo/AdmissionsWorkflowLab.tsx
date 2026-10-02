@@ -2,19 +2,24 @@ import { useState } from 'react'
 import type { KeyboardEvent, ReactNode } from 'react'
 import { AdmissionsAdminDemo } from './AdmissionsAdminDemo'
 import { AdmissionsApplicantDemo } from './AdmissionsApplicantDemo'
+import { TerritorialCatalogDemo } from './TerritorialCatalogDemo'
 import { createAdmissionsDemoStore } from './admissionsDemoStore'
+import { territorialCatalogClient as defaultTerritorialCatalogClient } from '../../territorial-catalog/territorialCatalogClient'
+import type { TerritorialCatalogClient } from '../../territorial-catalog/territorialCatalogClient'
 import './AdmissionsWorkflowLab.scss'
 
-type AdmissionsPerspective = 'applicant' | 'admin' | 'calendar'
+type AdmissionsPerspective = 'applicant' | 'admin' | 'calendar' | 'territories'
 
 interface AdmissionsWorkflowLabProps {
   calendar: ReactNode
+  territorialCatalogClient?: TerritorialCatalogClient
 }
 
 const TABS: { id: AdmissionsPerspective; label: string }[] = [
   { id: 'applicant', label: 'Aspirante · demo' },
   { id: 'admin', label: 'Equipo de admisiones · demo' },
   { id: 'calendar', label: 'Calendario público' },
+  { id: 'territories', label: 'Catálogo territorial · demo' },
 ]
 
 function panelId(perspective: AdmissionsPerspective) {
@@ -25,7 +30,10 @@ function tabId(perspective: AdmissionsPerspective) {
   return `admissions-lab-tab-${perspective}`
 }
 
-export function AdmissionsWorkflowLab({ calendar }: AdmissionsWorkflowLabProps) {
+export function AdmissionsWorkflowLab({
+  calendar,
+  territorialCatalogClient = defaultTerritorialCatalogClient,
+}: AdmissionsWorkflowLabProps) {
   const [store] = useState(createAdmissionsDemoStore)
   const [activePerspective, setActivePerspective] = useState<AdmissionsPerspective>('applicant')
 
@@ -118,6 +126,16 @@ export function AdmissionsWorkflowLab({ calendar }: AdmissionsWorkflowLabProps) 
           tabIndex={0}
         >
           {calendar}
+        </div>
+        <div
+          aria-labelledby={tabId('territories')}
+          className="admissions-lab-tabpanel"
+          hidden={activePerspective !== 'territories'}
+          id={panelId('territories')}
+          role="tabpanel"
+          tabIndex={0}
+        >
+          {activePerspective === 'territories' && <TerritorialCatalogDemo client={territorialCatalogClient} />}
         </div>
       </div>
     </section>
