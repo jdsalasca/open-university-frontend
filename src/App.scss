@@ -220,6 +220,11 @@
   .page-footer { flex-direction: column; gap: 6px; margin-bottom: 2px; }
 }
 
+@media (max-width: 320px) {
+  .breadcrumbs > span:first-child { display: none; }
+  .topbar { padding-inline: 8px; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; }
 }
