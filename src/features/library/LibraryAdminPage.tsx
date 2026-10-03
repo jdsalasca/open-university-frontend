@@ -55,6 +55,7 @@ function LibraryAdminPageContent({
   const [returning, setReturning] = useState(false)
   const [titleQueryInput, setTitleQueryInput] = useState('')
   const [titleQuery, setTitleQuery] = useState('')
+  const [overdueOnly, setOverdueOnly] = useState(false)
 
   /** A refused bearer means the cached permissions are stale, so the institutional session is revalidated. */
   const reportAuthorizationRejection = useCallback(async (error: unknown) => {
@@ -200,6 +201,9 @@ function LibraryAdminPageContent({
     await selectTitle(selectedTitleId)
   }
 
+  // The desk already receives the overdue flag per loan, so narrowing is a local view concern.
+  const visibleLoans = overdueOnly ? openLoans.filter((loan) => loan.overdue) : openLoans
+
   return (
     <section className="library-admin" aria-labelledby="library-admin-title">
       <header className="library-admin-heading">
@@ -218,33 +222,46 @@ function LibraryAdminPageContent({
       {loadState === 'ready' && <>
         <section className="library-section" aria-labelledby="library-open-loans-title">
           <h3 id="library-open-loans-title">Préstamos pendientes</h3>
+          {openLoans.length > 0 && (
+            <label className="library-field library-overdue-filter">
+              <input
+                type="checkbox"
+                aria-label="Solo vencidos"
+                checked={overdueOnly}
+                onChange={(event) => setOverdueOnly(event.currentTarget.checked)}
+              />
+              <span>Solo vencidos</span>
+            </label>
+          )}
           {openLoans.length === 0
             ? <p className="library-empty">No hay ejemplares pendientes de devolución.</p>
-            : <ul className="library-loans">
-              {openLoans.map((loan) => (
-                <li key={loan.loanId} className="library-loan">
-                  <span className="library-loan-due">
-                    <span className="library-loan-caption">Vence</span>
-                    <time dateTime={loan.dueOn}>{loan.dueOn}</time>
-                  </span>
-                  {loan.overdue && <span className="library-loan-overdue">Vencido</span>}
-                  <span className="library-loan-reference">{loan.sourceReference}</span>
-                  {canWrite && (
-                    <button
-                      type="button"
-                      disabled={returning || returnReference.trim().length === 0}
-                      onClick={() => void registerReturn(loan.loanId)}
-                    >
-                      Registrar devolución
-                    </button>
-                  )}
-                </li>
-              ))}
-            </ul>}
+            : visibleLoans.length === 0
+              ? <p className="library-empty">No hay préstamos vencidos.</p>
+              : <ul className="library-loans">
+                {visibleLoans.map((loan) => (
+                  <li key={loan.loanId} className="library-loan">
+                    <span className="library-loan-due">
+                      <span className="library-loan-caption">Vence</span>
+                      <time dateTime={loan.dueOn}>{loan.dueOn}</time>
+                    </span>
+                    {loan.overdue && <span className="library-loan-overdue">Vencido</span>}
+                    <span className="library-loan-reference">{loan.sourceReference}</span>
+                    {canWrite && (
+                      <button
+                        type="button"
+                        disabled={returning || returnReference.trim().length === 0}
+                        onClick={() => void registerReturn(loan.loanId)}
+                      >
+                        Registrar devolución
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>}
           {openLoans.length >= LIST_LIMIT && (
             <p className="library-hint">Mostrando los primeros {LIST_LIMIT} préstamos pendientes.</p>
           )}
-          {canWrite && openLoans.length > 0 && (
+          {canWrite && visibleLoans.length > 0 && (
             <label className="library-field">
               <span>Referencia institucional de la devolución</span>
               <input

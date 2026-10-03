@@ -26,6 +26,15 @@ const OVERDUE_LOAN: LibraryLoan = {
   sourceReference: 'Préstamo 1 de 2026',
 }
 
+const CURRENT_LOAN: LibraryLoan = {
+  ...OVERDUE_LOAN,
+  loanId: 'loan-2',
+  copyId: 'copy-2',
+  dueOn: '2099-01-01',
+  overdue: false,
+  sourceReference: 'Préstamo 2 de 2026',
+}
+
 const ACTIVE_COPY: LibraryCopy = {
   copyId: 'copy-1',
   titleId: 'title-1',
@@ -234,6 +243,26 @@ describe('LibraryAdminPage', () => {
       'token',
     ))
     expect(screen.queryByText(/no fue posible completar la operación/i)).toBeNull()
+  })
+
+  it('narrows the outstanding list to the overdue loans on demand', async () => {
+    // Arrange: the desk needs to chase what is already late without losing the whole picture.
+    const client = fakeClient({ getOpenLoans: vi.fn(async () => [OVERDUE_LOAN, CURRENT_LOAN]) })
+    const user = userEvent.setup()
+    render(<LibraryAdminPage client={client} authorization={{ accessToken: 'token', canRead: true, canWrite: false }} />)
+    await screen.findByText('Vencido')
+    expect(screen.getByText('2099-01-01')).toBeTruthy()
+
+    // Act
+    await user.click(screen.getByLabelText('Solo vencidos'))
+
+    // Assert
+    expect(screen.queryByText('2099-01-01')).toBeNull()
+    expect(screen.getByText('2026-02-01')).toBeTruthy()
+
+    // Act + Assert: turning it off restores the full list.
+    await user.click(screen.getByLabelText('Solo vencidos'))
+    expect(await screen.findByText('2099-01-01')).toBeTruthy()
   })
 
   it('renders nothing when the session cannot read the library', () => {
