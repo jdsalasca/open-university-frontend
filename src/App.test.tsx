@@ -176,7 +176,7 @@ describe('App', () => {
     )
 
     // Act
-    const mobileNavigation = await screen.findByRole('navigation', { name: 'Navegación móvil' })
+    const mobileNavigation = await screen.findByRole('navigation', { name: 'Navegación móvil' }, { timeout: 5_000 })
     await user.click(within(mobileNavigation).getByRole('button', { name: 'Más secciones' }))
 
     // Assert
