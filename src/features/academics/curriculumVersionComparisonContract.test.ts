@@ -111,6 +111,24 @@ describe('parseCurriculumImportPreview comparison contract', () => {
     await expect(parseCurriculumImportPreview(tooManySamples)).rejects.toThrow()
   })
 
+  it('rejects an added or removed sample that carries changed fields', async () => {
+    // Arrange: added/removed rows are field-less by contract; only modified rows carry a diff.
+    const addedWithFields = {
+      ...preview,
+      comparison: {
+        ...compared,
+        counts: { added: 1, removed: 0, modified: 0, unchanged: 0 },
+        addedSamples: [{ subjectCode: 'SUB-NEW', changedFields: ['CREDITS'] }],
+        removedSamples: [],
+        modifiedSamples: [],
+        unchangedSamples: [],
+      },
+    }
+
+    // Act + Assert
+    await expect(parseCurriculumImportPreview(addedWithFields)).rejects.toThrow()
+  })
+
   it('accepts an older backend response that omits comparison', async () => {
     // Arrange
     const response = { ...preview }

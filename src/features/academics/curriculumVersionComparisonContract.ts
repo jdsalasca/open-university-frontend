@@ -71,17 +71,19 @@ export function parseCurriculumVersionComparison(input: unknown, entryCount: num
       publishedAt: input.reference.publishedAt,
     },
     counts,
-    addedSamples: parseComparisonSamples(input.addedSamples, counts.added, 'unchanged'),
-    removedSamples: parseComparisonSamples(input.removedSamples, counts.removed, 'unchanged'),
+    // Added/removed rows carry no field-level diff: the backend emits them with an empty
+    // changedFields list, so they share the 'fieldless' rule with unchanged rows.
+    addedSamples: parseComparisonSamples(input.addedSamples, counts.added, 'fieldless'),
+    removedSamples: parseComparisonSamples(input.removedSamples, counts.removed, 'fieldless'),
     modifiedSamples: parseComparisonSamples(input.modifiedSamples, counts.modified, 'modified'),
-    unchangedSamples: parseComparisonSamples(input.unchangedSamples, counts.unchanged, 'unchanged'),
+    unchangedSamples: parseComparisonSamples(input.unchangedSamples, counts.unchanged, 'fieldless'),
   }
 }
 
 function parseComparisonSamples(
   input: unknown[],
   count: number,
-  kind: 'modified' | 'unchanged',
+  kind: 'modified' | 'fieldless',
 ): CurriculumVersionComparisonSample[] {
   if (input.length > Math.min(10, count)) throw malformedResponse()
   const allowedFields: readonly CurriculumVersionComparisonChangedField[] = [
@@ -96,7 +98,7 @@ function parseComparisonSamples(
         typeof field === 'string' && allowedFields.includes(field as CurriculumVersionComparisonChangedField))
       || new Set(sample.changedFields).size !== sample.changedFields.length
       || (kind === 'modified' && sample.changedFields.length === 0)
-      || (kind === 'unchanged' && sample.changedFields.length > 0)) throw malformedResponse()
+      || (kind === 'fieldless' && sample.changedFields.length > 0)) throw malformedResponse()
     return { subjectCode: sample.subjectCode, changedFields: [...sample.changedFields] }
   })
 }
