@@ -98,6 +98,9 @@ export function AdmissionsCalendarExperience({
             : 'No hay una convocatoria administrada publicada. Se muestra la agenda pública de referencia.'}
         </p>
       )}
+      {publicError && (
+        <button className="admissions-admin-secondary" type="button" onClick={refreshPublicCall}>Reintentar</button>
+      )}
       {publicState === 'published' && calls.length > 1 && selectedCall && (
         <div className="admissions-call-picker">
           <label htmlFor="admissions-published-call">Convocatoria publicada</label>
