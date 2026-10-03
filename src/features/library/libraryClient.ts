@@ -10,6 +10,7 @@ export interface LibraryClient {
   getTitles(query: string, accessToken: string, signal?: AbortSignal): Promise<LibraryTitle[]>
   getCopies(titleId: string, accessToken: string, signal?: AbortSignal): Promise<LibraryCopy[]>
   getOpenLoans(accessToken: string, signal?: AbortSignal): Promise<LibraryLoan[]>
+  copyOfBarcode(barcode: string, accessToken: string, signal?: AbortSignal): Promise<LibraryCopy>
   registerTitle(input: RegisterLibraryTitleInput, accessToken: string): Promise<LibraryTitle>
   registerCopy(titleId: string, input: RegisterLibraryCopyInput, accessToken: string): Promise<LibraryCopy>
   withdrawCopy(copyId: string, sourceReference: string, accessToken: string): Promise<LibraryCopy>
@@ -68,6 +69,8 @@ export function createLibraryClient(fetcher: typeof fetch = fetch): LibraryClien
       request<LibraryCopy[]>(`/titles/${encodeURIComponent(titleId)}/copies?limit=${LIST_LIMIT}`, accessToken, { signal }),
     getOpenLoans: (accessToken, signal) =>
       request<LibraryLoan[]>(`/open-loans?limit=${LIST_LIMIT}`, accessToken, { signal }),
+    copyOfBarcode: (barcode, accessToken, signal) =>
+      request<LibraryCopy>(`/copies/by-barcode/${encodeURIComponent(barcode)}`, accessToken, { signal }),
     registerTitle: (input, accessToken) =>
       request<LibraryTitle>('/titles', accessToken, { method: 'POST', body: input }),
     registerCopy: (titleId, input, accessToken) =>

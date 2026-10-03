@@ -20,6 +20,21 @@ describe('libraryClient', () => {
     expect(fetcher).toHaveBeenCalledWith(expect.stringContaining(`/open-loans?limit=${LIST_LIMIT}`), expect.anything())
   })
 
+  it('looks a copy up by the barcode it scans', async () => {
+    // Arrange
+    const fetcher = fakeFetcher()
+    const client = createLibraryClient(fetcher)
+
+    // Act
+    await client.copyOfBarcode('BC 0001', 'token')
+
+    // Assert
+    expect(fetcher).toHaveBeenCalledWith(
+      expect.stringContaining('/copies/by-barcode/BC%200001'),
+      expect.objectContaining({ headers: expect.objectContaining({ Authorization: 'Bearer token' }) }),
+    )
+  })
+
   it('sends the institutional reference and no date when a loan is returned', async () => {
     // Arrange
     const fetcher = fakeFetcher()

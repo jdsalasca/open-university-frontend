@@ -62,6 +62,7 @@ function fakeClient(overrides: Partial<LibraryClient> = {}): LibraryClient {
     registerTitle: vi.fn(async () => TITLE),
     registerCopy: vi.fn(async () => ACTIVE_COPY),
     withdrawCopy: vi.fn(async () => WITHDRAWN_COPY),
+    copyOfBarcode: vi.fn(async () => ACTIVE_COPY),
     returnLoan: vi.fn(async () => ({ ...OVERDUE_LOAN, returnedOn: '2026-10-03' })),
     ...overrides,
   }
@@ -263,6 +264,47 @@ describe('LibraryAdminPage', () => {
     // Act + Assert: turning it off restores the full list.
     await user.click(screen.getByLabelText('Solo vencidos'))
     expect(await screen.findByText('2099-01-01')).toBeTruthy()
+  })
+
+  it('identifies a copy from its barcode and lets the desk withdraw it', async () => {
+    // Arrange: the physical label is what the desk scans when it does not know the title.
+    const copyOfBarcode = vi.fn(async () => ACTIVE_COPY)
+      .mockResolvedValueOnce(ACTIVE_COPY)
+      .mockResolvedValue(WITHDRAWN_COPY)
+    const client = fakeClient({ copyOfBarcode })
+    const user = userEvent.setup()
+    render(<LibraryAdminPage client={client} authorization={{ accessToken: 'token', canRead: true, canWrite: true }} />)
+    await screen.findByText('Préstamos pendientes')
+
+    // Act
+    await user.type(screen.getByLabelText('Código de barras del ejemplar'), 'BC-0001')
+    await user.click(screen.getByRole('button', { name: 'Buscar ejemplar' }))
+
+    // Assert
+    await waitFor(() => expect(copyOfBarcode).toHaveBeenCalledWith('BC-0001', 'token'))
+    await screen.findByText('En circulación')
+    await user.type(screen.getByLabelText('Referencia institucional del retiro'), 'Resolución 9 de 2026')
+    await user.click(screen.getByRole('button', { name: 'Retirar' }))
+
+    // Assert: the same copy now shows why it left circulation.
+    expect(await screen.findByText('Retirado · Resolución de descarte 7 de 2026')).toBeTruthy()
+  })
+
+  it('says when no copy carries the scanned barcode', async () => {
+    // Arrange
+    const client = fakeClient({
+      copyOfBarcode: vi.fn(async () => { throw new LibraryApiError(404, 'missing') }),
+    })
+    const user = userEvent.setup()
+    render(<LibraryAdminPage client={client} authorization={{ accessToken: 'token', canRead: true, canWrite: false }} />)
+    await screen.findByText('Préstamos pendientes')
+
+    // Act
+    await user.type(screen.getByLabelText('Código de barras del ejemplar'), 'BC-0000')
+    await user.click(screen.getByRole('button', { name: 'Buscar ejemplar' }))
+
+    // Assert
+    expect(await screen.findByRole('alert')).toHaveTextContent(/no hay ningún ejemplar con ese código de barras/i)
   })
 
   it('renders nothing when the session cannot read the library', () => {

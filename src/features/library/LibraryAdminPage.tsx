@@ -56,6 +56,10 @@ function LibraryAdminPageContent({
   const [titleQueryInput, setTitleQueryInput] = useState('')
   const [titleQuery, setTitleQuery] = useState('')
   const [overdueOnly, setOverdueOnly] = useState(false)
+  const [barcodeInput, setBarcodeInput] = useState('')
+  const [foundCopy, setFoundCopy] = useState<LibraryCopy | null>(null)
+  const [barcodeError, setBarcodeError] = useState<string | null>(null)
+  const [lookingUp, setLookingUp] = useState(false)
 
   /** A refused bearer means the cached permissions are stale, so the institutional session is revalidated. */
   const reportAuthorizationRejection = useCallback(async (error: unknown) => {
@@ -137,19 +141,53 @@ function LibraryAdminPageContent({
     }
   }
 
-  async function withdraw(copyId: string) {
-    if (!canWrite || withdrawReference.trim().length === 0) return
+  /** A withdrawal is shared by the title list and the barcode lookup; each caller refreshes its own view. */
+  async function performWithdraw(copyId: string): Promise<boolean> {
+    if (!canWrite || withdrawReference.trim().length === 0) return false
     setActionError(null)
     setWithdrawing(true)
     try {
       await client.withdrawCopy(copyId, withdrawReference.trim(), accessToken)
-      setCopies(await client.getCopies(selectedTitleId, accessToken))
       setWithdrawReference('')
+      return true
     } catch (error) {
       setActionError(ACTION_ERROR)
       await reportAuthorizationRejection(error)
+      return false
     } finally {
       setWithdrawing(false)
+    }
+  }
+
+  async function withdraw(copyId: string) {
+    if (await performWithdraw(copyId)) {
+      setCopies(await client.getCopies(selectedTitleId, accessToken))
+    }
+  }
+
+  async function lookUpBarcode(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const barcode = barcodeInput.trim()
+    if (barcode.length === 0) return
+    setBarcodeError(null)
+    setFoundCopy(null)
+    setLookingUp(true)
+    try {
+      setFoundCopy(await client.copyOfBarcode(barcode, accessToken))
+    } catch (error) {
+      setBarcodeError(error instanceof LibraryApiError && error.status === 404
+        ? 'No hay ningún ejemplar con ese código de barras.'
+        : LOAD_ERROR)
+      await reportAuthorizationRejection(error)
+    } finally {
+      setLookingUp(false)
+    }
+  }
+
+  async function withdrawFoundCopy() {
+    if (!foundCopy) return
+    if (await performWithdraw(foundCopy.copyId)) {
+      setFoundCopy(await client.copyOfBarcode(foundCopy.barcode, accessToken))
     }
   }
 
@@ -294,6 +332,45 @@ function LibraryAdminPageContent({
               />
             </label>
             <button type="submit">Buscar</button>
+          </form>
+
+          <form className="library-form" onSubmit={(event) => void lookUpBarcode(event)}>
+            <h4>Buscar ejemplar por código de barras</h4>
+            <label className="library-field">
+              <span>Código de barras del ejemplar</span>
+              <input
+                aria-label="Código de barras del ejemplar"
+                value={barcodeInput}
+                maxLength={48}
+                onChange={(event) => setBarcodeInput(event.currentTarget.value)}
+              />
+            </label>
+            <button type="submit" disabled={lookingUp}>Buscar ejemplar</button>
+            {barcodeError && <p className="library-error" role="alert">{barcodeError}</p>}
+            {foundCopy && (
+              <ul className="library-copies">
+                <li className="library-copy">
+                  <span className="library-copy-barcode">{foundCopy.barcode}</span>
+                  <span className="library-copy-location">{foundCopy.location}</span>
+                  <span className={foundCopy.active ? 'library-copy-active' : 'library-copy-inactive'}>
+                    {foundCopy.active
+                      ? 'En circulación'
+                      : foundCopy.withdrawnReference
+                        ? `Retirado · ${foundCopy.withdrawnReference}`
+                        : 'Retirado'}
+                  </span>
+                  {canWrite && foundCopy.active && (
+                    <button
+                      type="button"
+                      disabled={withdrawing || withdrawReference.trim().length === 0}
+                      onClick={() => void withdrawFoundCopy()}
+                    >
+                      Retirar
+                    </button>
+                  )}
+                </li>
+              </ul>
+            )}
           </form>
           {titles.length === 0
             ? <p className="library-empty">{titleQuery
