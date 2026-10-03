@@ -19,7 +19,7 @@ describe('createAdmissionsCalendarIcs', () => {
 
     // Assert
     expect(unfolded).toContain('DTSTAMP:20261001T170000Z')
-    expect(unfolded).toContain('UID:pin-sale@admisiones.universiry.local')
+    expect(unfolded).toContain('UID:primer-semestre-academico-de-2027-pin-sale@admisiones.universiry.local')
     expect(unfolded).toContain('DTSTART;VALUE=DATE:20260921\r\nDTEND;VALUE=DATE:20261022')
     expect(unfolded).toContain('DTSTART;VALUE=DATE:20261023\r\nDTEND;VALUE=DATE:20261024')
     expect(unfolded).toContain(OFFICIAL_ADMISSIONS_CALENDAR_2027_I.source.url)

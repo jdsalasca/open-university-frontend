@@ -15,6 +15,7 @@ export function createAdmissionsCalendarIcs(
   }
 
   const timestamp = generatedAt.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z')
+  const callScope = createCallScope(calendar)
   const eventIds = new Set<string>()
   const lines = [
     'BEGIN:VCALENDAR',
@@ -47,7 +48,7 @@ export function createAdmissionsCalendarIcs(
 
     lines.push(
       'BEGIN:VEVENT',
-      `UID:${milestone.id}@admisiones.universiry.local`,
+      `UID:${callScope}-${milestone.id}@admisiones.universiry.local`,
       `DTSTAMP:${timestamp}`,
       `DTSTART;VALUE=DATE:${formatCalendarDate(startsOn)}`,
       `DTEND;VALUE=DATE:${formatCalendarDate(exclusiveEnd)}`,
@@ -79,6 +80,21 @@ export function downloadAdmissionsCalendar(calendar: PublicAdmissionsCalendar): 
     link.remove()
     window.setTimeout(() => URL.revokeObjectURL(objectUrl), 0)
   }
+}
+
+function createCallScope(calendar: PublicAdmissionsCalendar): string {
+  const source = calendar.callName.trim() || calendar.title?.trim() || ''
+  const scope = source
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+
+  if (!scope) {
+    throw new RangeError('La convocatoria necesita un nombre para identificar sus eventos.')
+  }
+  return scope
 }
 
 function createAdmissionsCalendarFilename(calendar: PublicAdmissionsCalendar): string {
