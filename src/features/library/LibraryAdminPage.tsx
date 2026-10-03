@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
-import { LibraryApiError } from './libraryClient'
+import { LibraryApiError, LIST_LIMIT } from './libraryClient'
 import { libraryClient as defaultLibraryClient } from './libraryClient'
 import type { LibraryClient } from './libraryClient'
 import type {
@@ -227,6 +227,9 @@ function LibraryAdminPageContent({
                 </li>
               ))}
             </ul>}
+          {openLoans.length >= LIST_LIMIT && (
+            <p className="library-hint">Mostrando los primeros {LIST_LIMIT} préstamos pendientes.</p>
+          )}
           {canWrite && openLoans.length > 0 && (
             <label className="library-field">
               <span>Referencia institucional de la devolución</span>
@@ -245,6 +248,9 @@ function LibraryAdminPageContent({
           {titles.length === 0
             ? <p className="library-empty">Todavía no hay títulos registrados.</p>
             : <>
+              {titles.length >= LIST_LIMIT && (
+                <p className="library-hint">Mostrando los primeros {LIST_LIMIT} títulos del catálogo.</p>
+              )}
               <label className="library-field">
                 <span>Seleccionar título</span>
                 <select

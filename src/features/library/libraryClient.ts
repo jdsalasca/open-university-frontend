@@ -28,6 +28,9 @@ export class LibraryApiError extends Error {
 
 const BASE = '/api/v1/admin/library'
 
+/** The most the API will return in one page, so the desk asks for the whole window it is allowed to see. */
+export const LIST_LIMIT = 100
+
 interface RequestOptions {
   method?: string
   body?: unknown
@@ -55,10 +58,11 @@ export function createLibraryClient(fetcher: typeof fetch = fetch): LibraryClien
   }
 
   return {
-    getTitles: (accessToken, signal) => request<LibraryTitle[]>('/titles', accessToken, { signal }),
+    getTitles: (accessToken, signal) => request<LibraryTitle[]>(`/titles?limit=${LIST_LIMIT}`, accessToken, { signal }),
     getCopies: (titleId, accessToken, signal) =>
-      request<LibraryCopy[]>(`/titles/${encodeURIComponent(titleId)}/copies`, accessToken, { signal }),
-    getOpenLoans: (accessToken, signal) => request<LibraryLoan[]>('/open-loans', accessToken, { signal }),
+      request<LibraryCopy[]>(`/titles/${encodeURIComponent(titleId)}/copies?limit=${LIST_LIMIT}`, accessToken, { signal }),
+    getOpenLoans: (accessToken, signal) =>
+      request<LibraryLoan[]>(`/open-loans?limit=${LIST_LIMIT}`, accessToken, { signal }),
     registerTitle: (input, accessToken) =>
       request<LibraryTitle>('/titles', accessToken, { method: 'POST', body: input }),
     registerCopy: (titleId, input, accessToken) =>

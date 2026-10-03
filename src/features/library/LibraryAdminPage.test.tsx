@@ -127,6 +127,18 @@ describe('LibraryAdminPage', () => {
     expect(await screen.findByText('No hay ejemplares pendientes de devolución.')).toBeTruthy()
   })
 
+  it('says when the catalogue page is only the first slice of a larger library', async () => {
+    // Arrange: the API caps one page, so the desk must not read the list as complete.
+    const manyTitles = Array.from({ length: 100 }, (_, index) => ({ ...TITLE, titleId: `title-${index}` }))
+    render(<LibraryAdminPage
+      client={fakeClient({ getTitles: vi.fn(async () => manyTitles) })}
+      authorization={{ accessToken: 'token', canRead: true, canWrite: false }}
+    />)
+
+    // Act + Assert
+    expect(await screen.findByText(/Mostrando los primeros 100 títulos/)).toBeTruthy()
+  })
+
   it('renders nothing when the session cannot read the library', () => {
     // Arrange + Act
     const { container } = render(
