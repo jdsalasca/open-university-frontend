@@ -146,7 +146,7 @@ test('public undergraduate directory keeps its dark surfaces readable', () => {
 
 test('dark theme keeps academic, spaces, and catalog chrome readable', () => {
   // Arrange: these elements keep hardcoded light backgrounds but inherit the light dark-mode text.
-  const selector = ':root[data-theme=dark] .workspace main :is(.academic-unit-copy strong, .academic-unit-copy small, .academic-sort-order, .spaces-type-badge, .spaces-pathway-kind, .spaces-pathway-note, .spaces-directory-footer, .catalog-operation-note, .catalog-locked-tag, .catalog-button, .room-allocation-synthetic-note, .room-allocation-controls, .room-allocation-input-summary, .room-allocation-session-needed)'
+  const selector = ':root[data-theme=dark] .workspace main :is(.academic-unit-copy strong, .academic-unit-copy small, .academic-sort-order, .spaces-type-badge, .spaces-pathway-kind, .spaces-pathway-note, .spaces-directory-footer, .catalog-operation-note, .catalog-locked-tag, .catalog-button, .academic-load-error, .room-allocation-synthetic-note, .room-allocation-controls, .room-allocation-input-summary, .room-allocation-session-needed)'
 
   // Act
   const declarations = darkRule(selector)
@@ -160,7 +160,7 @@ test('dark theme keeps academic, spaces, and catalog chrome readable', () => {
 
 test('dark theme keeps the room allocation demo readable', () => {
   // Arrange: the DEV-only demo also keeps hardcoded light surfaces.
-  const selector = ':root[data-theme=dark] .workspace main :is(.academic-unit-copy strong, .academic-unit-copy small, .academic-sort-order, .spaces-type-badge, .spaces-pathway-kind, .spaces-pathway-note, .spaces-directory-footer, .catalog-operation-note, .catalog-locked-tag, .catalog-button, .room-allocation-synthetic-note, .room-allocation-controls, .room-allocation-input-summary, .room-allocation-session-needed)'
+  const selector = ':root[data-theme=dark] .workspace main :is(.academic-unit-copy strong, .academic-unit-copy small, .academic-sort-order, .spaces-type-badge, .spaces-pathway-kind, .spaces-pathway-note, .spaces-directory-footer, .catalog-operation-note, .catalog-locked-tag, .catalog-button, .academic-load-error, .room-allocation-synthetic-note, .room-allocation-controls, .room-allocation-input-summary, .room-allocation-session-needed)'
 
   // Act
   const declarations = darkRule(selector)
