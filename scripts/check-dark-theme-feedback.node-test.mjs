@@ -146,23 +146,28 @@ test('public undergraduate directory keeps its dark surfaces readable', () => {
 
 test('dark theme keeps academic, spaces, and catalog chrome readable', () => {
   // Arrange: these elements keep hardcoded light backgrounds but inherit the light dark-mode text.
-  const selectors = [
-    ':root[data-theme=dark] .workspace main .academic-unit-copy strong',
-    ':root[data-theme=dark] .workspace main .academic-unit-copy small',
-    ':root[data-theme=dark] .workspace main .academic-sort-order',
-    ':root[data-theme=dark] .workspace main .spaces-type-badge',
-    ':root[data-theme=dark] .workspace main .spaces-pathway-kind',
-    ':root[data-theme=dark] .workspace main .spaces-pathway-note',
-    ':root[data-theme=dark] .workspace main .spaces-directory-footer',
-    ':root[data-theme=dark] .workspace main .catalog-operation-note',
-    ':root[data-theme=dark] .workspace main .catalog-locked-tag',
-    ':root[data-theme=dark] .workspace main .catalog-button',
-  ]
+  const selector = ':root[data-theme=dark] .workspace main :is(.academic-unit-copy strong, .academic-unit-copy small, .academic-sort-order, .spaces-type-badge, .spaces-pathway-kind, .spaces-pathway-note, .spaces-directory-footer, .catalog-operation-note, .catalog-locked-tag, .catalog-button, .room-allocation-synthetic-note, .room-allocation-controls, .room-allocation-input-summary, .room-allocation-session-needed)'
 
-  // Act + Assert
-  for (const selector of selectors) {
-    const declarations = darkRule(selector)
-    assert.ok(declarations, `dark theme rule must exist for ${selector}`)
-    assertReadableContrast(declarations)
-  }
+  // Act
+  const declarations = darkRule(selector)
+
+  // Assert
+  assert.ok(declarations, 'dark chrome rule must be present')
+  assert.match(declarations, /background:\s*var\(--ui-surface-raised\);/)
+  assert.match(declarations, /color:\s*var\(--ui-text-primary\);/)
+  assertReadableContrast(declarations)
+})
+
+test('dark theme keeps the room allocation demo readable', () => {
+  // Arrange: the DEV-only demo also keeps hardcoded light surfaces.
+  const selector = ':root[data-theme=dark] .workspace main :is(.academic-unit-copy strong, .academic-unit-copy small, .academic-sort-order, .spaces-type-badge, .spaces-pathway-kind, .spaces-pathway-note, .spaces-directory-footer, .catalog-operation-note, .catalog-locked-tag, .catalog-button, .room-allocation-synthetic-note, .room-allocation-controls, .room-allocation-input-summary, .room-allocation-session-needed)'
+
+  // Act
+  const declarations = darkRule(selector)
+
+  // Assert
+  assert.ok(declarations, 'dark chrome rule must be present')
+  assert.match(declarations, /background:\s*var\(--ui-surface-raised\);/)
+  assert.match(declarations, /color:\s*var\(--ui-text-primary\);/)
+  assertReadableContrast(declarations)
 })
