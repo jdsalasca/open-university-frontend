@@ -67,6 +67,7 @@ export function AcademicOfferingDraftPanel({
   const [curricula, setCurricula] = useState<AcademicCurriculum[]>([])
   const [curriculumState, setCurriculumState] = useState<RequestState>('ready')
   const [curriculumError, setCurriculumError] = useState('')
+  const [curriculumAttempt, setCurriculumAttempt] = useState(0)
   const [selectedCurriculumId, setSelectedCurriculumId] = useState('')
   const [subjectSearch, setSubjectSearch] = useState('')
   const [subjects, setSubjects] = useState<AcademicCurriculumEntry[]>([])
@@ -171,7 +172,7 @@ export function AcademicOfferingDraftPanel({
         setCurriculumState('error')
       })
     return () => controller.abort()
-  }, [accessToken, canWrite, catalogClient, isCurrentAccess, programs, selectedProgramId])
+  }, [accessToken, canWrite, catalogClient, curriculumAttempt, isCurrentAccess, programs, selectedProgramId])
 
   useEffect(() => {
     if (!canWrite || !selectedCurriculumId) {
@@ -499,7 +500,14 @@ export function AcademicOfferingDraftPanel({
             </label>
           </div>
           {curriculumState === 'loading' && <p className="academic-offering-inline-status" role="status">Cargando currículos publicados…</p>}
-          {curriculumState === 'error' && <div className="academic-offering-inline-error" role="alert"><span>{curriculumError}</span><button type="button" onClick={() => setSelectedProgramId('')}>Volver a consultar</button></div>}
+          {curriculumState === 'error' && (
+            <div className="academic-offering-inline-error" role="alert">
+              <span>{curriculumError}</span>
+              <button type="button" onClick={() => setCurriculumAttempt((attempt) => attempt + 1)}>
+                Reintentar consulta de currículos
+              </button>
+            </div>
+          )}
           {curriculumState === 'ready' && selectedProgramId && curricula.length === 0 && <p className="academic-offering-inline-status">Este programa no tiene currículos publicados disponibles.</p>}
           {subjectState === 'loading' && <p className="academic-offering-inline-status" role="status">Buscando asignaturas en el currículo publicado…</p>}
           {subjectState === 'error' && (
