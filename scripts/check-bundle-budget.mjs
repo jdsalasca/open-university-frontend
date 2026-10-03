@@ -14,11 +14,13 @@ const LOCAL_PREVIEW_CLIENT_KEY = 'src/features/identity/localPreviewSessionClien
 const LOCAL_PREVIEW_IDENTITY_KEY = 'src/features/identity/localPreviewIdentity.ts'
 
 export const DEFAULT_BUNDLE_BUDGETS = Object.freeze({
-  // The shared entry now includes the authenticated #biblioteca route; keep its added shell cost bounded.
-  entryJavaScript: 283_000,
+  // The shared entry now includes the authenticated #biblioteca, #avisos and #avisos-admin routes; keep their added
+  // shell cost bounded.
+  entryJavaScript: 286_000,
   entryStyles: 21_000,
-  // Keep the current catalog route bounded; its curriculum comparison panel remains in a separate lazy chunk.
-  programsJavaScript: 332_000,
+  // The shared entry now includes the public #estudiantes route, the catalog curriculum comparison and the
+  // authenticated library and notices routes; keep its added shell cost bounded.
+  programsJavaScript: 334_500,
   programsStyles: 48_000,
   oidcJavaScript: 75_000,
 })
