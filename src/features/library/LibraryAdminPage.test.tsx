@@ -176,6 +176,20 @@ describe('LibraryAdminPage', () => {
     expect(client.getTitles).toHaveBeenCalledTimes(3)
   })
 
+  it('reports a failed copy read instead of pretending the title has no copies', async () => {
+    // Arrange: an empty shelf and a broken request must not look the same.
+    const client = fakeClient({ getCopies: vi.fn(async () => { throw new Error('offline') }) })
+    const user = userEvent.setup()
+    render(<LibraryAdminPage client={client} authorization={{ accessToken: 'token', canRead: true, canWrite: false }} />)
+
+    // Act
+    await user.selectOptions(await screen.findByLabelText('Seleccionar título'), 'title-1')
+
+    // Assert
+    expect(await screen.findByRole('alert')).toHaveTextContent(/no fue posible consultar/i)
+    expect(screen.queryByText('Este título no tiene ejemplares registrados.')).toBeNull()
+  })
+
   it('renders nothing when the session cannot read the library', () => {
     // Arrange + Act
     const { container } = render(

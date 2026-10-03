@@ -48,6 +48,7 @@ function LibraryAdminPageContent({
   const [loadState, setLoadState] = useState<'loading' | 'ready' | 'error'>('loading')
   const [loadError, setLoadError] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
+  const [copiesFailed, setCopiesFailed] = useState(false)
   const [withdrawReference, setWithdrawReference] = useState('')
   const [withdrawing, setWithdrawing] = useState(false)
   const [returnReference, setReturnReference] = useState('')
@@ -107,10 +108,13 @@ function LibraryAdminPageContent({
     setSelectedTitleId(titleId)
     setCopies([])
     setActionError(null)
+    setCopiesFailed(false)
     if (!titleId) return
     try {
       setCopies(await client.getCopies(titleId, accessToken))
     } catch (error) {
+      // An unreadable shelf is not an empty shelf: the list must not claim there are no copies.
+      setCopiesFailed(true)
       setActionError(LOAD_ERROR)
       await reportAuthorizationRejection(error)
     }
@@ -289,7 +293,7 @@ function LibraryAdminPageContent({
                   ))}
                 </select>
               </label>
-              {selectedTitleId && (copies.length === 0
+              {selectedTitleId && (!copiesFailed && (copies.length === 0
                 ? <p className="library-empty">Este título no tiene ejemplares registrados.</p>
                 : <ul className="library-copies">
                   {copies.map((copy) => (
@@ -314,7 +318,7 @@ function LibraryAdminPageContent({
                       )}
                     </li>
                   ))}
-                </ul>)}
+                </ul>))}
             </>}
         </section>
       </>}
