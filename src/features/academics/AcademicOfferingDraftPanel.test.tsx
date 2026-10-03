@@ -205,7 +205,7 @@ describe('AcademicOfferingDraftPanel', () => {
     await user.click(screen.getByRole('button', { name: /guardar borrador/i }))
 
     // Assert
-    expect(await screen.findByRole('alert')).toHaveTextContent(/cambió el estado|actualiza la lista/i)
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/cambió el estado|actualiza la lista/i))
     expect(client.createDraft).toHaveBeenCalledTimes(1)
   })
 })

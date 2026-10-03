@@ -1,4 +1,4 @@
-import { cleanup, render, screen, within } from '@testing-library/react'
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it } from 'vitest'
 import { AdmissionsApplicantDemo } from './AdmissionsApplicantDemo'
@@ -61,7 +61,7 @@ describe('AdmissionsApplicantDemo', () => {
     await user.click(screen.getByRole('button', { name: /crear ficha sintética/i }))
 
     // Assert
-    expect(await screen.findByRole('status')).toHaveTextContent(/DEMO-0003/)
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(/DEMO-0003/))
     expect(screen.getByRole('status')).toHaveTextContent(/solo existe en memoria/i)
     expect(store.getState().applications[0]).toMatchObject({
       reference: 'DEMO-0003',

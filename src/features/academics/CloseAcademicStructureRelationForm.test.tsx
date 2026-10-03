@@ -170,7 +170,7 @@ describe('CloseAcademicStructureRelationForm', () => {
     ))
     expect(closeOrganizationRelation).toHaveBeenCalledTimes(1)
     expect(onClosed).toHaveBeenCalledTimes(1)
-    expect(await screen.findByRole('status')).toHaveTextContent(/relación.*cerrada/i)
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(/relación.*cerrada/i))
   })
 
   it('closes a dated site relation with the same confirmation and refresh safeguards', async () => {
@@ -210,7 +210,7 @@ describe('CloseAcademicStructureRelationForm', () => {
       'institutional-access-token',
     ))
     expect(onClosed).toHaveBeenCalledTimes(1)
-    expect(await screen.findByRole('status')).toHaveTextContent(/relación.*cerrada/i)
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(/relación.*cerrada/i))
   })
 
   it('closes one dated program affiliation without confusing it with the legacy faculty or campus labels', async () => {
@@ -256,7 +256,7 @@ describe('CloseAcademicStructureRelationForm', () => {
       'institutional-access-token',
     ))
     expect(onClosed).toHaveBeenCalledTimes(1)
-    expect(await screen.findByRole('status')).toHaveTextContent(/relación cerrada/i)
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(/relación cerrada/i))
   })
 
   it('refreshes after a concurrent change and does not retry the close automatically', async () => {
@@ -284,7 +284,7 @@ describe('CloseAcademicStructureRelationForm', () => {
     await user.click(screen.getByRole('button', { name: 'Confirmar cierre de relación' }))
 
     // Assert
-    expect(await screen.findByRole('alert')).toHaveTextContent(/conflicto.*actualicé la estructura/i)
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/conflicto.*actualicé la estructura/i))
     expect(closeOrganizationRelation).toHaveBeenCalledTimes(1)
     expect(onClosed).toHaveBeenCalledTimes(1)
     expect(screen.queryByRole('region', { name: 'Confirmar cierre de relación' })).not.toBeInTheDocument()
@@ -318,7 +318,7 @@ describe('CloseAcademicStructureRelationForm', () => {
     fireEvent.submit(container.querySelector('form')!)
 
     // Assert
-    expect(await screen.findByRole('alert')).toHaveTextContent(/acorte su vigencia/i)
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/acorte su vigencia/i))
     expect(closeOrganizationRelation).not.toHaveBeenCalled()
   })
 

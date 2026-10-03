@@ -151,7 +151,7 @@ describe('RoomAllocationDemo', () => {
     // Act
     await user.click(screen.getByRole('button', { name: /calcular propuesta/i }))
     await waitFor(() => expect(propose).toHaveBeenCalledOnce())
-    expect(await screen.findByRole('status')).toHaveTextContent(/comparando horarios, aforo y recursos/i)
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(/comparando horarios, aforo y recursos/i))
     rerender(<RoomAllocationDemo session={null} client={createClient(propose)} />)
 
     // Assert

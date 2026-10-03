@@ -80,7 +80,7 @@ describe('academic period administration forms', () => {
     await user.click(screen.getByRole('button', { name: 'Crear borrador de periodo' }))
 
     // Assert
-    expect(await screen.findByRole('alert')).toHaveTextContent(/máximo admitido es 99/i)
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/máximo admitido es 99/i))
     expect(createPeriod).not.toHaveBeenCalled()
   })
 
@@ -131,7 +131,7 @@ describe('academic period administration forms', () => {
     await user.click(screen.getByRole('button', { name: 'Crear borrador de periodo' }))
 
     // Assert
-    expect(await screen.findByRole('alert')).toHaveTextContent(/periodo regular.*1 o 2/i)
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/periodo regular.*1 o 2/i))
     expect(createPeriod).not.toHaveBeenCalled()
   })
 
@@ -195,7 +195,7 @@ describe('academic period administration forms', () => {
     await user.click(screen.getByRole('button', { name: 'Guardar borrador de calendario' }))
 
     // Assert
-    expect(await screen.findByRole('alert')).toHaveTextContent(/posterior.*inicio/i)
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/posterior.*inicio/i))
     expect(createCalendar).not.toHaveBeenCalled()
   })
 

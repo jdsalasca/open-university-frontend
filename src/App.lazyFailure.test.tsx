@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { App } from './App'
 import { BrandingProvider } from './features/branding/BrandingProvider'
@@ -30,7 +30,7 @@ describe('App route chunk recovery', () => {
     )
 
     // Assert
-    expect(await screen.findByRole('alert')).toHaveTextContent('No se pudo cargar el módulo académico')
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('No se pudo cargar el módulo académico'))
     expect(screen.getByRole('button', { name: 'Recargar pantalla' })).toBeVisible()
     expect(screen.getByRole('link', { name: 'Identidad visual' })).toBeVisible()
   })

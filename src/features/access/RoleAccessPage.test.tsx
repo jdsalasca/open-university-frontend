@@ -122,7 +122,7 @@ describe('RoleAccessPage', () => {
     expect(client.assignments).toHaveBeenNthCalledWith(
       1, selectedIdentity.userId, 'synthetic-token', expect.any(AbortSignal))
     expect(client.assignments).toHaveBeenCalledTimes(2)
-    expect(await screen.findByRole('status')).toHaveTextContent('Perfil asignado')
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Perfil asignado'))
   })
 
   it('refreshes after a stale revoke conflict and never retries the mutation', async () => {
@@ -144,7 +144,7 @@ describe('RoleAccessPage', () => {
     // Assert
     await waitFor(() => expect(client.revoke).toHaveBeenCalledOnce())
     expect(client.assignments).toHaveBeenCalledTimes(2)
-    expect(await screen.findByRole('status')).toHaveTextContent('cambió en otra sesión')
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('cambió en otra sesión'))
     expect(screen.getByText(/versión 2/i)).toBeVisible()
   })
 })

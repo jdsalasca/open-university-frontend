@@ -82,7 +82,7 @@ describe('CreateAcademicChildUnitForm', () => {
     }, 'institutional-access-token'))
     expect(onCreated).toHaveBeenCalledWith(childId)
     expect(onRefresh).not.toHaveBeenCalled()
-    expect(await screen.findByRole('status')).toHaveTextContent(/unidad hija registrada/i)
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(/unidad hija registrada/i))
   })
 
   it('refreshes current structure after a server conflict and does not repeat the write', async () => {
@@ -110,7 +110,7 @@ describe('CreateAcademicChildUnitForm', () => {
     await user.click(screen.getByRole('button', { name: 'Crear unidad hija' }))
 
     // Assert
-    expect(await screen.findByRole('alert')).toHaveTextContent(/conflicto/i)
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/conflicto/i))
     expect(onRefresh).toHaveBeenCalledTimes(1)
     expect(createChildUnit).toHaveBeenCalledTimes(1)
     expect(onCreated).not.toHaveBeenCalled()

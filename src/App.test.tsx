@@ -751,7 +751,7 @@ describe('App', () => {
     // Assert: stale /me permission must not re-enable the rejected bearer.
     await waitFor(() => expect(identityCurrent).toHaveBeenCalledTimes(2))
     expect(openPeriod).toHaveBeenCalledOnce()
-    expect(await screen.findByRole('alert')).toHaveTextContent(/permiso|sesión|servidor/i)
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/permiso|sesión|servidor/i))
     expect(screen.queryByRole('button', { name: 'Abrir periodo 2026-2' })).not.toBeInTheDocument()
 
     // Act: navigating away and back must keep the token rejected for period writes.

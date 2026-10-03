@@ -27,7 +27,7 @@ describe('AdmissionsCallManagementPanel reload', () => {
       onPublished={vi.fn()} />)
 
     // Act
-    expect(await screen.findByRole('alert')).toHaveTextContent(/no fue posible consultar/i)
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/no fue posible consultar/i))
     await user.click(screen.getByRole('button', { name: /reintentar/i }))
 
     // Assert

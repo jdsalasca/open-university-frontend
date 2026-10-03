@@ -62,7 +62,7 @@ describe('CreateFacultyForm', () => {
       sourceReference: 'Acto institucional de prueba',
     }, 'institutional-access-token'))
     expect(onCreated).toHaveBeenCalledWith(siteId)
-    expect(await screen.findByRole('status')).toHaveTextContent(/lugar registrado/i)
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(/lugar registrado/i))
   })
 
   it('creates a root faculty with an institutional reference and refreshes the structure', async () => {
@@ -101,7 +101,7 @@ describe('CreateFacultyForm', () => {
       sourceReference: 'Acuerdo institucional de prueba',
     }, 'institutional-access-token'))
     expect(onCreated).toHaveBeenCalledWith(unitId)
-    expect(await screen.findByRole('status')).toHaveTextContent(/facultad registrada/i)
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(/facultad registrada/i))
   })
 
   it('keeps a duplicate-code conflict visible and does not refresh the structure', async () => {
@@ -128,7 +128,7 @@ describe('CreateFacultyForm', () => {
     await user.click(screen.getByRole('button', { name: 'Crear facultad' }))
 
     // Assert
-    expect(await screen.findByRole('alert')).toHaveTextContent(/ya existe|conflicto/i)
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/ya existe|conflicto/i))
     expect(onCreated).not.toHaveBeenCalled()
   })
 
@@ -156,6 +156,6 @@ describe('CreateFacultyForm', () => {
 
     // Assert
     await waitFor(() => expect(onAuthorizationRejected).toHaveBeenCalledWith('institutional-access-token'))
-    expect(await screen.findByRole('alert')).toHaveTextContent(/permiso|sesión/i)
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/permiso|sesión/i))
   })
 })

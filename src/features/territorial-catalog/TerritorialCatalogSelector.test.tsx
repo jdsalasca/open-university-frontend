@@ -154,7 +154,7 @@ describe('TerritorialCatalogSelector', () => {
     render(<TerritorialCatalogSelector client={client} />)
 
     // Act
-    expect(await screen.findByRole('alert')).toHaveTextContent(/no se pudo consultar/i)
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/no se pudo consultar/i))
     await user.click(screen.getByRole('button', { name: 'Reintentar' }))
 
     // Assert
@@ -173,7 +173,7 @@ describe('TerritorialCatalogSelector', () => {
     await user.selectOptions(await screen.findByLabelText('Departamento de referencia'), '15')
 
     // Act
-    expect(await screen.findByRole('alert')).toHaveTextContent(/no se pudieron cargar las entidades/i)
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/no se pudieron cargar las entidades/i))
     await user.click(screen.getByRole('button', { name: 'Reintentar' }))
 
     // Assert

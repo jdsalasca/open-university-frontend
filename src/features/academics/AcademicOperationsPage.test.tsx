@@ -331,7 +331,7 @@ describe('AcademicOperationsPage', () => {
     await user.click(within(confirmation).getByRole('button', { name: 'Confirmar reasignación' }))
 
     // Assert
-    expect(await screen.findByRole('alert')).toHaveTextContent(/conflicto.*actualicé la estructura/i)
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/conflicto.*actualicé la estructura/i))
     expect(reassignProgramAffiliation).toHaveBeenCalledOnce()
     expect(getStructure).toHaveBeenCalledTimes(2)
     expect(getAdminStructure).toHaveBeenCalledTimes(2)
@@ -698,7 +698,7 @@ describe('AcademicOperationsPage', () => {
     await user.click(screen.getByRole('button', { name: 'Guardar orden de Sede Central Tunja' }))
 
     // Assert
-    expect(await screen.findByRole('alert')).toHaveTextContent(/estructura cambió|prioridad cambió/i)
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/estructura cambió|prioridad cambió/i))
     expect(getAdminStructure).toHaveBeenCalledTimes(2)
     expect(await screen.findByText('08')).toBeVisible()
     expect(changeSiteOrder).toHaveBeenCalledOnce()
@@ -723,7 +723,7 @@ describe('AcademicOperationsPage', () => {
     fireEvent.submit(screen.getByRole('form', { name: 'Editar orden de Facultad de Ciencias' }))
 
     // Assert
-    expect(await screen.findByRole('alert')).toHaveTextContent(/entero entre 0 y 100000/i)
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/entero entre 0 y 100000/i))
     expect(changeOrganizationUnitOrder).not.toHaveBeenCalled()
   })
 
@@ -912,7 +912,7 @@ describe('AcademicOperationsPage', () => {
     await user.click(await screen.findByRole('button', { name: 'Ver historial de 2026-2' }))
 
     // Assert
-    expect(await screen.findByRole('alert')).toHaveTextContent(/no fue posible consultar el historial/i)
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/no fue posible consultar el historial/i))
     await waitFor(() => expect(onAuthorizationRejected).toHaveBeenCalledWith(accessToken))
   })
 
@@ -974,7 +974,7 @@ describe('AcademicOperationsPage', () => {
     await user.click(screen.getByRole('button', { name: 'Confirmar cierre' }))
 
     // Assert
-    expect(await screen.findByRole('alert')).toHaveTextContent(/otro cambio modificó el periodo/i)
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/otro cambio modificó el periodo/i))
     expect(getAdminPeriods).toHaveBeenCalledTimes(2)
     expect(screen.getByText(/Calendario rev\. 2/)).toBeVisible()
     expect(screen.queryByText(/Calendario rev\. 1/)).not.toBeInTheDocument()

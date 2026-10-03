@@ -153,7 +153,7 @@ describe('ReassignAcademicProgramAffiliationForm', () => {
       sourceReference: 'Acta aprobada de reasignación',
     }, authorization.accessToken)
     expect(onReassigned).toHaveBeenCalledOnce()
-    expect(await screen.findByRole('status')).toHaveTextContent(/reasignada y estructura actualizada/i)
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(/reasignada y estructura actualizada/i))
   })
 
   it('refreshes after a conflict but never retries the write', async () => {
@@ -179,7 +179,7 @@ describe('ReassignAcademicProgramAffiliationForm', () => {
     await user.click(within(confirmation).getByRole('button', { name: 'Confirmar reasignación' }))
 
     // Assert
-    expect(await screen.findByRole('alert')).toHaveTextContent(/conflicto.*actualicé la estructura/i)
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/conflicto.*actualicé la estructura/i))
     expect(reassignProgramAffiliation).toHaveBeenCalledOnce()
     expect(onReassigned).toHaveBeenCalledOnce()
   })
@@ -207,7 +207,7 @@ describe('ReassignAcademicProgramAffiliationForm', () => {
     await user.click(screen.getByRole('button', { name: 'Revisar reasignación' }))
 
     // Assert
-    expect(await screen.findByRole('alert')).toHaveTextContent(/cambia la unidad o la sede/i)
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/cambia la unidad o la sede/i))
     expect(screen.queryByRole('group', { name: 'Confirmar reasignación' })).not.toBeInTheDocument()
     expect(reassignProgramAffiliation).not.toHaveBeenCalled()
   })
@@ -237,7 +237,7 @@ describe('ReassignAcademicProgramAffiliationForm', () => {
     await user.click(within(confirmation).getByRole('button', { name: 'Confirmar reasignación' }))
 
     // Assert
-    expect(await screen.findByRole('alert')).toHaveTextContent(/servidor negó el permiso/i)
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/servidor negó el permiso/i))
     expect(onAuthorizationRejected).toHaveBeenCalledOnce()
     expect(onAuthorizationRejected).toHaveBeenCalledWith(authorization.accessToken)
     expect(onReassigned).not.toHaveBeenCalled()

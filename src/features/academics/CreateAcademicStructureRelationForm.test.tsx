@@ -100,7 +100,7 @@ describe('CreateAcademicStructureRelationForm', () => {
       'institutional-access-token',
     ))
     expect(onCreated).toHaveBeenCalledTimes(1)
-    expect(await screen.findByRole('status')).toHaveTextContent(/relación de unidades registrada/i)
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(/relación de unidades registrada/i))
   })
 
   it('creates an audited site hierarchy relation with explicit endpoints and validity', async () => {
@@ -142,7 +142,7 @@ describe('CreateAcademicStructureRelationForm', () => {
       'institutional-access-token',
     ))
     expect(onCreated).toHaveBeenCalledTimes(1)
-    expect(await screen.findByRole('status')).toHaveTextContent(/relación de lugares registrada/i)
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(/relación de lugares registrada/i))
   })
 
   it('rejects selecting the same place as parent and child without calling the server', async () => {
@@ -168,7 +168,7 @@ describe('CreateAcademicStructureRelationForm', () => {
     await user.click(screen.getByRole('button', { name: 'Vincular lugares' }))
 
     // Assert
-    expect(await screen.findByRole('alert')).toHaveTextContent(/deben ser diferentes/i)
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/deben ser diferentes/i))
     expect(relateSites).not.toHaveBeenCalled()
   })
 
@@ -198,7 +198,7 @@ describe('CreateAcademicStructureRelationForm', () => {
     await user.click(screen.getByRole('button', { name: 'Vincular lugares' }))
 
     // Assert
-    expect(await screen.findByRole('alert')).toHaveTextContent(/conflicto.*actualicé la estructura/i)
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/conflicto.*actualicé la estructura/i))
     expect(onCreated).toHaveBeenCalledTimes(1)
   })
 })

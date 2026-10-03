@@ -583,7 +583,7 @@ describe('AcademicCatalogPage', () => {
     await userEvent.click(await screen.findByRole('button', { name: /ver asignaturas de la versión 2026-A/i }))
 
     // Assert
-    expect(await screen.findByRole('alert')).toHaveTextContent(/no se pudieron cargar las asignaturas/i)
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/no se pudieron cargar las asignaturas/i))
     expect(screen.queryByRole('table', { name: /asignaturas de la versión 2026-A/i })).not.toBeInTheDocument()
     expect(screen.queryByText('Cálculo I')).not.toBeInTheDocument()
   })
@@ -602,7 +602,7 @@ describe('AcademicCatalogPage', () => {
     await userEvent.click(await screen.findByRole('button', { name: /ver asignaturas de la versión 2026-A/i }))
 
     // Assert
-    expect(await screen.findByRole('alert')).toHaveTextContent(/ya no está publicada o no existe/i)
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/ya no está publicada o no existe/i))
     expect(screen.queryByRole('table', { name: /asignaturas de la versión 2026-A/i })).not.toBeInTheDocument()
     expect(screen.queryByText('Cálculo I')).not.toBeInTheDocument()
   })
@@ -620,7 +620,7 @@ describe('AcademicCatalogPage', () => {
     await userEvent.click(await screen.findByRole('button', { name: /ver asignaturas de la versión 2026-A/i }))
 
     // Assert
-    expect(await screen.findByRole('alert')).toHaveTextContent(/no está disponible para consulta pública/i)
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/no está disponible para consulta pública/i))
     expect(screen.queryByText('Cálculo I')).not.toBeInTheDocument()
   })
 
@@ -745,7 +745,7 @@ describe('AcademicCatalogPage', () => {
     fireEvent.change(input, { target: { files: [file] } })
 
     // Assert
-    expect(await screen.findByRole('alert')).toHaveTextContent(errorText)
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(errorText))
     expect(client.importCsv).not.toHaveBeenCalled()
   })
 
@@ -792,7 +792,7 @@ describe('AcademicCatalogPage', () => {
     await userEvent.click(screen.getByRole('button', { name: /validar csv/i }))
 
     // Assert
-    expect(await screen.findByRole('alert')).toHaveTextContent('No fue posible validar el archivo.')
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('No fue posible validar el archivo.'))
     expect(client.importCsv).not.toHaveBeenCalled()
 
   })
@@ -812,7 +812,7 @@ describe('AcademicCatalogPage', () => {
 
     // Act
     await userEvent.click(screen.getByRole('button', { name: /validar csv/i }))
-    expect(await screen.findByRole('alert')).toHaveTextContent('Servicio temporalmente no disponible.')
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Servicio temporalmente no disponible.'))
     fireEvent.change(input, { target: { files: [file] } })
     await userEvent.click(screen.getByRole('button', { name: /validar csv/i }))
 
@@ -966,7 +966,7 @@ describe('AcademicCatalogPage', () => {
     await userEvent.click(screen.getByRole('button', { name: /publicar 2026-A/i }))
 
     // Assert
-    expect(await screen.findByRole('alert')).toHaveTextContent(message)
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(message))
   })
 
   it('does not show write controls to an authenticated catalog reader', async () => {

@@ -99,7 +99,7 @@ describe('CreateAcademicProgramAffiliationForm', () => {
       'institutional-access-token',
     ))
     expect(onCreated).toHaveBeenCalledTimes(1)
-    expect(await screen.findByRole('status')).toHaveTextContent(/afiliación.*registrada/i)
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(/afiliación.*registrada/i))
   })
 
   it('refreshes after a program affiliation conflict without retrying the write', async () => {
@@ -128,7 +128,7 @@ describe('CreateAcademicProgramAffiliationForm', () => {
     await user.click(screen.getByRole('button', { name: 'Crear afiliación' }))
 
     // Assert
-    expect(await screen.findByRole('alert')).toHaveTextContent(/conflicto.*actualicé la estructura/i)
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/conflicto.*actualicé la estructura/i))
     expect(affiliateProgram).toHaveBeenCalledTimes(1)
     expect(onCreated).toHaveBeenCalledTimes(1)
   })
@@ -160,7 +160,7 @@ describe('CreateAcademicProgramAffiliationForm', () => {
     await user.click(screen.getByRole('button', { name: 'Crear afiliación' }))
 
     // Assert
-    expect(await screen.findByRole('alert')).toHaveTextContent(/negó el permiso.*volviendo a comprobar/i)
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/negó el permiso.*volviendo a comprobar/i))
     expect(onAuthorizationRejected).toHaveBeenCalledWith('institutional-access-token')
   })
 

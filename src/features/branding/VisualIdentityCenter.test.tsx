@@ -1,4 +1,4 @@
-import { cleanup, render, screen, within } from '@testing-library/react'
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { BrandingProvider } from './BrandingProvider'
@@ -250,7 +250,7 @@ describe('VisualIdentityCenter', () => {
     await user.click(screen.getByRole('button', { name: 'Publicar cambios' }))
 
     // Assert
-    expect(await screen.findByRole('alert')).toHaveTextContent('La configuración cambió en otra sesión')
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('La configuración cambió en otra sesión'))
     expect(label).toHaveValue('Comunidad UPTC')
     expect(client.publishConfiguration).toHaveBeenCalledWith(expect.objectContaining({ expectedRevision: 7 }), 'test-access-token')
   })
@@ -268,7 +268,7 @@ describe('VisualIdentityCenter', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Confirmar restauración' }))
 
     // Assert
-    expect(await screen.findByRole('status')).toHaveTextContent('Revisión 8 publicada')
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Revisión 8 publicada'))
     expect(client.restoreRevision).toHaveBeenCalledWith(6, 7, 'test-access-token')
   })
 
@@ -293,7 +293,7 @@ describe('VisualIdentityCenter', () => {
     renderCenter({ client, initialConfiguration: null })
 
     // Act + Assert
-    expect(await screen.findByRole('alert')).toHaveTextContent('No se pudo cargar la configuración administrativa')
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('No se pudo cargar la configuración administrativa'))
     expect(screen.getByRole('button', { name: 'Reintentar carga' })).toBeEnabled()
   })
 

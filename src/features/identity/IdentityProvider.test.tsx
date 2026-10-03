@@ -271,7 +271,7 @@ describe('IdentityProvider', () => {
     await renderProvider({ manager, identityClient: api })
 
     // Act + Assert
-    expect(await screen.findByRole('status')).toHaveTextContent('authenticated:subject-42:branding:read')
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('authenticated:subject-42:branding:read'))
     expect(api.current).toHaveBeenCalledWith('synthetic-access-token', expect.any(AbortSignal))
     expect(screen.queryByText(/synthetic-access-token/)).not.toBeInTheDocument()
   })
@@ -362,7 +362,7 @@ describe('IdentityProvider', () => {
     await renderProvider({ manager, identityClient: api })
 
     // Act + Assert
-    expect(await screen.findByRole('status')).toHaveTextContent('authenticated:subject-42:branding:read')
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('authenticated:subject-42:branding:read'))
     expect(manager.signinCallback).toHaveBeenCalledOnce()
     expect(window.location.pathname).toBe('/')
     expect(window.location.search).toBe('')
@@ -376,7 +376,7 @@ describe('IdentityProvider', () => {
     await renderProvider({ manager })
 
     // Act + Assert
-    expect(await screen.findByRole('status')).toHaveTextContent('error')
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('error'))
     expect(manager.removeUser).toHaveBeenCalled()
     expect(window.location.search).toBe('')
     expect(screen.queryByText(/provider details must stay private/)).not.toBeInTheDocument()
@@ -399,7 +399,7 @@ describe('IdentityProvider', () => {
     const user = userEvent.setup()
     const manager = makeManager({ getUser: vi.fn().mockResolvedValue(currentUser) })
     await renderProvider({ manager })
-    expect(await screen.findByRole('status')).toHaveTextContent('authenticated:subject-42:branding:read')
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('authenticated:subject-42:branding:read'))
 
     // Act
     await user.click(screen.getByRole('button', { name: 'Cerrar sesión' }))
@@ -435,13 +435,13 @@ describe('IdentityProvider', () => {
         .mockResolvedValue(identity),
     }
     await renderProvider({ manager, identityClient: api })
-    expect(await screen.findByRole('status')).toHaveTextContent('error')
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('error'))
 
     // Act
     await user.click(screen.getByRole('button', { name: 'Reintentar' }))
 
     // Assert
-    expect(await screen.findByRole('status')).toHaveTextContent('authenticated:subject-42:branding:read')
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('authenticated:subject-42:branding:read'))
     expect(api.current).toHaveBeenCalledTimes(2)
   })
 })
