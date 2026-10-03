@@ -174,6 +174,36 @@ const importPreview: CurriculumImportPreview = {
   }],
 }
 
+const noReferenceComparison: NonNullable<CurriculumImportPreview['comparison']> = {
+  status: 'NO_REFERENCE',
+  reference: null,
+  counts: null,
+  addedSamples: [],
+  removedSamples: [],
+  modifiedSamples: [],
+  unchangedSamples: [],
+}
+
+const comparedPreview: CurriculumImportPreview = {
+  ...importPreview,
+  entryCount: 3,
+  comparison: {
+    status: 'COMPARED',
+    reference: {
+      curriculumId: '46e7938c-cbab-4f97-9dc5-0ad1ab04603d',
+      curriculumVersion: '2025-A',
+      cohortFrom: '2025-1',
+      cohortThrough: null,
+      publishedAt: '2025-01-10T10:00:00Z',
+    },
+    counts: { added: 1, removed: 1, modified: 1, unchanged: 0 },
+    addedSamples: [{ subjectCode: 'SUB-ADD', changedFields: [] }],
+    removedSamples: [{ subjectCode: 'SUB-REMOVE', changedFields: [] }],
+    modifiedSamples: [{ subjectCode: 'MAT-101', changedFields: ['CREDITS', 'ORDER'] }],
+    unchangedSamples: [],
+  },
+}
+
 const publicDetails: AcademicCurriculumDetails = {
   ...details,
   curriculum: publishedCurriculum,
@@ -778,6 +808,47 @@ describe('AcademicCatalogPage', () => {
     expect(await screen.findByText(/borrador creado/i)).toBeVisible()
     expect(screen.getByRole('button', { name: /revisar 2026-A/i })).toBeVisible()
     expect(listDrafts).toHaveBeenCalledTimes(2)
+  })
+
+  it('explains that no comparison was made when a published reference is absent', async () => {
+    // Arrange
+    const client = createClient({
+      previewCsv: vi.fn().mockResolvedValue({ ...importPreview, comparison: noReferenceComparison }),
+    })
+    await renderCatalogPage({ client, authorization })
+    const input = await screen.findByLabelText(/archivo CSV/i)
+    fireEvent.change(input, { target: { files: [new File(['csv'], 'plan.csv', { type: 'text/csv' })] } })
+
+    // Act
+    await userEvent.click(screen.getByRole('button', { name: /validar csv/i }))
+
+    // Assert
+    expect(await screen.findByRole('heading', { name: /comparación informativa/i })).toBeVisible()
+    expect(screen.getByRole('status')).toHaveTextContent(/no existe una versión publicada comparable/i)
+    expect(screen.getByRole('status')).toHaveTextContent(/no se realizó una comparación/i)
+  })
+
+  it('shows published-reference metadata, all change counts, examples, and changed-field labels', async () => {
+    // Arrange
+    const client = createClient({ previewCsv: vi.fn().mockResolvedValue(comparedPreview) })
+    await renderCatalogPage({ client, authorization })
+    const input = await screen.findByLabelText(/archivo CSV/i)
+    fireEvent.change(input, { target: { files: [new File(['csv'], 'plan.csv', { type: 'text/csv' })] } })
+
+    // Act
+    await userEvent.click(screen.getByRole('button', { name: /validar csv/i }))
+
+    // Assert
+    expect(await screen.findByText(/versión publicada 2025-A/i)).toBeVisible()
+    expect(screen.getByText(/2025-1/)).toBeVisible()
+    expect(screen.getByText(/publicado el/i)).toBeVisible()
+    expect(screen.getByText(/Nuevas: 1/)).toBeVisible()
+    expect(screen.getByText(/Retiradas: 1/)).toBeVisible()
+    expect(screen.getByText(/Modificadas: 1/)).toBeVisible()
+    expect(screen.getByText('SUB-ADD')).toBeVisible()
+    expect(screen.getByText('SUB-REMOVE')).toBeVisible()
+    expect(screen.getByText(/Cambios: Créditos, Orden/)).toBeVisible()
+    expect(screen.getByText(/hasta diez ejemplos/i)).toBeVisible()
   })
 
   it('does not import when the preview is rejected', async () => {

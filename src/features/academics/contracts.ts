@@ -92,6 +92,55 @@ export interface CurriculumImportPreviewEntry {
   choiceGroup: string | null
 }
 
+export type CurriculumVersionComparisonChangedField =
+  | 'NAME'
+  | 'CREDITS'
+  | 'SEMESTER'
+  | 'ORDER'
+  | 'FORMATION_SPACE'
+  | 'COMPONENT'
+  | 'CHOICE_GROUP'
+
+export interface CurriculumVersionComparisonSample {
+  subjectCode: string
+  changedFields: CurriculumVersionComparisonChangedField[]
+}
+
+export interface CurriculumVersionComparisonReference {
+  curriculumId: string
+  curriculumVersion: string
+  cohortFrom: string
+  cohortThrough: string | null
+  publishedAt: string
+}
+
+export interface CurriculumVersionComparisonCounts {
+  added: number
+  removed: number
+  modified: number
+  unchanged: number
+}
+
+export type CurriculumVersionComparison =
+  | {
+    status: 'NO_REFERENCE'
+    reference: null
+    counts: null
+    addedSamples: CurriculumVersionComparisonSample[]
+    removedSamples: CurriculumVersionComparisonSample[]
+    modifiedSamples: CurriculumVersionComparisonSample[]
+    unchangedSamples: CurriculumVersionComparisonSample[]
+  }
+  | {
+    status: 'COMPARED'
+    reference: CurriculumVersionComparisonReference
+    counts: CurriculumVersionComparisonCounts
+    addedSamples: CurriculumVersionComparisonSample[]
+    removedSamples: CurriculumVersionComparisonSample[]
+    modifiedSamples: CurriculumVersionComparisonSample[]
+    unchangedSamples: CurriculumVersionComparisonSample[]
+  }
+
 export interface CurriculumImportPreview {
   programCode: string
   academicLevel: AcademicLevel
@@ -108,6 +157,7 @@ export interface CurriculumImportPreview {
   entryCount: number
   semesters: number[]
   sampleEntries: CurriculumImportPreviewEntry[]
+  comparison?: CurriculumVersionComparison
 }
 
 export const MAX_PUBLIC_CURRICULUM_PAGE_SIZE = 100
@@ -279,7 +329,7 @@ export function parseAcademicCurriculumEntriesPage(
   }
 }
 
-export function parseCurriculumImportPreview(input: unknown): CurriculumImportPreview {
+export async function parseCurriculumImportPreview(input: unknown): Promise<CurriculumImportPreview> {
   if (!isRecord(input)
     || !isProgramCode(input.programCode)
     || input.academicLevel !== 'PREGRADO'
@@ -309,6 +359,12 @@ export function parseCurriculumImportPreview(input: unknown): CurriculumImportPr
 
   const sampleEntries = input.sampleEntries.map(parseCurriculumImportPreviewEntry)
   if (sampleEntries.some((entry) => !semesters.includes(entry.semester))) throw malformedResponse()
+  const entryCount = input.entryCount
+  const comparisonInput = input.comparison
+  const comparison = comparisonInput === undefined
+    ? undefined
+    : await import('./curriculumVersionComparisonContract')
+      .then(({ parseCurriculumVersionComparison }) => parseCurriculumVersionComparison(comparisonInput, entryCount))
 
   return {
     programCode: input.programCode,
@@ -326,6 +382,7 @@ export function parseCurriculumImportPreview(input: unknown): CurriculumImportPr
     entryCount: input.entryCount,
     semesters: [...semesters],
     sampleEntries,
+    ...(comparison === undefined ? {} : { comparison }),
   }
 }
 
@@ -435,31 +492,31 @@ function parseCurriculumImportPreviewEntry(input: unknown): CurriculumImportPrev
   }
 }
 
-function malformedResponse() {
+export function malformedResponse() {
   return new Error('The academic catalog response is malformed.')
 }
 
-function isRecord(input: unknown): input is Record<string, unknown> {
+export function isRecord(input: unknown): input is Record<string, unknown> {
   return typeof input === 'object' && input !== null && !Array.isArray(input)
 }
 
-function isUuid(input: unknown): input is string {
+export function isUuid(input: unknown): input is string {
   return typeof input === 'string' && UUID_PATTERN.test(input)
 }
 
-function isProgramCode(input: unknown): input is string {
+export function isProgramCode(input: unknown): input is string {
   return typeof input === 'string' && PROGRAM_CODE_PATTERN.test(input)
 }
 
-function isBoundedText(input: unknown, maxLength: number): input is string {
+export function isBoundedText(input: unknown, maxLength: number): input is string {
   return typeof input === 'string' && input.trim().length > 0 && [...input].length <= maxLength
 }
 
-function isCohort(input: unknown): input is string {
+export function isCohort(input: unknown): input is string {
   return typeof input === 'string' && COHORT_PATTERN.test(input)
 }
 
-function isNonNegativeInteger(input: unknown): input is number {
+export function isNonNegativeInteger(input: unknown): input is number {
   return Number.isSafeInteger(input) && Number(input) >= 0
 }
 
@@ -467,6 +524,6 @@ function isPositiveInteger(input: unknown): input is number {
   return Number.isSafeInteger(input) && Number(input) > 0
 }
 
-function isIsoInstant(input: unknown): input is string {
+export function isIsoInstant(input: unknown): input is string {
   return typeof input === 'string' && /^\d{4}-\d\d-\d\dT/.test(input) && Number.isFinite(Date.parse(input))
 }

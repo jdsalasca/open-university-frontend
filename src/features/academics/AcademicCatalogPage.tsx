@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import type { ChangeEvent } from 'react'
 import { academicCatalogClient } from './academicCatalogClient'
 import { academicOperationsClient } from './academicOperationsClient'
@@ -21,6 +21,8 @@ import {
   validateCurriculumCsvFile,
 } from './contracts'
 import './AcademicCatalogPage.scss'
+
+const CurriculumVersionComparisonPanel = lazy(() => import('./CurriculumVersionComparisonPanel'))
 
 interface AcademicCatalogPageProps {
   client?: AcademicCatalogClient
@@ -901,6 +903,11 @@ function CurriculumImportPreviewPanel({ preview }: { preview: CurriculumImportPr
       </dl>
       <p className="catalog-import-preview-note">Facultad y sede se conservan como datos del archivo de origen; la adscripción vigente se administra en estructura académica.</p>
       <p className="catalog-import-preview-count">{numberFormat.format(preview.entryCount)} asignaturas · {numberFormat.format(preview.semesters.length)} {preview.semesters.length === 1 ? 'semestre' : 'semestres'}</p>
+      {preview.comparison && (
+        <Suspense fallback={<p className="catalog-import-preview-note" role="status">Cargando comparación…</p>}>
+          <CurriculumVersionComparisonPanel comparison={preview.comparison} />
+        </Suspense>
+      )}
       <div className="catalog-review-table-wrap">
         <table className="catalog-review-table">
           <caption>Muestra de hasta 10 asignaturas de la carga</caption>
