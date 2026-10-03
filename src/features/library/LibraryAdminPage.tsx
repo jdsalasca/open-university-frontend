@@ -19,6 +19,7 @@ interface LibraryAdminPageProps {
 
 const LOAD_ERROR = 'No fue posible consultar la biblioteca. Verifica tu sesión y vuelve a intentarlo.'
 const ACTION_ERROR = 'No fue posible completar la operación. Revisa los datos e inténtalo de nuevo.'
+const REFRESH_ERROR = 'La operación se aplicó, pero no fue posible actualizar la vista. Vuelve a consultar.'
 const REJECTED_ERROR = 'El servidor rechazó la sesión y no fue posible revalidarla. Inicia sesión de nuevo.'
 
 export function LibraryAdminPage({ client = defaultLibraryClient, authorization, onAuthorizationRejected }: LibraryAdminPageProps) {
@@ -159,9 +160,19 @@ function LibraryAdminPageContent({
     }
   }
 
+  /** A write that succeeded but whose follow-up read failed must say so instead of leaving a stale view. */
+  async function refreshAfterWrite(reread: () => Promise<void>) {
+    try {
+      await reread()
+    } catch (error) {
+      setActionError(REFRESH_ERROR)
+      await reportAuthorizationRejection(error)
+    }
+  }
+
   async function withdraw(copyId: string) {
     if (await performWithdraw(copyId)) {
-      setCopies(await client.getCopies(selectedTitleId, accessToken))
+      await refreshAfterWrite(async () => { setCopies(await client.getCopies(selectedTitleId, accessToken)) })
     }
   }
 
@@ -186,8 +197,9 @@ function LibraryAdminPageContent({
 
   async function withdrawFoundCopy() {
     if (!foundCopy) return
+    const barcode = foundCopy.barcode
     if (await performWithdraw(foundCopy.copyId)) {
-      setFoundCopy(await client.copyOfBarcode(foundCopy.barcode, accessToken))
+      await refreshAfterWrite(async () => { setFoundCopy(await client.copyOfBarcode(barcode, accessToken)) })
     }
   }
 

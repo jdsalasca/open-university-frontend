@@ -307,6 +307,26 @@ describe('LibraryAdminPage', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(/no hay ningún ejemplar con ese código de barras/i)
   })
 
+  it('reports a failed refresh after a withdrawal that already succeeded', async () => {
+    // Arrange: the write lands but the follow-up read fails; the desk must not be left with a silent stale list.
+    const getCopies = vi.fn()
+      .mockResolvedValueOnce([ACTIVE_COPY])
+      .mockRejectedValue(new Error('offline'))
+    const client = fakeClient({ getCopies })
+    const user = userEvent.setup()
+    render(<LibraryAdminPage client={client} authorization={{ accessToken: 'token', canRead: true, canWrite: true }} />)
+    await user.selectOptions(await screen.findByLabelText('Seleccionar título'), 'title-1')
+    await screen.findByText('BC-0001')
+    await user.type(screen.getByLabelText('Referencia institucional del retiro'), 'Resolución 9 de 2026')
+
+    // Act
+    await user.click(screen.getByRole('button', { name: 'Retirar' }))
+
+    // Assert
+    await waitFor(() => expect(client.withdrawCopy).toHaveBeenCalledTimes(1))
+    expect(await screen.findByRole('alert')).toHaveTextContent(/no fue posible actualizar/i)
+  })
+
   it('renders nothing when the session cannot read the library', () => {
     // Arrange + Act
     const { container } = render(
