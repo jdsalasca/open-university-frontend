@@ -13,6 +13,7 @@ export interface LibraryClient {
   registerTitle(input: RegisterLibraryTitleInput, accessToken: string): Promise<LibraryTitle>
   registerCopy(titleId: string, input: RegisterLibraryCopyInput, accessToken: string): Promise<LibraryCopy>
   withdrawCopy(copyId: string, sourceReference: string, accessToken: string): Promise<LibraryCopy>
+  returnLoan(loanId: string, sourceReference: string, accessToken: string): Promise<LibraryLoan>
 }
 
 export class LibraryApiError extends Error {
@@ -67,6 +68,12 @@ export function createLibraryClient(fetcher: typeof fetch = fetch): LibraryClien
       }),
     withdrawCopy: (copyId, sourceReference, accessToken) =>
       request<LibraryCopy>(`/copies/${encodeURIComponent(copyId)}/withdraw`, accessToken, {
+        method: 'POST',
+        body: { sourceReference },
+      }),
+    // The date is omitted on purpose: the backend stamps the return with the institutional clock.
+    returnLoan: (loanId, sourceReference, accessToken) =>
+      request<LibraryLoan>(`/loans/${encodeURIComponent(loanId)}/return`, accessToken, {
         method: 'POST',
         body: { sourceReference },
       }),

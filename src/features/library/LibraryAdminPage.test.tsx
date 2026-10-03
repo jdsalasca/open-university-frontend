@@ -53,6 +53,7 @@ function fakeClient(overrides: Partial<LibraryClient> = {}): LibraryClient {
     registerTitle: vi.fn(async () => TITLE),
     registerCopy: vi.fn(async () => ACTIVE_COPY),
     withdrawCopy: vi.fn(async () => WITHDRAWN_COPY),
+    returnLoan: vi.fn(async () => ({ ...OVERDUE_LOAN, returnedOn: '2026-10-03' })),
     ...overrides,
   }
 }
@@ -104,6 +105,26 @@ describe('LibraryAdminPage', () => {
     expect(client.withdrawCopy).not.toHaveBeenCalled()
     await user.type(screen.getByLabelText('Referencia institucional del retiro'), 'Resolución 9 de 2026')
     expect((screen.getByRole('button', { name: 'Retirar' }) as HTMLButtonElement).disabled).toBe(false)
+  })
+
+  it('registers the return of an outstanding loan with an institutional reference', async () => {
+    // Arrange: the desk sees one loan on its way out, which then leaves the outstanding list.
+    const client = fakeClient({
+      getOpenLoans: vi.fn(async () => [OVERDUE_LOAN]).mockResolvedValueOnce([OVERDUE_LOAN]).mockResolvedValue([]),
+    })
+    const user = userEvent.setup()
+    render(<LibraryAdminPage client={client} authorization={{ accessToken: 'token', canRead: true, canWrite: true }} />)
+
+    // Act
+    await screen.findByText('Préstamos pendientes')
+    const registerReturn = () => screen.getByRole('button', { name: 'Registrar devolución' }) as HTMLButtonElement
+    expect(registerReturn().disabled).toBe(true)
+    await user.type(screen.getByLabelText('Referencia institucional de la devolución'), 'Devolución 1 de 2026')
+    await user.click(registerReturn())
+
+    // Assert
+    await waitFor(() => expect(client.returnLoan).toHaveBeenCalledWith('loan-1', 'Devolución 1 de 2026', 'token'))
+    expect(await screen.findByText('No hay ejemplares pendientes de devolución.')).toBeTruthy()
   })
 
   it('renders nothing when the session cannot read the library', () => {

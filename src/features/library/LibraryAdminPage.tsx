@@ -50,6 +50,8 @@ function LibraryAdminPageContent({
   const [actionError, setActionError] = useState<string | null>(null)
   const [withdrawReference, setWithdrawReference] = useState('')
   const [withdrawing, setWithdrawing] = useState(false)
+  const [returnReference, setReturnReference] = useState('')
+  const [returning, setReturning] = useState(false)
 
   /** A refused bearer means the cached permissions are stale, so the institutional session is revalidated. */
   const reportAuthorizationRejection = useCallback(async (error: unknown) => {
@@ -111,6 +113,22 @@ function LibraryAdminPageContent({
       await reportAuthorizationRejection(error)
     }
   }, [accessToken, client, reportAuthorizationRejection])
+
+  async function registerReturn(loanId: string) {
+    if (!canWrite || returnReference.trim().length === 0) return
+    setActionError(null)
+    setReturning(true)
+    try {
+      await client.returnLoan(loanId, returnReference.trim(), accessToken)
+      setReturnReference('')
+      await fetchCatalogue(new AbortController().signal)
+    } catch (error) {
+      setActionError(ACTION_ERROR)
+      await reportAuthorizationRejection(error)
+    } finally {
+      setReturning(false)
+    }
+  }
 
   async function withdraw(copyId: string) {
     if (!canWrite || withdrawReference.trim().length === 0) return
@@ -197,9 +215,29 @@ function LibraryAdminPageContent({
                   </span>
                   {loan.overdue && <span className="library-loan-overdue">Vencido</span>}
                   <span className="library-loan-reference">{loan.sourceReference}</span>
+                  {canWrite && (
+                    <button
+                      type="button"
+                      disabled={returning || returnReference.trim().length === 0}
+                      onClick={() => void registerReturn(loan.loanId)}
+                    >
+                      Registrar devolución
+                    </button>
+                  )}
                 </li>
               ))}
             </ul>}
+          {canWrite && openLoans.length > 0 && (
+            <label className="library-field">
+              <span>Referencia institucional de la devolución</span>
+              <input
+                aria-label="Referencia institucional de la devolución"
+                value={returnReference}
+                maxLength={240}
+                onChange={(event) => setReturnReference(event.currentTarget.value)}
+              />
+            </label>
+          )}
         </section>
 
         <section className="library-section" aria-labelledby="library-catalogue-title">
