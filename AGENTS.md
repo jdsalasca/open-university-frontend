@@ -1,6 +1,7 @@
 # Frontend — instrucciones de trabajo
 
 - Este directorio es el repositorio privado `Universiry-frontend`, rama de integración `develop`, montado como submódulo del checkout backend para desarrollo conjunto.
+- Integra y publica únicamente en `develop`; no crees ramas de funcionalidad, refs remotas adicionales ni PRs. Para aislar trabajo usa un worktree detached iniciado en `origin/develop` y publica con fast-forward solo cuando el usuario lo haya autorizado.
 - Usa Vite, React, TypeScript y SCSS. Los estilos pertenecen a componentes/capacidades; los tokens compartidos viven en `src/styles/_tokens.scss`.
 - El selector global es una preferencia visual local con modos `system`, `light` y `dark`; Zustand persiste exclusivamente `universiry-theme-preference`. Respeta el sistema operativo en modo automático y no mezcles esta preferencia con el Centro de Identidad Visual ni la uses como autorización.
 - El frontend presenta y valida temprano; permisos, validación de dominio y persistencia se aplican en el backend.
