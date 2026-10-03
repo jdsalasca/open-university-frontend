@@ -155,7 +155,9 @@ function LibraryAdminPageContent({
   async function registerTitle(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!canWrite) return
-    const form = new FormData(event.currentTarget)
+    // React nulls currentTarget after the handler returns, so the element is captured before any await.
+    const formElement = event.currentTarget
+    const form = new FormData(formElement)
     setActionError(null)
     try {
       await client.registerTitle({
@@ -165,18 +167,22 @@ function LibraryAdminPageContent({
         publicationYear: form.get('publicationYear') ? Number(form.get('publicationYear')) : null,
         sourceReference: String(form.get('reference') ?? '').trim(),
       }, accessToken)
-      event.currentTarget.reset()
-      await fetchCatalogue(titleQuery, new AbortController().signal)
     } catch (error) {
       setActionError(ACTION_ERROR)
       await reportAuthorizationRejection(error)
+      return
     }
+    // The write succeeded; a later refresh failure must not be reported as a failed registration.
+    formElement.reset()
+    await fetchCatalogue(titleQuery, new AbortController().signal)
   }
 
   async function registerCopy(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!canWrite || !selectedTitleId) return
-    const form = new FormData(event.currentTarget)
+    // React nulls currentTarget after the handler returns, so the element is captured before any await.
+    const formElement = event.currentTarget
+    const form = new FormData(formElement)
     setActionError(null)
     try {
       await client.registerCopy(selectedTitleId, {
@@ -184,12 +190,14 @@ function LibraryAdminPageContent({
         location: String(form.get('location') ?? '').trim(),
         sourceReference: String(form.get('reference') ?? '').trim(),
       }, accessToken)
-      event.currentTarget.reset()
-      await selectTitle(selectedTitleId)
     } catch (error) {
       setActionError(ACTION_ERROR)
       await reportAuthorizationRejection(error)
+      return
     }
+    // The write succeeded; a later refresh failure must not be reported as a failed registration.
+    formElement.reset()
+    await selectTitle(selectedTitleId)
   }
 
   return (
@@ -349,7 +357,7 @@ function LibraryAdminPageContent({
                 <input name="barcode" required maxLength={48} /></label>
               <label className="library-field"><span>Ubicación</span>
                 <input name="location" required maxLength={120} /></label>
-              <label className="library-field"><span>Referencia institucional</span>
+              <label className="library-field"><span>Referencia institucional del ejemplar</span>
                 <input name="reference" required maxLength={240} /></label>
               <button type="submit">Registrar ejemplar</button>
             </form>

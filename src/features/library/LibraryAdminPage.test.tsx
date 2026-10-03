@@ -190,6 +190,52 @@ describe('LibraryAdminPage', () => {
     expect(screen.queryByText('Este título no tiene ejemplares registrados.')).toBeNull()
   })
 
+  it('registers a title without reporting a failure after the write succeeded', async () => {
+    // Arrange
+    const client = fakeClient()
+    const user = userEvent.setup()
+    render(<LibraryAdminPage client={client} authorization={{ accessToken: 'token', canRead: true, canWrite: true }} />)
+    await screen.findByLabelText('Buscar título')
+
+    // Act
+    await user.type(screen.getByLabelText('Título de la obra'), 'Física moderna')
+    await user.type(screen.getByLabelText('Autor'), 'Autor cuatro')
+    await user.type(screen.getByLabelText('Edición'), '1a')
+    await user.type(screen.getByLabelText('Referencia institucional'), 'Acta 9 de 2026')
+    await user.click(screen.getByRole('button', { name: 'Registrar título' }))
+
+    // Assert
+    await waitFor(() => expect(client.registerTitle).toHaveBeenCalledTimes(1))
+    expect(client.registerTitle).toHaveBeenCalledWith(
+      { title: 'Física moderna', authors: ['Autor cuatro'], edition: '1a', publicationYear: null, sourceReference: 'Acta 9 de 2026' },
+      'token',
+    )
+    expect(screen.queryByText(/no fue posible completar la operación/i)).toBeNull()
+  })
+
+  it('registers a copy without reporting a failure after the write succeeded', async () => {
+    // Arrange
+    const client = fakeClient({ getCopies: vi.fn(async () => [ACTIVE_COPY]) })
+    const user = userEvent.setup()
+    render(<LibraryAdminPage client={client} authorization={{ accessToken: 'token', canRead: true, canWrite: true }} />)
+    await user.selectOptions(await screen.findByLabelText('Seleccionar título'), 'title-1')
+    await screen.findByText('BC-0001')
+
+    // Act
+    await user.type(screen.getByLabelText('Código de barras'), 'BC-0002')
+    await user.type(screen.getByLabelText('Ubicación'), 'Estante C-2')
+    await user.type(screen.getByLabelText('Referencia institucional del ejemplar'), 'Acta 10 de 2026')
+    await user.click(screen.getByRole('button', { name: 'Registrar ejemplar' }))
+
+    // Assert
+    await waitFor(() => expect(client.registerCopy).toHaveBeenCalledWith(
+      'title-1',
+      { barcode: 'BC-0002', location: 'Estante C-2', sourceReference: 'Acta 10 de 2026' },
+      'token',
+    ))
+    expect(screen.queryByText(/no fue posible completar la operación/i)).toBeNull()
+  })
+
   it('renders nothing when the session cannot read the library', () => {
     // Arrange + Act
     const { container } = render(
