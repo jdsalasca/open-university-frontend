@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { App } from './App'
@@ -161,6 +161,32 @@ function publicSpaceGuideClient(): SpaceGuideClient {
 }
 
 describe('App', () => {
+  it('offers mobile destinations while keeping unavailable and unauthorized routes out', async () => {
+    // Arrange
+    const user = userEvent.setup()
+    window.history.replaceState(null, '', '#inicio')
+    render(
+      <BrandingProvider loader={async () => DEFAULT_BRANDING}>
+        <App
+          oidcConfiguration={{ status: 'unconfigured' }}
+          currentIdentityClient={identityClientWithPermissions([])}
+          localPreviewSessionClient={null}
+        />
+      </BrandingProvider>,
+    )
+
+    // Act
+    const mobileNavigation = await screen.findByRole('navigation', { name: 'Navegación móvil' })
+    await user.click(within(mobileNavigation).getByRole('button', { name: 'Más secciones' }))
+
+    // Assert
+    expect(within(mobileNavigation).getByRole('link', { name: 'Inicio' })).toHaveAttribute('aria-current', 'page')
+    expect(within(mobileNavigation).getByRole('link', { name: 'Programas' })).toBeInTheDocument()
+    expect(within(mobileNavigation).getByRole('link', { name: 'Estructura académica' })).toBeInTheDocument()
+    expect(within(mobileNavigation).queryByRole('link', { name: 'Accesos y perfiles' })).not.toBeInTheDocument()
+    expect(within(mobileNavigation).queryByRole('link', { name: 'Resumen' })).not.toBeInTheDocument()
+  })
+
   it('opens the local student week experience from development navigation', async () => {
     // Arrange
     const user = userEvent.setup()

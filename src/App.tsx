@@ -23,6 +23,7 @@ import { useIdentity } from './features/identity/identityContext'
 import type { IdentityClient } from './features/identity/identityContracts'
 import type { OidcConfigurationResult } from './features/identity/oidcConfiguration'
 import { ThemeSelector } from './features/theme/ThemeSelector'
+import type { MobileNavigationItem } from './features/navigation/MobileNavigation'
 import './App.scss'
 
 const AcademicCatalogPage = lazy(() =>
@@ -52,6 +53,10 @@ const VisualIdentityCenter = lazy(() =>
 const RoleAccessPage = lazy(() =>
   import('./features/access/RoleAccessPage')
     .then(({ RoleAccessPage: page }) => ({ default: page })),
+)
+const MobileNavigation = lazy(() =>
+  import('./features/navigation/MobileNavigation')
+    .then(({ MobileNavigation: navigation }) => ({ default: navigation })),
 )
 const StudentAcademicWeekDemo = import.meta.env.DEV
   ? lazy(() => import('./features/students/demo/MyAcademicWeekDemo')
@@ -257,6 +262,28 @@ function ApplicationShell({
         && authenticatedIdentity.accessToken !== rejectedAdmissionsAccessToken,
     }
     : null
+  const mobileNavigationItems: MobileNavigationItem[] = [
+    { href: '#inicio', label: 'Inicio', symbol: MODULE_SYMBOLS['visual-identity'], primary: true },
+    { href: '#programas', label: programsLabel, symbol: MODULE_SYMBOLS.programs, primary: true },
+    ...(roleAccessAuthorization?.canRead
+      ? [{ href: '#accesos', label: 'Accesos y perfiles', symbol: '⌑' }]
+      : []),
+    ...(admissionsModule?.available && admissionsModule.visible
+      ? [{ href: '#admisiones', label: admissionsLabel, symbol: MODULE_SYMBOLS.admissions }]
+      : []),
+    ...(spacesModule?.available && spacesModule.visible
+      ? [{ href: '#espacios', label: spacesLabel, symbol: MODULE_SYMBOLS.spaces }]
+      : []),
+    { href: '#estudiantes', label: studentServicesLabel, symbol: MODULE_SYMBOLS.students },
+    { href: '#academia', label: 'Estructura académica', symbol: MODULE_SYMBOLS['academic-load'] },
+    ...(import.meta.env.DEV
+      ? [
+        { href: '#estudiante-demo', label: 'Mi semana · demo', symbol: '▦' },
+        { href: '#calificaciones-demo', label: 'Registro de calificaciones · demo', symbol: '∑' },
+        { href: '#aulas-demo', label: 'Asignación de aulas · demo', symbol: '⌖' },
+      ]
+      : []),
+  ]
   const revalidateRejectedStructureAccess = useCallback(async (accessToken: string): Promise<void> => {
     setRejectedStructureAccessToken(accessToken)
     await retry()
@@ -429,6 +456,9 @@ function ApplicationShell({
           <span className="environment-indicator" aria-hidden="true" />
           <span><strong>Entorno de desarrollo</strong><small>Sin datos estudiantiles reales</small></span>
         </div>
+        <Suspense fallback={null}>
+          <MobileNavigation items={mobileNavigationItems} currentHash={window.location.hash || '#inicio'} />
+        </Suspense>
       </aside>
 
       <div className="workspace">
