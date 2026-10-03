@@ -472,6 +472,33 @@ describe('AcademicCatalogPage', () => {
     expect(screen.getByRole('cell', { name: 'Física I' })).toBeVisible()
   })
 
+  it('renders a subject repeated across semesters without duplicate React keys', async () => {
+    // Arrange: the same subject revision can appear in two semesters of one curriculum.
+    const repeatedEntry = publicDetails.entries[0]
+    const repeatedEntries = [
+      repeatedEntry,
+      { ...repeatedEntry, semester: 2, rowOrder: 2 },
+    ]
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const client = createClient({
+      listPrograms: vi.fn().mockResolvedValue([program]),
+      listCurricula: vi.fn().mockResolvedValue([publishedCurriculum]),
+      listPublishedCurriculumEntries: vi.fn().mockImplementation((_id, query: AcademicCurriculumEntriesPageQuery) =>
+        Promise.resolve(createEntriesPage(query, repeatedEntries))),
+    })
+    await renderCatalogPage({ client })
+
+    // Act
+    await userEvent.click(await screen.findByRole('button', { name: /ver asignaturas de la versión 2026-A/i }))
+    await screen.findByRole('table', { name: /asignaturas de la versión 2026-A/i })
+
+    // Assert
+    const duplicateKeyWarning = consoleError.mock.calls.find((call) =>
+      call.some((argument) => typeof argument === 'string' && /same key|duplicate key/i.test(argument)))
+    expect(duplicateKeyWarning).toBeUndefined()
+    consoleError.mockRestore()
+  })
+
   it('filters_by_numeric_semester', async () => {
     // Arrange
     const listEntries = vi.fn().mockImplementation((_id, query: AcademicCurriculumEntriesPageQuery) => Promise.resolve(

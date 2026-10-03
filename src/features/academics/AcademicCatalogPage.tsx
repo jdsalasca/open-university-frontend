@@ -531,7 +531,7 @@ function PublishedCurriculumDetails({ client, curriculum, onClose }: PublishedCu
                   </thead>
                   <tbody>
                     {entriesPage.entries.map((entry) => (
-                      <tr key={entry.subjectRevisionId}>
+                      <tr key={`${entry.subjectRevisionId}-${entry.rowOrder}`}>
                         <td>{entry.semester}</td>
                         <td>{entry.subjectCode}</td>
                         <td>{entry.subjectName}</td>
