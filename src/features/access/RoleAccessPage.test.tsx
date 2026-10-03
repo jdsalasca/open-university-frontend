@@ -68,6 +68,28 @@ async function chooseTarget(user: ReturnType<typeof userEvent.setup>) {
 }
 
 describe('RoleAccessPage', () => {
+  it('asks for the whole search page and says when the result may be capped', async () => {
+    // Arrange: the server caps a search at 100, so asking for fewer identities hides matches without saying so.
+    const many = Array.from({ length: 100 }, (_, index) => ({
+      userId: `7b717347-ae70-4a76-9a1d-01b9f178c0${String(index).padStart(2, '0')}`,
+      issuer: 'https://identity.example.edu',
+      subject: `teacher-${index}`,
+    }))
+    const client = clientMock()
+    client.searchIdentities = vi.fn().mockResolvedValue(many)
+    const user = userEvent.setup()
+    renderPage(client, { accessToken: 'token', canRead: true, canWrite: false })
+
+    // Act
+    await screen.findByRole('heading', { name: 'Accesos y perfiles' })
+    await user.type(screen.getByLabelText('Prefijo del identificador'), 'teacher')
+    await user.click(screen.getByRole('button', { name: 'Buscar identidad' }))
+
+    // Assert
+    await waitFor(() => expect(client.searchIdentities).toHaveBeenCalledWith('teacher', 100, 'token', expect.anything()))
+    expect(await screen.findByText(/mostrando las primeras 100 identidades/i)).toBeTruthy()
+  })
+
   it('keeps the console closed and makes no API request without read permission', async () => {
     // Arrange
     const client = clientMock()

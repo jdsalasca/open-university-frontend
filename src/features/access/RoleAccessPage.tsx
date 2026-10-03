@@ -30,6 +30,9 @@ type ProfileCatalogResult = { accessToken: string; attempt: number; profiles: Ro
 type ScopeOptionsResult = { key: string; options: RoleAccessScopeOption[]; failed: boolean }
 const EMPTY_ROLE_PROFILES: RoleProfile[] = []
 
+/** The server caps an identity search at 100; asking for less hides matches without telling the operator. */
+const IDENTITY_SEARCH_LIMIT = 100
+
 interface RoleAccessPageProps {
   client?: RoleAccessClient
   authorization: RoleAccessAuthorization | null
@@ -132,7 +135,7 @@ export function RoleAccessPage({
     setSelectedIdentity(null)
     setAssignments([])
     try {
-      const results = await client.searchIdentities(searchPrefix, 25, currentToken, controller.signal)
+      const results = await client.searchIdentities(searchPrefix, IDENTITY_SEARCH_LIMIT, currentToken, controller.signal)
       if (controller.signal.aborted) return
       setSearchResults(results)
       setSearchState('ready')
@@ -302,6 +305,11 @@ export function RoleAccessPage({
 
             {searchState === 'ready' && searchResults.length === 0 && (
               <p className="role-access-empty">No hay identidades registradas que coincidan con ese prefijo.</p>
+            )}
+            {searchState === 'ready' && searchResults.length >= IDENTITY_SEARCH_LIMIT && (
+              <p className="role-access-hint">
+                Mostrando las primeras {IDENTITY_SEARCH_LIMIT} identidades. Afina el prefijo para acotar la búsqueda.
+              </p>
             )}
             {searchState === 'error' && <p className="role-access-inline-error">No se pudo completar la búsqueda. Revisa el acceso e inténtalo de nuevo.</p>}
             {searchResults.length > 0 && (
