@@ -46,6 +46,10 @@ const StudentServicesPage = lazy(() =>
   import('./features/students/StudentServicesPage')
     .then(({ StudentServicesPage: page }) => ({ default: page })),
 )
+const LibraryAdminPage = lazy(() =>
+  import('./features/library/LibraryAdminPage')
+    .then(({ LibraryAdminPage: page }) => ({ default: page })),
+)
 const VisualIdentityCenter = lazy(() =>
   import('./features/branding/VisualIdentityCenter')
     .then(({ VisualIdentityCenter: page }) => ({ default: page })),
@@ -96,7 +100,7 @@ function resolveAcademicOperationsClient(client?: AcademicOperationsClient): Pro
   return academicOperationsClientPromise
 }
 
-type ApplicationView = 'identity' | 'programs' | 'academia' | 'admissions' | 'spaces' | 'access'
+type ApplicationView = 'identity' | 'programs' | 'academia' | 'admissions' | 'spaces' | 'access' | 'library'
   | 'student-services' | 'student-demo' | 'gradebook-demo' | 'room-allocation-demo'
 
 const MODULE_SYMBOLS: Record<string, string> = {
@@ -203,6 +207,7 @@ function ApplicationShell({
   const isSpacesView = view === 'spaces'
   const isStudentServicesView = view === 'student-services'
   const isRoleAccessView = view === 'access'
+  const isLibraryView = view === 'library'
   const isStudentDemoView = view === 'student-demo'
   const isGradeEntryDemoView = import.meta.env.DEV && view === 'gradebook-demo'
   const isRoomAllocationDemoView = import.meta.env.DEV && view === 'room-allocation-demo'
@@ -262,6 +267,13 @@ function ApplicationShell({
         && authenticatedIdentity.accessToken !== rejectedAdmissionsAccessToken,
     }
     : null
+  const libraryAuthorization = authenticatedIdentity
+    ? {
+      accessToken: authenticatedIdentity.accessToken,
+      canRead: authenticatedIdentity.permissions.includes('library:read'),
+      canWrite: authenticatedIdentity.permissions.includes('library:write'),
+    }
+    : null
   const mobileNavigationItems: MobileNavigationItem[] = [
     { href: '#inicio', label: 'Inicio', symbol: MODULE_SYMBOLS['visual-identity'], primary: true },
     { href: '#programas', label: programsLabel, symbol: MODULE_SYMBOLS.programs, primary: true },
@@ -275,6 +287,9 @@ function ApplicationShell({
       ? [{ href: '#espacios', label: spacesLabel, symbol: MODULE_SYMBOLS.spaces }]
       : []),
     { href: '#estudiantes', label: studentServicesLabel, symbol: MODULE_SYMBOLS.students },
+    ...(libraryAuthorization?.canRead
+      ? [{ href: '#biblioteca', label: 'Biblioteca', symbol: '▤' }]
+      : []),
     { href: '#academia', label: 'Estructura académica', symbol: MODULE_SYMBOLS['academic-load'] },
     ...(import.meta.env.DEV
       ? [
@@ -339,6 +354,7 @@ function ApplicationShell({
             : 'Sin sesión institucional'
   const identityCenterKey = `${branding.revision}:${authenticatedIdentity?.subject ?? 'anonymous'}`
   const currentPageLabel = isRoleAccessView ? 'Accesos y perfiles'
+    : isLibraryView ? 'Biblioteca'
     : isStudentServicesView ? studentServicesLabel
     : isStudentDemoView ? 'Vida académica · demo'
     : isGradeEntryDemoView ? 'Registro de calificaciones · demo'
@@ -412,6 +428,14 @@ function ApplicationShell({
               <span>Estructura y periodos · Vista previa</span>
               {isAcademicOperationsView && <span className="nav-status" aria-hidden="true" />}
             </a>
+            {libraryAuthorization?.canRead && (
+              <a className={`nav-item${isLibraryView ? ' active' : ''}`} href="#biblioteca"
+                aria-current={isLibraryView ? 'page' : undefined}>
+                <span className="nav-glyph" aria-hidden="true">▤</span>
+                <span>Biblioteca · Catálogo y circulación</span>
+                {isLibraryView && <span className="nav-status" aria-hidden="true" />}
+              </a>
+            )}
             {import.meta.env.DEV && (
               <a className={`nav-item${isStudentDemoView ? ' active' : ''}`} href="#estudiante-demo"
                 aria-current={isStudentDemoView ? 'page' : undefined}>
@@ -463,11 +487,13 @@ function ApplicationShell({
 
       <div className="workspace">
         <header className="topbar">
-          <div className="breadcrumbs"><span>{isProgramsView || isAcademicOperationsView || isAdmissionsView || isSpacesView || isStudentServicesView || isStudentDemoView || isGradeEntryDemoView || isRoomAllocationDemoView ? 'Vida universitaria' : 'Administración'}</span><span aria-hidden="true">/</span><strong>{currentPageLabel}</strong></div>
+          <div className="breadcrumbs"><span>{isProgramsView || isAcademicOperationsView || isAdmissionsView || isSpacesView || isStudentServicesView || isLibraryView || isStudentDemoView || isGradeEntryDemoView || isRoomAllocationDemoView ? 'Vida universitaria' : 'Administración'}</span><span aria-hidden="true">/</span><strong>{currentPageLabel}</strong></div>
           <div className="topbar-meta">
-            <span className="autosave-indicator"><span aria-hidden="true" />{isStudentServicesView ? 'Directorio público' : isStudentDemoView || isGradeEntryDemoView || isRoomAllocationDemoView ? 'Experiencia de muestra' : isRoleAccessView ? 'Control administrativo' : isAdmissionsView ? 'Consulta de admisiones' : isSpacesView ? 'Consulta de espacios' : isProgramsView ? 'Consulta de programas' : isAcademicOperationsView ? 'Consulta académica' : status === 'ready' ? 'Identidad sincronizada' : 'Identidad de respaldo'}</span>
+            <span className="autosave-indicator"><span aria-hidden="true" />{isLibraryView ? 'Servicios bibliográficos' : isStudentServicesView ? 'Directorio público' : isStudentDemoView || isGradeEntryDemoView || isRoomAllocationDemoView ? 'Experiencia de muestra' : isRoleAccessView ? 'Control administrativo' : isAdmissionsView ? 'Consulta de admisiones' : isSpacesView ? 'Consulta de espacios' : isProgramsView ? 'Consulta de programas' : isAcademicOperationsView ? 'Consulta académica' : status === 'ready' ? 'Identidad sincronizada' : 'Identidad de respaldo'}</span>
             <span className="topbar-divider" aria-hidden="true" />
-            {isGradeEntryDemoView
+            {isLibraryView
+              ? <span className="revision-chip">BIBLIOTECA · CATÁLOGO</span>
+              : isGradeEntryDemoView
               ? <span className="revision-chip">CALIFICACIONES · DEMO</span>
               : isStudentDemoView
               ? <span className="revision-chip">VIDA ACADÉMICA · DEMO</span>
@@ -511,8 +537,8 @@ function ApplicationShell({
           </div>
         </header>
 
-        <main id={isStudentServicesView ? 'estudiantes' : isStudentDemoView ? 'estudiante-demo' : isGradeEntryDemoView ? 'calificaciones-demo' : isRoomAllocationDemoView ? 'aulas-demo' : view === 'identity' ? 'inicio' : view === 'programs' ? 'programas' : isAdmissionsView ? 'admisiones' : isSpacesView ? 'espacios' : isRoleAccessView ? 'accesos' : 'academia'}
-          className={isStudentServicesView ? 'student-services-page-content' : isStudentDemoView ? 'student-week-page-content' : isGradeEntryDemoView ? 'grade-entry-page-content' : isRoomAllocationDemoView ? 'room-allocation-page-content' : isRoleAccessView ? 'role-access-page-content' : isAdmissionsView ? 'admissions-page-content' : isSpacesView ? 'spaces-page-content' : isProgramsView ? 'catalog-page-content' : isAcademicOperationsView ? 'academic-page-content' : 'page-content identity-page-content'}>
+        <main id={isStudentServicesView ? 'estudiantes' : isLibraryView ? 'biblioteca' : isStudentDemoView ? 'estudiante-demo' : isGradeEntryDemoView ? 'calificaciones-demo' : isRoomAllocationDemoView ? 'aulas-demo' : view === 'identity' ? 'inicio' : view === 'programs' ? 'programas' : isAdmissionsView ? 'admisiones' : isSpacesView ? 'espacios' : isRoleAccessView ? 'accesos' : 'academia'}
+          className={isStudentServicesView ? 'student-services-page-content' : isLibraryView ? 'library-page-content' : isStudentDemoView ? 'student-week-page-content' : isGradeEntryDemoView ? 'grade-entry-page-content' : isRoomAllocationDemoView ? 'room-allocation-page-content' : isRoleAccessView ? 'role-access-page-content' : isAdmissionsView ? 'admissions-page-content' : isSpacesView ? 'spaces-page-content' : isProgramsView ? 'catalog-page-content' : isAcademicOperationsView ? 'academic-page-content' : 'page-content identity-page-content'}>
           {isLocalPreviewSession && (
             <aside className="local-preview-session-banner" role="status">
               <strong>Desarrollador local · modo preview</strong>
@@ -537,6 +563,8 @@ function ApplicationShell({
               ? 'la experiencia académica de ejemplo'
               : isStudentServicesView
                 ? 'el directorio de servicios estudiantiles'
+              : isLibraryView
+                ? 'el catálogo de biblioteca'
               : isAdmissionsView
               ? 'la agenda de admisiones'
               : isSpacesView
@@ -548,7 +576,7 @@ function ApplicationShell({
                 : 'el centro de identidad visual'} />}
           >
             <Suspense fallback={<p className="module-loading" role="status" aria-live="polite">
-              Cargando {isStudentServicesView ? 'directorio de servicios estudiantiles' : isRoomAllocationDemoView ? 'asignación de aulas de ejemplo' : isGradeEntryDemoView ? 'registro de calificaciones de ejemplo' : isStudentDemoView ? 'experiencia académica de ejemplo' : isRoleAccessView ? 'consola de accesos' : isAdmissionsView ? 'agenda de admisiones' : isSpacesView ? 'guía de espacios' : isProgramsView || isAcademicOperationsView ? 'módulo académico' : 'centro de identidad visual'}…
+              Cargando {isStudentServicesView ? 'directorio de servicios estudiantiles' : isLibraryView ? 'catálogo de biblioteca' : isRoomAllocationDemoView ? 'asignación de aulas de ejemplo' : isGradeEntryDemoView ? 'registro de calificaciones de ejemplo' : isStudentDemoView ? 'experiencia académica de ejemplo' : isRoleAccessView ? 'consola de accesos' : isAdmissionsView ? 'agenda de admisiones' : isSpacesView ? 'guía de espacios' : isProgramsView || isAcademicOperationsView ? 'módulo académico' : 'centro de identidad visual'}…
             </p>}>
               {isRoomAllocationDemoView && RoomAllocationDemo
                 ? <RoomAllocationDemo
@@ -583,6 +611,8 @@ function ApplicationShell({
                       onAuthorizationRejected={revalidateRejectedAdmissionsAccess} />
                     : isSpacesView
                       ? <SpaceGuidePage client={spaceGuideClient} />
+                    : isLibraryView
+                      ? <LibraryAdminPage authorization={libraryAuthorization} />
                     : <VisualIdentityCenter
                     key={identityCenterKey}
                     accessToken={authenticatedIdentity?.accessToken ?? null}
@@ -592,7 +622,11 @@ function ApplicationShell({
             </Suspense>
           </ModuleLoadBoundary>
 
-          <footer className="page-footer"><span>{branding.institutionName}</span><span>{isRoleAccessView
+          <footer className="page-footer"><span>{branding.institutionName}</span><span>{isLibraryView
+            ? libraryAuthorization?.canWrite
+              ? 'Catálogo y circulación · Referencia institucional exigida en cada operación'
+              : 'Consulta del catálogo · Sin permiso de escritura'
+            : isRoleAccessView
             ? roleAccessAuthorization?.canWrite
               ? 'Gestión de perfiles · permisos asignados y auditados en el servidor'
               : 'Consulta de perfiles · escritura requiere autorización institucional'
@@ -631,6 +665,7 @@ function readApplicationView(): ApplicationView {
   if (import.meta.env.DEV && window.location.hash === '#calificaciones-demo') return 'gradebook-demo'
   if (import.meta.env.DEV && window.location.hash === '#estudiante-demo') return 'student-demo'
   if (window.location.hash === '#estudiantes') return 'student-services'
+  if (window.location.hash === '#biblioteca') return 'library'
   if (window.location.hash === '#programas') return 'programs'
   if (window.location.hash === '#academia') return 'academia'
   if (window.location.hash === '#admisiones') return 'admissions'

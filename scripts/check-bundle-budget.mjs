@@ -13,10 +13,11 @@ const LOCAL_PREVIEW_CLIENT_KEY = 'src/features/identity/localPreviewSessionClien
 const LOCAL_PREVIEW_IDENTITY_KEY = 'src/features/identity/localPreviewIdentity.ts'
 
 export const DEFAULT_BUNDLE_BUDGETS = Object.freeze({
-  entryJavaScript: 280_000,
+  // The shared entry now includes the authenticated #biblioteca route; keep its added shell cost bounded.
+  entryJavaScript: 283_000,
   entryStyles: 21_000,
-  // The shared entry now includes the public #estudiantes route; keep its added shell cost bounded.
-  programsJavaScript: 328_500,
+  // The shared entry now includes the public #estudiantes and authenticated #biblioteca routes; keep its added shell cost bounded.
+  programsJavaScript: 331_500,
   programsStyles: 48_000,
   oidcJavaScript: 75_000,
 })

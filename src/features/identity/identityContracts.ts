@@ -9,6 +9,8 @@ export type ApplicationPermission =
   | 'admissions:calendar:write'
   | 'identity:roles:read'
   | 'identity:roles:write'
+  | 'library:read'
+  | 'library:write'
 
 const academicPermissionAreas: readonly AcademicPermissionArea[] = ['catalog', 'structure', 'period', 'offerings']
 const permissionActions: readonly PermissionAction[] = ['read', 'write']
@@ -23,6 +25,8 @@ export const APPLICATION_PERMISSIONS: readonly ApplicationPermission[] = [
   'admissions:calendar:write',
   'identity:roles:read',
   'identity:roles:write',
+  'library:read',
+  'library:write',
 ]
 
 export interface CurrentIdentity {

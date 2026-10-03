@@ -1,0 +1,76 @@
+import type {
+  LibraryCopy,
+  LibraryLoan,
+  LibraryTitle,
+  RegisterLibraryCopyInput,
+  RegisterLibraryTitleInput,
+} from './libraryContracts'
+
+export interface LibraryClient {
+  getTitles(accessToken: string, signal?: AbortSignal): Promise<LibraryTitle[]>
+  getCopies(titleId: string, accessToken: string, signal?: AbortSignal): Promise<LibraryCopy[]>
+  getOpenLoans(accessToken: string, signal?: AbortSignal): Promise<LibraryLoan[]>
+  registerTitle(input: RegisterLibraryTitleInput, accessToken: string): Promise<LibraryTitle>
+  registerCopy(titleId: string, input: RegisterLibraryCopyInput, accessToken: string): Promise<LibraryCopy>
+  withdrawCopy(copyId: string, sourceReference: string, accessToken: string): Promise<LibraryCopy>
+}
+
+export class LibraryApiError extends Error {
+  readonly status: number
+
+  constructor(status: number, message: string) {
+    super(message)
+    this.name = 'LibraryApiError'
+    this.status = status
+  }
+}
+
+const BASE = '/api/v1/admin/library'
+
+interface RequestOptions {
+  method?: string
+  body?: unknown
+  signal?: AbortSignal
+}
+
+export function createLibraryClient(fetcher: typeof fetch = fetch): LibraryClient {
+  async function request<T>(path: string, accessToken: string, options: RequestOptions = {}): Promise<T> {
+    const { method = 'GET', body, signal } = options
+    const response = await fetcher(`${BASE}${path}`, {
+      method,
+      credentials: 'omit',
+      headers: {
+        Accept: 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+        ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
+      },
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      ...(signal ? { signal } : {}),
+    })
+    if (!response.ok) {
+      throw new LibraryApiError(response.status, 'No fue posible completar la operación de biblioteca.')
+    }
+    return (await response.json()) as T
+  }
+
+  return {
+    getTitles: (accessToken, signal) => request<LibraryTitle[]>('/titles', accessToken, { signal }),
+    getCopies: (titleId, accessToken, signal) =>
+      request<LibraryCopy[]>(`/titles/${encodeURIComponent(titleId)}/copies`, accessToken, { signal }),
+    getOpenLoans: (accessToken, signal) => request<LibraryLoan[]>('/open-loans', accessToken, { signal }),
+    registerTitle: (input, accessToken) =>
+      request<LibraryTitle>('/titles', accessToken, { method: 'POST', body: input }),
+    registerCopy: (titleId, input, accessToken) =>
+      request<LibraryCopy>(`/titles/${encodeURIComponent(titleId)}/copies`, accessToken, {
+        method: 'POST',
+        body: input,
+      }),
+    withdrawCopy: (copyId, sourceReference, accessToken) =>
+      request<LibraryCopy>(`/copies/${encodeURIComponent(copyId)}/withdraw`, accessToken, {
+        method: 'POST',
+        body: { sourceReference },
+      }),
+  }
+}
+
+export const libraryClient = createLibraryClient()
