@@ -234,6 +234,66 @@
   color: var(--ui-text-primary);
 }
 
+:root[data-theme='dark'] .workspace main .academic-unit-copy strong {
+  border-color: var(--ui-border);
+  background: var(--ui-surface-raised);
+  color: var(--ui-text-primary);
+}
+
+:root[data-theme='dark'] .workspace main .academic-unit-copy small {
+  border-color: var(--ui-border);
+  background: var(--ui-surface-raised);
+  color: var(--ui-text-primary);
+}
+
+:root[data-theme='dark'] .workspace main .academic-sort-order {
+  border-color: var(--ui-border);
+  background: var(--ui-surface-raised);
+  color: var(--ui-text-primary);
+}
+
+:root[data-theme='dark'] .workspace main .spaces-type-badge {
+  border-color: var(--ui-border);
+  background: var(--ui-surface-raised);
+  color: var(--ui-text-primary);
+}
+
+:root[data-theme='dark'] .workspace main .spaces-pathway-kind {
+  border-color: var(--ui-border);
+  background: var(--ui-surface-raised);
+  color: var(--ui-text-primary);
+}
+
+:root[data-theme='dark'] .workspace main .spaces-pathway-note {
+  border-color: var(--ui-border);
+  background: var(--ui-surface-raised);
+  color: var(--ui-text-primary);
+}
+
+:root[data-theme='dark'] .workspace main .spaces-directory-footer {
+  border-color: var(--ui-border);
+  background: var(--ui-surface-raised);
+  color: var(--ui-text-primary);
+}
+
+:root[data-theme='dark'] .workspace main .catalog-operation-note {
+  border-color: var(--ui-border);
+  background: var(--ui-surface-raised);
+  color: var(--ui-text-primary);
+}
+
+:root[data-theme='dark'] .workspace main .catalog-locked-tag {
+  border-color: var(--ui-border);
+  background: var(--ui-surface-raised);
+  color: var(--ui-text-primary);
+}
+
+:root[data-theme='dark'] .workspace main .catalog-button {
+  border-color: var(--ui-border);
+  background: var(--ui-surface-raised);
+  color: var(--ui-text-primary);
+}
+
 :root[data-theme='dark'] .workspace main :is(a, button):focus-visible,
 :root[data-theme='dark'] button:focus-visible,
 :root[data-theme='dark'] input:focus-visible,

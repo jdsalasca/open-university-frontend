@@ -143,3 +143,26 @@ test('public undergraduate directory keeps its dark surfaces readable', () => {
     assertReadableContrast(declarations)
   }
 })
+
+test('dark theme keeps academic, spaces, and catalog chrome readable', () => {
+  // Arrange: these elements keep hardcoded light backgrounds but inherit the light dark-mode text.
+  const selectors = [
+    ':root[data-theme=dark] .workspace main .academic-unit-copy strong',
+    ':root[data-theme=dark] .workspace main .academic-unit-copy small',
+    ':root[data-theme=dark] .workspace main .academic-sort-order',
+    ':root[data-theme=dark] .workspace main .spaces-type-badge',
+    ':root[data-theme=dark] .workspace main .spaces-pathway-kind',
+    ':root[data-theme=dark] .workspace main .spaces-pathway-note',
+    ':root[data-theme=dark] .workspace main .spaces-directory-footer',
+    ':root[data-theme=dark] .workspace main .catalog-operation-note',
+    ':root[data-theme=dark] .workspace main .catalog-locked-tag',
+    ':root[data-theme=dark] .workspace main .catalog-button',
+  ]
+
+  // Act + Assert
+  for (const selector of selectors) {
+    const declarations = darkRule(selector)
+    assert.ok(declarations, `dark theme rule must exist for ${selector}`)
+    assertReadableContrast(declarations)
+  }
+})
