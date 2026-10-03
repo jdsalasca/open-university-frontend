@@ -72,6 +72,7 @@ export function AcademicOfferingDraftPanel({
   const [subjects, setSubjects] = useState<AcademicCurriculumEntry[]>([])
   const [subjectState, setSubjectState] = useState<RequestState>('ready')
   const [subjectError, setSubjectError] = useState('')
+  const [subjectAttempt, setSubjectAttempt] = useState(0)
   const [selectedSubjectId, setSelectedSubjectId] = useState('')
   const [editingOfferingId, setEditingOfferingId] = useState<string | null>(null)
   const [editingValues, setEditingValues] = useState<FormValues>(EMPTY_FORM)
@@ -202,7 +203,7 @@ export function AcademicOfferingDraftPanel({
         setSubjectState('error')
       })
     return () => controller.abort()
-  }, [accessToken, canWrite, catalogClient, isCurrentAccess, selectedCurriculumId, subjectSearch])
+  }, [accessToken, canWrite, catalogClient, isCurrentAccess, selectedCurriculumId, subjectAttempt, subjectSearch])
 
   useEffect(() => {
     if (!canRead || !accessToken || !historyOfferingId) {
@@ -501,7 +502,14 @@ export function AcademicOfferingDraftPanel({
           {curriculumState === 'error' && <div className="academic-offering-inline-error" role="alert"><span>{curriculumError}</span><button type="button" onClick={() => setSelectedProgramId('')}>Volver a consultar</button></div>}
           {curriculumState === 'ready' && selectedProgramId && curricula.length === 0 && <p className="academic-offering-inline-status">Este programa no tiene currículos publicados disponibles.</p>}
           {subjectState === 'loading' && <p className="academic-offering-inline-status" role="status">Buscando asignaturas en el currículo publicado…</p>}
-          {subjectState === 'error' && <p className="academic-offering-inline-error" role="alert">{subjectError}</p>}
+          {subjectState === 'error' && (
+            <div className="academic-offering-inline-error" role="alert">
+              <span>{subjectError}</span>
+              <button type="button" onClick={() => setSubjectAttempt((attempt) => attempt + 1)}>
+                Reintentar consulta de asignaturas
+              </button>
+            </div>
+          )}
           {subjectState === 'ready' && selectedCurriculumId && subjects.length === 0 && <p className="academic-offering-inline-status">No hay asignaturas que coincidan con la búsqueda.</p>}
           <footer className="academic-offering-form-footer">
             <p>El grupo queda ligado a este periodo y a la revisión publicada del currículo.</p>
