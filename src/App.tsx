@@ -41,6 +41,10 @@ const SpaceGuidePage = lazy(() =>
   import('./features/spaces/SpaceGuidePage')
     .then(({ SpaceGuidePage: page }) => ({ default: page })),
 )
+const StudentServicesPage = lazy(() =>
+  import('./features/students/StudentServicesPage')
+    .then(({ StudentServicesPage: page }) => ({ default: page })),
+)
 const VisualIdentityCenter = lazy(() =>
   import('./features/branding/VisualIdentityCenter')
     .then(({ VisualIdentityCenter: page }) => ({ default: page })),
@@ -88,7 +92,7 @@ function resolveAcademicOperationsClient(client?: AcademicOperationsClient): Pro
 }
 
 type ApplicationView = 'identity' | 'programs' | 'academia' | 'admissions' | 'spaces' | 'access'
-  | 'student-demo' | 'gradebook-demo' | 'room-allocation-demo'
+  | 'student-services' | 'student-demo' | 'gradebook-demo' | 'room-allocation-demo'
 
 const MODULE_SYMBOLS: Record<string, string> = {
   home: '⌂',
@@ -174,6 +178,7 @@ function ApplicationShell({
   const programsModule = branding.modules.find((module) => module.key === 'programs')
   const admissionsModule = branding.modules.find((module) => module.key === 'admissions')
   const spacesModule = branding.modules.find((module) => module.key === 'spaces')
+  const studentsModule = branding.modules.find((module) => module.key === 'students')
   const institutionLogo = branding.assets.logoDark
     ? `/assets/${branding.assets.logoDark}`
     : null
@@ -184,10 +189,14 @@ function ApplicationShell({
     ? 'Aspirante y equipo · demo'
     : 'Información pública'
   const spacesLabel = spacesModule?.label ?? 'Guía de espacios'
+  const studentServicesLabel = studentsModule?.label && studentsModule.label !== 'Estudiantes'
+    ? `Servicios · ${studentsModule.label}`
+    : 'Servicios estudiantiles'
   const isProgramsView = view === 'programs'
   const isAcademicOperationsView = view === 'academia'
   const isAdmissionsView = view === 'admissions'
   const isSpacesView = view === 'spaces'
+  const isStudentServicesView = view === 'student-services'
   const isRoleAccessView = view === 'access'
   const isStudentDemoView = view === 'student-demo'
   const isGradeEntryDemoView = import.meta.env.DEV && view === 'gradebook-demo'
@@ -303,6 +312,7 @@ function ApplicationShell({
             : 'Sin sesión institucional'
   const identityCenterKey = `${branding.revision}:${authenticatedIdentity?.subject ?? 'anonymous'}`
   const currentPageLabel = isRoleAccessView ? 'Accesos y perfiles'
+    : isStudentServicesView ? studentServicesLabel
     : isStudentDemoView ? 'Vida académica · demo'
     : isGradeEntryDemoView ? 'Registro de calificaciones · demo'
     : isRoomAllocationDemoView ? 'Asignación de aulas · demo'
@@ -364,6 +374,12 @@ function ApplicationShell({
                 {isSpacesView && <span className="nav-status" aria-hidden="true" />}
               </a>
             )}
+            <a className={`nav-item${isStudentServicesView ? ' active' : ''}`} href="#estudiantes"
+              aria-current={isStudentServicesView ? 'page' : undefined}>
+              <span className="nav-glyph" aria-hidden="true">{MODULE_SYMBOLS.students}</span>
+              <span>{studentServicesLabel} · Directorio público</span>
+              {isStudentServicesView && <span className="nav-status" aria-hidden="true" />}
+            </a>
             <a className={`nav-item${isAcademicOperationsView ? ' active' : ''}`} href="#academia" aria-current={isAcademicOperationsView ? 'page' : undefined}>
               <span className="nav-glyph" aria-hidden="true">◷</span>
               <span>Estructura y periodos · Vista previa</span>
@@ -417,9 +433,9 @@ function ApplicationShell({
 
       <div className="workspace">
         <header className="topbar">
-          <div className="breadcrumbs"><span>{isProgramsView || isAcademicOperationsView || isAdmissionsView || isSpacesView || isStudentDemoView || isGradeEntryDemoView || isRoomAllocationDemoView ? 'Vida universitaria' : 'Administración'}</span><span aria-hidden="true">/</span><strong>{currentPageLabel}</strong></div>
+          <div className="breadcrumbs"><span>{isProgramsView || isAcademicOperationsView || isAdmissionsView || isSpacesView || isStudentServicesView || isStudentDemoView || isGradeEntryDemoView || isRoomAllocationDemoView ? 'Vida universitaria' : 'Administración'}</span><span aria-hidden="true">/</span><strong>{currentPageLabel}</strong></div>
           <div className="topbar-meta">
-            <span className="autosave-indicator"><span aria-hidden="true" />{isStudentDemoView || isGradeEntryDemoView || isRoomAllocationDemoView ? 'Experiencia de muestra' : isRoleAccessView ? 'Control administrativo' : isAdmissionsView ? 'Consulta de admisiones' : isSpacesView ? 'Consulta de espacios' : isProgramsView ? 'Consulta de programas' : isAcademicOperationsView ? 'Consulta académica' : status === 'ready' ? 'Identidad sincronizada' : 'Identidad de respaldo'}</span>
+            <span className="autosave-indicator"><span aria-hidden="true" />{isStudentServicesView ? 'Directorio público' : isStudentDemoView || isGradeEntryDemoView || isRoomAllocationDemoView ? 'Experiencia de muestra' : isRoleAccessView ? 'Control administrativo' : isAdmissionsView ? 'Consulta de admisiones' : isSpacesView ? 'Consulta de espacios' : isProgramsView ? 'Consulta de programas' : isAcademicOperationsView ? 'Consulta académica' : status === 'ready' ? 'Identidad sincronizada' : 'Identidad de respaldo'}</span>
             <span className="topbar-divider" aria-hidden="true" />
             {isGradeEntryDemoView
               ? <span className="revision-chip">CALIFICACIONES · DEMO</span>
@@ -465,8 +481,8 @@ function ApplicationShell({
           </div>
         </header>
 
-        <main id={isStudentDemoView ? 'estudiante-demo' : isGradeEntryDemoView ? 'calificaciones-demo' : isRoomAllocationDemoView ? 'aulas-demo' : view === 'identity' ? 'inicio' : view === 'programs' ? 'programas' : isAdmissionsView ? 'admisiones' : isSpacesView ? 'espacios' : isRoleAccessView ? 'accesos' : 'academia'}
-          className={isStudentDemoView ? 'student-week-page-content' : isGradeEntryDemoView ? 'grade-entry-page-content' : isRoomAllocationDemoView ? 'room-allocation-page-content' : isRoleAccessView ? 'role-access-page-content' : isAdmissionsView ? 'admissions-page-content' : isSpacesView ? 'spaces-page-content' : isProgramsView ? 'catalog-page-content' : isAcademicOperationsView ? 'academic-page-content' : 'page-content identity-page-content'}>
+        <main id={isStudentServicesView ? 'estudiantes' : isStudentDemoView ? 'estudiante-demo' : isGradeEntryDemoView ? 'calificaciones-demo' : isRoomAllocationDemoView ? 'aulas-demo' : view === 'identity' ? 'inicio' : view === 'programs' ? 'programas' : isAdmissionsView ? 'admisiones' : isSpacesView ? 'espacios' : isRoleAccessView ? 'accesos' : 'academia'}
+          className={isStudentServicesView ? 'student-services-page-content' : isStudentDemoView ? 'student-week-page-content' : isGradeEntryDemoView ? 'grade-entry-page-content' : isRoomAllocationDemoView ? 'room-allocation-page-content' : isRoleAccessView ? 'role-access-page-content' : isAdmissionsView ? 'admissions-page-content' : isSpacesView ? 'spaces-page-content' : isProgramsView ? 'catalog-page-content' : isAcademicOperationsView ? 'academic-page-content' : 'page-content identity-page-content'}>
           {isLocalPreviewSession && (
             <aside className="local-preview-session-banner" role="status">
               <strong>Desarrollador local · modo preview</strong>
@@ -489,6 +505,8 @@ function ApplicationShell({
                 ? 'la asignación de aulas de ejemplo'
               : isStudentDemoView
               ? 'la experiencia académica de ejemplo'
+              : isStudentServicesView
+                ? 'el directorio de servicios estudiantiles'
               : isAdmissionsView
               ? 'la agenda de admisiones'
               : isSpacesView
@@ -500,7 +518,7 @@ function ApplicationShell({
                 : 'el centro de identidad visual'} />}
           >
             <Suspense fallback={<p className="module-loading" role="status" aria-live="polite">
-              Cargando {isRoomAllocationDemoView ? 'asignación de aulas de ejemplo' : isGradeEntryDemoView ? 'registro de calificaciones de ejemplo' : isStudentDemoView ? 'experiencia académica de ejemplo' : isRoleAccessView ? 'consola de accesos' : isAdmissionsView ? 'agenda de admisiones' : isSpacesView ? 'guía de espacios' : isProgramsView || isAcademicOperationsView ? 'módulo académico' : 'centro de identidad visual'}…
+              Cargando {isStudentServicesView ? 'directorio de servicios estudiantiles' : isRoomAllocationDemoView ? 'asignación de aulas de ejemplo' : isGradeEntryDemoView ? 'registro de calificaciones de ejemplo' : isStudentDemoView ? 'experiencia académica de ejemplo' : isRoleAccessView ? 'consola de accesos' : isAdmissionsView ? 'agenda de admisiones' : isSpacesView ? 'guía de espacios' : isProgramsView || isAcademicOperationsView ? 'módulo académico' : 'centro de identidad visual'}…
             </p>}>
               {isRoomAllocationDemoView && RoomAllocationDemo
                 ? <RoomAllocationDemo
@@ -512,6 +530,8 @@ function ApplicationShell({
                 ? <GradeEntryDemo />
                 : isStudentDemoView && StudentAcademicWeekDemo
                 ? <StudentAcademicWeekDemo />
+                : isStudentServicesView
+                  ? <StudentServicesPage />
                 : isRoleAccessView
                 ? <RoleAccessPage client={roleAccessClient} authorization={roleAccessAuthorization}
                   loadScopeOptions={loadRoleScopeOptions} onAuthorizationRejected={revalidateRejectedRoleAccess} />
@@ -550,6 +570,8 @@ function ApplicationShell({
               ? 'Laboratorio DEV · Datos sintéticos · Borrador volátil sin integración institucional'
               : isRoomAllocationDemoView
                 ? 'Laboratorio DEV · Escenarios sintéticos · Sin reservas ni persistencia'
+            : isStudentServicesView
+              ? 'Fuentes públicas UPTC · Sin credenciales ni trámites'
             : isStudentDemoView
               ? 'Semana y asignaturas ficticias · Sin matrícula institucional ni consulta de datos personales'
             : isAdmissionsView
@@ -578,6 +600,7 @@ function readApplicationView(): ApplicationView {
   if (import.meta.env.DEV && window.location.hash === '#aulas-demo') return 'room-allocation-demo'
   if (import.meta.env.DEV && window.location.hash === '#calificaciones-demo') return 'gradebook-demo'
   if (import.meta.env.DEV && window.location.hash === '#estudiante-demo') return 'student-demo'
+  if (window.location.hash === '#estudiantes') return 'student-services'
   if (window.location.hash === '#programas') return 'programs'
   if (window.location.hash === '#academia') return 'academia'
   if (window.location.hash === '#admisiones') return 'admissions'

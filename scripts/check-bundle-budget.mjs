@@ -15,8 +15,8 @@ const LOCAL_PREVIEW_IDENTITY_KEY = 'src/features/identity/localPreviewIdentity.t
 export const DEFAULT_BUNDLE_BUDGETS = Object.freeze({
   entryJavaScript: 280_000,
   entryStyles: 21_000,
-  // The two offerings permission identifiers use this 200 B allowance; the panel remains deferred.
-  programsJavaScript: 326_200,
+  // The shared entry now includes the public #estudiantes route; keep its added shell cost bounded.
+  programsJavaScript: 328_500,
   programsStyles: 48_000,
   oidcJavaScript: 75_000,
 })

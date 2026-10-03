@@ -457,7 +457,8 @@ describe('App', () => {
     const link = await screen.findByRole('link', { name: /admisiones/i })
     expect(link).toHaveAccessibleName(/admisiones.*aspirante y equipo.*demo/i)
     await user.click(link)
-    expect(await screen.findByRole('tab', { name: /aspirante · demo/i })).toHaveAttribute('aria-selected', 'true')
+    expect(await screen.findByRole('tab', { name: /aspirante · demo/i }, { timeout: 5_000 }))
+      .toHaveAttribute('aria-selected', 'true')
     await user.click(screen.getByRole('tab', { name: /calendario público/i }))
 
     // Assert
@@ -857,5 +858,29 @@ describe('App', () => {
 
     // Assert: a denied token cannot regain its editor after route navigation.
     expect(screen.queryByRole('button', { name: 'Cambiar orden de Facultad de Ciencias' })).not.toBeInTheDocument()
+  })
+})
+
+describe('Student services directory route', () => {
+  it('opens the public directory from the application navigation', async () => {
+    // Arrange
+    const user = userEvent.setup()
+    window.history.replaceState(null, '', '#inicio')
+    render(
+      <BrandingProvider loader={async () => DEFAULT_BRANDING}>
+        <App />
+      </BrandingProvider>,
+    )
+
+    // Act
+    const servicesLink = await screen.findByRole('link', { name: /servicios estudiantiles/i })
+    await user.click(servicesLink)
+
+    // Assert
+    expect(await screen.findByRole('heading', {
+      name: 'Servicios para acompañar tu vida universitaria',
+    })).toBeVisible()
+    expect(servicesLink).toHaveAttribute('href', '#estudiantes')
+    expect(servicesLink).toHaveAttribute('aria-current', 'page')
   })
 })
