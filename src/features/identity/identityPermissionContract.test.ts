@@ -38,4 +38,13 @@ describe('identity permission contract', () => {
     // Act + Assert
     expect(() => parseCurrentIdentity({ userId: USER_ID, subject: 'subject-1', permissions: unknown })).toThrow()
   })
+
+  it('names the offending permission so a rejected session is diagnosable', () => {
+    // Arrange: without the name, a session lockout looks identical to a broken response.
+    const permissions = [...SERVER_PERMISSIONS, 'notices:destroy']
+
+    // Act + Assert
+    expect(() => parseCurrentIdentity({ userId: USER_ID, subject: 'subject-1', permissions }))
+      .toThrow(/notices:destroy/)
+  })
 })

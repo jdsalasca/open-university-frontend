@@ -47,10 +47,17 @@ export function parseCurrentIdentity(value: unknown): CurrentIdentity {
   if (!isRecord(value)
     || !isUuid(value.userId)
     || !isBoundedSubject(value.subject)
-    || !Array.isArray(value.permissions)
-    || value.permissions.some((permission) => typeof permission !== 'string' || !ALLOWED_PERMISSIONS.has(permission))
-    || new Set(value.permissions).size !== value.permissions.length) {
+    || !Array.isArray(value.permissions)) {
     throw malformedIdentity()
+  }
+
+  const rejected = value.permissions.find(
+    (permission) => typeof permission !== 'string' || !ALLOWED_PERMISSIONS.has(permission))
+  if (rejected !== undefined) {
+    throw malformedIdentity(describePermission(rejected))
+  }
+  if (new Set(value.permissions).size !== value.permissions.length) {
+    throw malformedIdentity('duplicate permissions')
   }
 
   return {
@@ -58,6 +65,15 @@ export function parseCurrentIdentity(value: unknown): CurrentIdentity {
     subject: value.subject,
     permissions: value.permissions as ApplicationPermission[],
   }
+}
+
+/** The value comes from the server, so it is only echoed back when it is short and printable. */
+function describePermission(value: unknown): string {
+  if (typeof value !== 'string' || value.length === 0 || value.length > 60
+    || containsAsciiControlCharacters(value)) {
+    return 'unknown permission'
+  }
+  return `unknown permission "${value}"`
 }
 
 function isUuid(value: unknown): value is string {
@@ -78,6 +94,6 @@ function isBoundedSubject(value: unknown): value is string {
     && !containsAsciiControlCharacters(value)
 }
 
-function malformedIdentity(): Error {
-  return new Error('The current identity response is malformed.')
+function malformedIdentity(detail?: string): Error {
+  return new Error(`The current identity response is malformed.${detail ? ` (${detail})` : ''}`)
 }
