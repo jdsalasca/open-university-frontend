@@ -14,26 +14,31 @@ import './LibraryAdminPage.scss'
 interface LibraryAdminPageProps {
   client?: LibraryClient
   authorization: LibraryAuthorization | null
+  onAuthorizationRejected?: (accessToken: string) => Promise<void>
 }
 
 const LOAD_ERROR = 'No fue posible consultar la biblioteca. Verifica tu sesión y vuelve a intentarlo.'
 const ACTION_ERROR = 'No fue posible completar la operación. Revisa los datos e inténtalo de nuevo.'
+const REJECTED_ERROR = 'El servidor rechazó la sesión y no fue posible revalidarla. Inicia sesión de nuevo.'
 
-export function LibraryAdminPage({ client = defaultLibraryClient, authorization }: LibraryAdminPageProps) {
+export function LibraryAdminPage({ client = defaultLibraryClient, authorization, onAuthorizationRejected }: LibraryAdminPageProps) {
   if (!authorization?.canRead) return null
   return <LibraryAdminPageContent
     key={authorization.accessToken}
     client={client}
     authorization={authorization}
+    onAuthorizationRejected={onAuthorizationRejected}
   />
 }
 
 function LibraryAdminPageContent({
   client,
   authorization,
+  onAuthorizationRejected,
 }: {
   client: LibraryClient
   authorization: LibraryAuthorization
+  onAuthorizationRejected?: (accessToken: string) => Promise<void>
 }) {
   const { accessToken, canWrite } = authorization
   const [openLoans, setOpenLoans] = useState<LibraryLoan[]>([])
@@ -45,6 +50,17 @@ function LibraryAdminPageContent({
   const [actionError, setActionError] = useState<string | null>(null)
   const [withdrawReference, setWithdrawReference] = useState('')
   const [withdrawing, setWithdrawing] = useState(false)
+
+  /** A refused bearer means the cached permissions are stale, so the institutional session is revalidated. */
+  const reportAuthorizationRejection = useCallback(async (error: unknown) => {
+    if (error instanceof LibraryApiError && (error.status === 401 || error.status === 403)) {
+      try {
+        await onAuthorizationRejected?.(accessToken)
+      } catch {
+        setLoadError(REJECTED_ERROR)
+      }
+    }
+  }, [accessToken, onAuthorizationRejected])
 
   const fetchCatalogue = useCallback(async (signal: AbortSignal) => {
     try {
@@ -63,8 +79,9 @@ function LibraryAdminPageContent({
         ? 'La sesión no autoriza la lectura de la biblioteca.'
         : LOAD_ERROR)
       setLoadState('error')
+      await reportAuthorizationRejection(error)
     }
-  }, [accessToken, client])
+  }, [accessToken, client, reportAuthorizationRejection])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -89,10 +106,11 @@ function LibraryAdminPageContent({
     if (!titleId) return
     try {
       setCopies(await client.getCopies(titleId, accessToken))
-    } catch {
+    } catch (error) {
       setActionError(LOAD_ERROR)
+      await reportAuthorizationRejection(error)
     }
-  }, [accessToken, client])
+  }, [accessToken, client, reportAuthorizationRejection])
 
   async function withdraw(copyId: string) {
     if (!canWrite || withdrawReference.trim().length === 0) return
@@ -102,8 +120,9 @@ function LibraryAdminPageContent({
       await client.withdrawCopy(copyId, withdrawReference.trim(), accessToken)
       setCopies(await client.getCopies(selectedTitleId, accessToken))
       setWithdrawReference('')
-    } catch {
+    } catch (error) {
       setActionError(ACTION_ERROR)
+      await reportAuthorizationRejection(error)
     } finally {
       setWithdrawing(false)
     }
@@ -124,8 +143,9 @@ function LibraryAdminPageContent({
       }, accessToken)
       event.currentTarget.reset()
       await fetchCatalogue(new AbortController().signal)
-    } catch {
+    } catch (error) {
       setActionError(ACTION_ERROR)
+      await reportAuthorizationRejection(error)
     }
   }
 
@@ -142,8 +162,9 @@ function LibraryAdminPageContent({
       }, accessToken)
       event.currentTarget.reset()
       await selectTitle(selectedTitleId)
-    } catch {
+    } catch (error) {
       setActionError(ACTION_ERROR)
+      await reportAuthorizationRejection(error)
     }
   }
 

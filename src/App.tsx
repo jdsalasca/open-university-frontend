@@ -176,6 +176,7 @@ function ApplicationShell({
   const [rejectedOfferingAccessToken, setRejectedOfferingAccessToken] = useState<string | null>(null)
   const [rejectedRoleAccessToken, setRejectedRoleAccessToken] = useState<string | null>(null)
   const [rejectedAdmissionsAccessToken, setRejectedAdmissionsAccessToken] = useState<string | null>(null)
+  const [rejectedLibraryAccessToken, setRejectedLibraryAccessToken] = useState<string | null>(null)
   useEffect(() => {
     const onHashChange = () => setView(readApplicationView())
     window.addEventListener('hashchange', onHashChange)
@@ -270,8 +271,10 @@ function ApplicationShell({
   const libraryAuthorization = authenticatedIdentity
     ? {
       accessToken: authenticatedIdentity.accessToken,
-      canRead: authenticatedIdentity.permissions.includes('library:read'),
-      canWrite: authenticatedIdentity.permissions.includes('library:write'),
+      canRead: authenticatedIdentity.permissions.includes('library:read')
+        && authenticatedIdentity.accessToken !== rejectedLibraryAccessToken,
+      canWrite: authenticatedIdentity.permissions.includes('library:write')
+        && authenticatedIdentity.accessToken !== rejectedLibraryAccessToken,
     }
     : null
   const mobileNavigationItems: MobileNavigationItem[] = [
@@ -317,6 +320,10 @@ function ApplicationShell({
   }, [retry])
   const revalidateRejectedAdmissionsAccess = useCallback(async (accessToken: string): Promise<void> => {
     setRejectedAdmissionsAccessToken(accessToken)
+    await retry()
+  }, [retry])
+  const revalidateRejectedLibraryAccess = useCallback(async (accessToken: string): Promise<void> => {
+    setRejectedLibraryAccessToken(accessToken)
     await retry()
   }, [retry])
   const loadRoleScopeOptions = useCallback(async (
@@ -612,7 +619,10 @@ function ApplicationShell({
                     : isSpacesView
                       ? <SpaceGuidePage client={spaceGuideClient} />
                     : isLibraryView
-                      ? <LibraryAdminPage authorization={libraryAuthorization} />
+                      ? <LibraryAdminPage
+                        authorization={libraryAuthorization}
+                        onAuthorizationRejected={revalidateRejectedLibraryAccess}
+                      />
                     : <VisualIdentityCenter
                     key={identityCenterKey}
                     accessToken={authenticatedIdentity?.accessToken ?? null}

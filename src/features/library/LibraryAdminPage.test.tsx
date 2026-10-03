@@ -2,6 +2,7 @@ import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { LibraryAdminPage } from './LibraryAdminPage'
+import { LibraryApiError } from './libraryClient'
 import type { LibraryClient } from './libraryClient'
 import type { LibraryCopy, LibraryLoan, LibraryTitle } from './libraryContracts'
 
@@ -59,6 +60,41 @@ describe('LibraryAdminPage', () => {
     expect(screen.getByText('2026-02-01')).toBeTruthy()
     expect(screen.getByText('Vencido')).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Registrar título' })).toBeNull()
+  })
+
+  it('asks the session to revalidate when the server rejects the library token', async () => {
+    // Arrange: the server refuses the current bearer, so the identity has to be revalidated.
+    const onAuthorizationRejected = vi.fn(async () => undefined)
+    const client = fakeClient({
+      getOpenLoans: vi.fn(async () => { throw new LibraryApiError(403, 'forbidden') }),
+    })
+
+    // Act
+    render(<LibraryAdminPage
+      client={client}
+      authorization={{ accessToken: 'token', canRead: true, canWrite: false }}
+      onAuthorizationRejected={onAuthorizationRejected}
+    />)
+
+    // Assert
+    await waitFor(() => expect(onAuthorizationRejected).toHaveBeenCalledWith('token'))
+  })
+
+  it('does not allow withdrawing a copy without an institutional reference', async () => {
+    // Arrange
+    const client = fakeClient()
+    const user = userEvent.setup()
+    render(<LibraryAdminPage client={client} authorization={{ accessToken: 'token', canRead: true, canWrite: true }} />)
+
+    // Act
+    await user.selectOptions(await screen.findByLabelText('Seleccionar título'), 'title-1')
+    await screen.findByText('BC-0001')
+
+    // Assert: the button is inert until a reference exists, and nothing was written.
+    expect((screen.getByRole('button', { name: 'Retirar' }) as HTMLButtonElement).disabled).toBe(true)
+    expect(client.withdrawCopy).not.toHaveBeenCalled()
+    await user.type(screen.getByLabelText('Referencia institucional del retiro'), 'Resolución 9 de 2026')
+    expect((screen.getByRole('button', { name: 'Retirar' }) as HTMLButtonElement).disabled).toBe(false)
   })
 
   it('renders nothing when the session cannot read the library', () => {
