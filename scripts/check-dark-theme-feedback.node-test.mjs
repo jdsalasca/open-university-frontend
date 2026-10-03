@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { test } from 'node:test'
 import { compile } from 'sass'
@@ -78,4 +79,32 @@ test('dark theme gives structure audit events a readable raised surface', () => 
   assert.match(declarations, /background:\s*var\(--ui-surface-raised\);/)
   assert.match(declarations, /color:\s*var\(--ui-text-primary\);/)
   assertReadableContrast(declarations)
+})
+
+test('library page styles reference only tokens the theme defines, so dark mode can override them', () => {
+  // Arrange: a component that invents token names silently keeps light colors in dark mode.
+  const libraryStylesheet = readFileSync(
+    fileURLToPath(new URL('../src/features/library/LibraryAdminPage.scss', import.meta.url)), 'utf8')
+
+  // Act
+  const definedTokens = new Set([...compiledTheme.matchAll(/(--[a-z0-9-]+):/g)].map((match) => match[1]))
+  const referenced = [...new Set([...libraryStylesheet.matchAll(/var\((--[a-z0-9-]+)/g)].map((match) => match[1]))]
+
+  // Assert
+  assert.ok(referenced.length > 0, 'the library page must style itself through theme tokens')
+  assert.deepEqual(referenced.filter((token) => !definedTokens.has(token)), [])
+})
+
+test('library page surfaces keep WCAG AA contrast in dark mode', () => {
+  // Arrange
+  const dark = darkRule(':root[data-theme=dark]')
+  const token = (name) => dark?.match(new RegExp(`--${name}:\\s*(#[0-9a-f]{6});`, 'i'))?.[1]
+
+  // Act + Assert
+  const surface = token('ui-surface')
+  const raised = token('ui-surface-raised')
+  const text = token('ui-text-primary')
+  assert.ok(surface && raised && text, 'dark tokens must be defined')
+  assert.ok(contrastRatio(text, surface) >= 4.5, 'library text on surface must meet WCAG AA')
+  assert.ok(contrastRatio(text, raised) >= 4.5, 'library text on raised surface must meet WCAG AA')
 })
