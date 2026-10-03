@@ -92,6 +92,7 @@ describe('mobile navigation', () => {
     await user.click(moreButton)
 
     // Assert
+    expect(moreButton).toHaveClass('is-current')
     expect(screen.getByRole('link', { name: 'Estructura académica' })).toHaveAttribute('aria-current', 'page')
     expect(screen.getByRole('link', { name: 'Programas' })).not.toHaveAttribute('aria-current', 'page')
   })

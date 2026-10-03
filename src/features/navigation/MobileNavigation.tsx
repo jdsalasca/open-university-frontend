@@ -48,7 +48,7 @@ export function MobileNavigation({ items, currentHash }: MobileNavigationProps) 
         })}
         {overflowItems.length > 0 && (
           <button
-            className="mobile-navigation-item mobile-navigation-more"
+            className={`mobile-navigation-item mobile-navigation-more${currentOverflowItem ? ' is-current' : ''}`}
             type="button"
             aria-label={currentOverflowItem
               ? `Más secciones; sección actual: ${currentOverflowItem.label}`

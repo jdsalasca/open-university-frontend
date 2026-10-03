@@ -210,8 +210,9 @@
   .mobile-navigation-item { display: flex; min-width: 0; min-height: 48px; align-items: center; flex-direction: column; justify-content: center; gap: 3px; border: 0; border-radius: 10px; padding: 2px 5px; background: transparent; color: #f0efe7; font: inherit; text-decoration: none; cursor: pointer; }
   .mobile-navigation-item > span:last-child { max-width: 100%; overflow: hidden; font-size: 10px; line-height: 1.15; text-overflow: ellipsis; white-space: nowrap; }
   .mobile-navigation-symbol { display: grid; min-width: 20px; place-items: center; color: #c2c2b8; font-size: 17px; line-height: 1; }
-  .mobile-navigation-item[aria-current='page'] { color: var(--brand-primary, #ffcc29); }
-  .mobile-navigation-item[aria-current='page'] .mobile-navigation-symbol { color: var(--brand-primary, #ffcc29); }
+  .mobile-navigation-item[aria-current='page'], .mobile-navigation-more.is-current { color: var(--brand-primary, #ffcc29); }
+  .mobile-navigation-item[aria-current='page'] .mobile-navigation-symbol,
+  .mobile-navigation-more.is-current .mobile-navigation-symbol { color: var(--brand-primary, #ffcc29); }
   .mobile-navigation-item:focus-visible { @include tokens.focus-ring(2px); }
   .mobile-navigation-item:hover { background: #282923; }
   .mobile-navigation-more { appearance: none; }
