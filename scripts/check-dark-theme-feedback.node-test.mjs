@@ -108,3 +108,22 @@ test('library page surfaces keep WCAG AA contrast in dark mode', () => {
   assert.ok(contrastRatio(text, surface) >= 4.5, 'library text on surface must meet WCAG AA')
   assert.ok(contrastRatio(text, raised) >= 4.5, 'library text on raised surface must meet WCAG AA')
 })
+
+test('public undergraduate directory keeps its dark surfaces readable', () => {
+  // Arrange
+  const selectors = [
+    ':root[data-theme=dark] .workspace main .public-undergraduate-directory .public-undergraduate-hero',
+    ':root[data-theme=dark] .workspace main .public-undergraduate-directory .public-undergraduate-source-note',
+    ':root[data-theme=dark] .workspace main .public-undergraduate-directory .public-undergraduate-filters',
+    ':root[data-theme=dark] .workspace main .public-undergraduate-directory .public-undergraduate-results-count',
+    ':root[data-theme=dark] .workspace main .public-undergraduate-directory .public-undergraduate-offer-tag',
+    ':root[data-theme=dark] .workspace main .public-undergraduate-directory .public-undergraduate-offer-tag.is-marked',
+  ]
+
+  // Act + Assert
+  for (const selector of selectors) {
+    const declarations = darkRule(selector)
+    assert.ok(declarations, `dark theme rule must exist for ${selector}`)
+    assertReadableContrast(declarations)
+  }
+})

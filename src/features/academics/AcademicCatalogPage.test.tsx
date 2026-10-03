@@ -1,7 +1,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import type { ComponentType } from 'react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type {
   AcademicCatalogClient,
   AcademicCurriculum,
@@ -17,7 +17,36 @@ import type {
 } from './contracts'
 import type { AcademicOperationsClient, AcademicStructureSnapshot } from './academicOperationsContracts'
 
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  vi.unstubAllGlobals()
+})
+
+beforeEach(() => {
+  vi.stubGlobal('fetch', vi.fn(async () => ({
+    ok: true,
+    json: async () => ({
+      schemaVersion: 1,
+      source: {
+        pageUrl: 'https://www.uptc.edu.co/sitio/portal/sitios/programas_ofer/pregrado.html',
+        pageUpdatedAt: '2026-09-15',
+        capturedAt: '2026-10-02',
+      },
+      programs: [{
+        id: 'public-test-program',
+        name: 'Programa público de prueba',
+        faculty: 'Facultad de prueba',
+        facultyCode: '00',
+        level: 'Profesional Universitario',
+        modality: 'Presencial',
+        placeLabel: 'Tunja',
+        locationsSummary: 'Tunja',
+        markedOffered: true,
+        detailUrl: 'https://www.uptc.edu.co/sitio/portal/programas/public-test-program/',
+      }],
+    }),
+  })))
+})
 
 interface AcademicCatalogPageProps {
   client: AcademicCatalogClient
@@ -851,8 +880,9 @@ describe('AcademicCatalogPage', () => {
 
     // Assert
     expect(await screen.findByRole('heading', { name: /comparación informativa/i })).toBeVisible()
-    expect(screen.getByRole('status')).toHaveTextContent(/no existe una versión publicada comparable/i)
-    expect(screen.getByRole('status')).toHaveTextContent(/no se realizó una comparación/i)
+    const comparisonPanel = screen.getByRole('region', { name: /comparación informativa/i })
+    expect(within(comparisonPanel).getByRole('status')).toHaveTextContent(/no existe una versión publicada comparable/i)
+    expect(within(comparisonPanel).getByRole('status')).toHaveTextContent(/no se realizó una comparación/i)
   })
 
   it('shows published-reference metadata, all change counts, examples, and changed-field labels', async () => {
@@ -1117,5 +1147,51 @@ describe('AcademicCatalogPage', () => {
     expect(screen.getByRole('link', { name: /descargar plantilla csv/i })).toHaveAttribute('download', 'academic-curriculum-template.csv')
     expect(screen.queryByLabelText(/archivo CSV/i)).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /publicar/i })).not.toBeInTheDocument()
+  })
+
+  it('shows the public UPTC undergraduate directory separately before the platform curriculum catalog', async () => {
+    // Arrange
+    const fetchSnapshot = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        schemaVersion: 1,
+        source: {
+          pageUrl: 'https://www.uptc.edu.co/sitio/portal/sitios/programas_ofer/pregrado.html',
+          pageUpdatedAt: '2026-09-15',
+          capturedAt: '2026-10-03',
+        },
+        programs: [{
+          id: 'public-001',
+          name: 'Ingeniería Mecánica',
+          faculty: 'Facultad de Ingeniería',
+          facultyCode: '07',
+          level: 'Profesional Universitario',
+          modality: 'Presencial',
+          placeLabel: 'Tunja',
+          locationsSummary: 'Tunja',
+          markedOffered: true,
+          detailUrl: 'https://www.uptc.edu.co/sitio/portal/programas/public-001/',
+        }],
+      }),
+    }))
+    vi.stubGlobal('fetch', fetchSnapshot)
+    await renderCatalogPage({ client: createClient() })
+
+    // Act
+    const publicDirectoryHeading = await screen.findByRole('heading', { name: 'Programas de pregrado UPTC' })
+    const platformCatalogHeading = await screen.findByRole('heading', { name: 'Programas de pregrado presencial' })
+
+    // Assert
+    expect(publicDirectoryHeading.compareDocumentPosition(platformCatalogHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(screen.getByRole('link', { name: /catálogo público uptc/i })).toHaveAttribute(
+      'href',
+      'https://www.uptc.edu.co/sitio/portal/sitios/programas_ofer/pregrado.html',
+    )
+    expect(screen.getByRole('link', { name: 'Ingeniería Mecánica' })).toHaveAttribute(
+      'href',
+      'https://www.uptc.edu.co/sitio/portal/programas/public-001/',
+    )
+    expect(fetchSnapshot).toHaveBeenCalledOnce()
+    expect(screen.getByText('No hay programas publicados todavía')).toBeVisible()
   })
 })

@@ -240,3 +240,37 @@
   background: #79691f;
   color: #fffbed;
 }
+
+:root[data-theme='dark'] .workspace main .public-undergraduate-directory .public-undergraduate-hero {
+  border-color: var(--ui-border);
+  background: var(--ui-surface-raised);
+  color: var(--ui-text-primary);
+}
+
+:root[data-theme='dark'] .workspace main .public-undergraduate-directory .public-undergraduate-source-note {
+  border-color: var(--ui-border);
+  background: var(--ui-surface-raised);
+  color: var(--ui-text-primary);
+}
+
+:root[data-theme='dark'] .workspace main .public-undergraduate-directory .public-undergraduate-filters {
+  border-color: var(--ui-border);
+  background: var(--ui-surface);
+  color: var(--ui-text-primary);
+}
+
+:root[data-theme='dark'] .workspace main .public-undergraduate-directory .public-undergraduate-results-count {
+  border-color: var(--ui-border);
+  background: var(--ui-surface-raised);
+  color: var(--ui-text-primary);
+}
+
+:root[data-theme='dark'] .workspace main .public-undergraduate-directory .public-undergraduate-offer-tag {
+  background: var(--ui-surface-raised);
+  color: var(--ui-text-secondary);
+}
+
+:root[data-theme='dark'] .workspace main .public-undergraduate-directory .public-undergraduate-offer-tag.is-marked {
+  background: #29382a;
+  color: #d5e8c9;
+}
