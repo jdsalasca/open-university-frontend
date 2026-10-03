@@ -26,6 +26,10 @@ import { ThemeSelector } from './features/theme/ThemeSelector'
 import type { MobileNavigationItem } from './features/navigation/MobileNavigation'
 import './App.scss'
 
+const WorkspaceHomePage = lazy(() =>
+  import('./features/workspace/WorkspaceHomePage')
+    .then(({ WorkspaceHomePage: page }) => ({ default: page })),
+)
 const AcademicCatalogPage = lazy(() =>
   import('./features/academics/AcademicCatalogPage')
     .then(({ AcademicCatalogPage: page }) => ({ default: page })),
@@ -70,19 +74,6 @@ const MobileNavigation = lazy(() =>
   import('./features/navigation/MobileNavigation')
     .then(({ MobileNavigation: navigation }) => ({ default: navigation })),
 )
-const StudentAcademicWeekDemo = import.meta.env.DEV
-  ? lazy(() => import('./features/students/demo/MyAcademicWeekDemo')
-    .then(({ MyAcademicWeekDemo: page }) => ({ default: page })))
-  : null
-const GradeEntryDemo = import.meta.env.DEV
-  ? lazy(() => import('./features/gradebook/demo/GradeEntryDemo')
-    .then(({ GradeEntryDemo: page }) => ({ default: page })))
-  : null
-const RoomAllocationDemo = import.meta.env.DEV
-  ? lazy(() => import('./features/room-planning/demo/RoomAllocationDemo')
-    .then(({ RoomAllocationDemo: page }) => ({ default: page })))
-  : null
-
 interface AppProps {
   catalogClient?: AcademicCatalogClient
   academicOperationsClient?: AcademicOperationsClient
@@ -108,8 +99,8 @@ function resolveAcademicOperationsClient(client?: AcademicOperationsClient): Pro
   return academicOperationsClientPromise
 }
 
-type ApplicationView = 'identity' | 'programs' | 'academia' | 'admissions' | 'spaces' | 'access' | 'library' | 'notices' | 'notices-admin'
-  | 'student-services' | 'student-demo' | 'gradebook-demo' | 'room-allocation-demo'
+type ApplicationView = 'home' | 'identity' | 'programs' | 'academia' | 'admissions' | 'spaces' | 'access' | 'library' | 'notices' | 'notices-admin'
+  | 'student-services'
 
 const MODULE_SYMBOLS: Record<string, string> = {
   home: '⌂',
@@ -191,7 +182,7 @@ function ApplicationShell({
     return () => window.removeEventListener('hashchange', onHashChange)
   }, [])
 
-  const modules = branding.modules.filter((module) => !['visual-identity', 'programs', 'admissions', 'spaces'].includes(module.key))
+  const modules = branding.modules.filter((module) => !['visual-identity', 'programs', 'admissions', 'spaces', 'students'].includes(module.key))
   const identityModule = branding.modules.find((module) => module.key === 'visual-identity')
   const programsModule = branding.modules.find((module) => module.key === 'programs')
   const admissionsModule = branding.modules.find((module) => module.key === 'admissions')
@@ -203,9 +194,6 @@ function ApplicationShell({
   const identityLabel = identityModule?.label ?? 'Identidad visual'
   const programsLabel = programsModule?.label ?? 'Programas'
   const admissionsLabel = admissionsModule?.label ?? 'Admisiones'
-  const admissionsNavigationPurpose = import.meta.env.DEV
-    ? 'Aspirante y equipo · demo'
-    : 'Información pública'
   const spacesLabel = spacesModule?.label ?? 'Guía de espacios'
   const studentServicesLabel = studentsModule?.label && studentsModule.label !== 'Estudiantes'
     ? `Servicios · ${studentsModule.label}`
@@ -215,13 +203,11 @@ function ApplicationShell({
   const isAdmissionsView = view === 'admissions'
   const isSpacesView = view === 'spaces'
   const isStudentServicesView = view === 'student-services'
+  const isHomeView = view === 'home'
   const isRoleAccessView = view === 'access'
   const isLibraryView = view === 'library'
   const isNoticesView = view === 'notices'
   const isNoticesAdminView = view === 'notices-admin'
-  const isStudentDemoView = view === 'student-demo'
-  const isGradeEntryDemoView = import.meta.env.DEV && view === 'gradebook-demo'
-  const isRoomAllocationDemoView = import.meta.env.DEV && view === 'room-allocation-demo'
   const isIdentityView = view === 'identity'
   const authenticatedIdentity = identity.status === 'authenticated' ? identity : null
   const hasAuthenticatedSession = authenticatedIdentity !== null
@@ -294,8 +280,9 @@ function ApplicationShell({
     }
     : null
   const mobileNavigationItems: MobileNavigationItem[] = [
-    { href: '#inicio', label: 'Inicio', symbol: MODULE_SYMBOLS['visual-identity'], primary: true },
+    { href: '#resumen', label: 'Resumen', symbol: MODULE_SYMBOLS.home, primary: true },
     { href: '#programas', label: programsLabel, symbol: MODULE_SYMBOLS.programs, primary: true },
+    { href: '#inicio', label: identityLabel, symbol: MODULE_SYMBOLS['visual-identity'] },
     ...(roleAccessAuthorization?.canRead
       ? [{ href: '#accesos', label: 'Accesos y perfiles', symbol: '⌑' }]
       : []),
@@ -316,13 +303,6 @@ function ApplicationShell({
       ? [{ href: '#avisos-admin', label: 'Administrar avisos', symbol: '✎' }]
       : []),
     { href: '#academia', label: 'Estructura académica', symbol: MODULE_SYMBOLS['academic-load'] },
-    ...(import.meta.env.DEV
-      ? [
-        { href: '#estudiante-demo', label: 'Mi semana · demo', symbol: '▦' },
-        { href: '#calificaciones-demo', label: 'Registro de calificaciones · demo', symbol: '∑' },
-        { href: '#aulas-demo', label: 'Asignación de aulas · demo', symbol: '⌖' },
-      ]
-      : []),
   ]
   const revalidateRejectedStructureAccess = useCallback(async (accessToken: string): Promise<void> => {
     setRejectedStructureAccessToken(accessToken)
@@ -382,14 +362,12 @@ function ApplicationShell({
           : identity.reason === 'expired' ? 'Sesión vencida · Sin acceso'
             : 'Sin sesión institucional'
   const identityCenterKey = `${branding.revision}:${authenticatedIdentity?.subject ?? 'anonymous'}`
-  const currentPageLabel = isRoleAccessView ? 'Accesos y perfiles'
+  const currentPageLabel = isHomeView ? 'Resumen'
+    : isRoleAccessView ? 'Accesos y perfiles'
     : isLibraryView ? 'Biblioteca'
     : isNoticesView ? 'Mis avisos'
     : isNoticesAdminView ? 'Administrar avisos'
     : isStudentServicesView ? studentServicesLabel
-    : isStudentDemoView ? 'Vida académica · demo'
-    : isGradeEntryDemoView ? 'Registro de calificaciones · demo'
-    : isRoomAllocationDemoView ? 'Asignación de aulas · demo'
     : isAdmissionsView ? admissionsLabel
     : isSpacesView ? spacesLabel
     : isProgramsView ? programsLabel
@@ -399,7 +377,7 @@ function ApplicationShell({
   return (
     <div className="platform-shell">
       <aside className="sidebar" aria-label="Navegación del sistema">
-        <a className="brand-lockup" href="#inicio" aria-label={`${branding.institutionName}, inicio`}>
+        <a className="brand-lockup" href="#resumen" aria-label={`${branding.institutionName}, inicio`}>
           {institutionLogo
             ? <img className="brand-lockup-logo" src={institutionLogo} alt="" />
             : <span className="brand-monogram" aria-hidden="true">U</span>}
@@ -412,10 +390,11 @@ function ApplicationShell({
         <div className="sidebar-group">
           <p className="sidebar-caption">ESPACIO DE TRABAJO</p>
           <nav className="primary-nav" aria-label="Principal">
-            <button className="nav-item" type="button" disabled title="El resumen estará disponible cuando el módulo se implemente">
+            <a className={`nav-item${isHomeView ? ' active' : ''}`} href="#resumen" aria-current={isHomeView ? 'page' : undefined}>
               <span className="nav-glyph" aria-hidden="true">⌂</span>
               <span>Resumen</span>
-            </button>
+              {isHomeView && <span className="nav-status" aria-hidden="true" />}
+            </a>
             <a className={`nav-item${isIdentityView ? ' active' : ''}`} href="#inicio" aria-current={isIdentityView ? 'page' : undefined}>
               <span className="nav-glyph" aria-hidden="true">✳</span>
               <span>{identityLabel}</span>
@@ -431,32 +410,32 @@ function ApplicationShell({
             )}
             <a className={`nav-item${isProgramsView ? ' active' : ''}`} href="#programas" aria-current={isProgramsView ? 'page' : undefined}>
               <span className="nav-glyph" aria-hidden="true">▧</span>
-              <span>{programsLabel} · Vista previa</span>
+              <span>{programsLabel}</span>
               {isProgramsView && <span className="nav-status" aria-hidden="true" />}
             </a>
             {admissionsModule?.available && admissionsModule.visible && (
               <a className={`nav-item${isAdmissionsView ? ' active' : ''}`} href="#admisiones" aria-current={isAdmissionsView ? 'page' : undefined}>
                 <span className="nav-glyph" aria-hidden="true">{MODULE_SYMBOLS.admissions}</span>
-                <span>{admissionsLabel} · {admissionsNavigationPurpose}</span>
+                <span>{admissionsLabel} · Información pública</span>
                 {isAdmissionsView && <span className="nav-status" aria-hidden="true" />}
               </a>
             )}
             {spacesModule?.available && spacesModule.visible && (
               <a className={`nav-item${isSpacesView ? ' active' : ''}`} href="#espacios" aria-current={isSpacesView ? 'page' : undefined}>
                 <span className="nav-glyph" aria-hidden="true">{MODULE_SYMBOLS.spaces}</span>
-                <span>{spacesLabel} · Guía pública</span>
+              <span>{spacesLabel}</span>
                 {isSpacesView && <span className="nav-status" aria-hidden="true" />}
               </a>
             )}
             <a className={`nav-item${isStudentServicesView ? ' active' : ''}`} href="#estudiantes"
               aria-current={isStudentServicesView ? 'page' : undefined}>
               <span className="nav-glyph" aria-hidden="true">{MODULE_SYMBOLS.students}</span>
-              <span>{studentServicesLabel} · Directorio público</span>
+              <span>{studentServicesLabel}</span>
               {isStudentServicesView && <span className="nav-status" aria-hidden="true" />}
             </a>
             <a className={`nav-item${isAcademicOperationsView ? ' active' : ''}`} href="#academia" aria-current={isAcademicOperationsView ? 'page' : undefined}>
               <span className="nav-glyph" aria-hidden="true">◷</span>
-              <span>Estructura y periodos · Vista previa</span>
+              <span>Estructura y periodos</span>
               {isAcademicOperationsView && <span className="nav-status" aria-hidden="true" />}
             </a>
             {libraryAuthorization?.canRead && (
@@ -483,30 +462,6 @@ function ApplicationShell({
                 {isNoticesAdminView && <span className="nav-status" aria-hidden="true" />}
               </a>
             )}
-            {import.meta.env.DEV && (
-              <a className={`nav-item${isStudentDemoView ? ' active' : ''}`} href="#estudiante-demo"
-                aria-current={isStudentDemoView ? 'page' : undefined}>
-                <span className="nav-glyph" aria-hidden="true">▦</span>
-                <span>Vida académica · demo</span>
-                {isStudentDemoView && <span className="nav-status" aria-hidden="true" />}
-              </a>
-            )}
-            {import.meta.env.DEV && (
-              <a className={`nav-item${isGradeEntryDemoView ? ' active' : ''}`} href="#calificaciones-demo"
-                aria-current={isGradeEntryDemoView ? 'page' : undefined}>
-                <span className="nav-glyph" aria-hidden="true">∑</span>
-                <span>Registro de calificaciones · demo</span>
-                {isGradeEntryDemoView && <span className="nav-status" aria-hidden="true" />}
-              </a>
-            )}
-            {import.meta.env.DEV && (
-              <a className={`nav-item${isRoomAllocationDemoView ? ' active' : ''}`} href="#aulas-demo"
-                aria-current={isRoomAllocationDemoView ? 'page' : undefined}>
-                <span className="nav-glyph" aria-hidden="true">⌖</span>
-                <span>Asignación de aulas · demo</span>
-                {isRoomAllocationDemoView && <span className="nav-status" aria-hidden="true" />}
-              </a>
-            )}
           </nav>
         </div>
 
@@ -528,26 +483,24 @@ function ApplicationShell({
           <span><strong>Entorno de desarrollo</strong><small>Sin datos estudiantiles reales</small></span>
         </div>
         <Suspense fallback={null}>
-          <MobileNavigation items={mobileNavigationItems} currentHash={window.location.hash || '#inicio'} />
+          <MobileNavigation items={mobileNavigationItems} currentHash={window.location.hash || '#resumen'} />
         </Suspense>
       </aside>
 
       <div className="workspace">
         <header className="topbar">
-          <div className="breadcrumbs"><span>{isProgramsView || isAcademicOperationsView || isAdmissionsView || isSpacesView || isStudentServicesView || isLibraryView || isNoticesView || isNoticesAdminView || isStudentDemoView || isGradeEntryDemoView || isRoomAllocationDemoView ? 'Vida universitaria' : 'Administración'}</span><span aria-hidden="true">/</span><strong>{currentPageLabel}</strong></div>
+          <div className="breadcrumbs"><span>{isHomeView ? 'Portal universitario' : isProgramsView || isAcademicOperationsView || isAdmissionsView || isSpacesView || isStudentServicesView || isLibraryView || isNoticesView || isNoticesAdminView ? 'Vida universitaria' : 'Administración'}</span><span aria-hidden="true">/</span><strong>{currentPageLabel}</strong></div>
           <div className="topbar-meta">
-            <span className="autosave-indicator"><span aria-hidden="true" />{isNoticesAdminView ? 'Administración de avisos' : isNoticesView ? 'Avisos institucionales' : isLibraryView ? 'Servicios bibliográficos' : isStudentServicesView ? 'Directorio público' : isStudentDemoView || isGradeEntryDemoView || isRoomAllocationDemoView ? 'Experiencia de muestra' : isRoleAccessView ? 'Control administrativo' : isAdmissionsView ? 'Consulta de admisiones' : isSpacesView ? 'Consulta de espacios' : isProgramsView ? 'Consulta de programas' : isAcademicOperationsView ? 'Consulta académica' : status === 'ready' ? 'Identidad sincronizada' : 'Identidad de respaldo'}</span>
+            <span className="autosave-indicator"><span aria-hidden="true" />{isHomeView ? 'Inicio institucional' : isNoticesAdminView ? 'Administración de avisos' : isNoticesView ? 'Avisos institucionales' : isLibraryView ? 'Servicios bibliográficos' : isStudentServicesView ? 'Directorio público' : isRoleAccessView ? 'Control administrativo' : isAdmissionsView ? 'Consulta de admisiones' : isSpacesView ? 'Consulta de espacios' : isProgramsView ? 'Consulta de programas' : isAcademicOperationsView ? 'Consulta académica' : status === 'ready' ? 'Identidad sincronizada' : 'Identidad de respaldo'}</span>
             <span className="topbar-divider" aria-hidden="true" />
-            {isNoticesAdminView
+            {isHomeView
+              ? <span className="revision-chip">PORTAL UNIVERSITARIO</span>
+              : isNoticesAdminView
               ? <span className="revision-chip">AVISOS · ADMINISTRACIÓN</span>
               : isNoticesView
               ? <span className="revision-chip">AVISOS · COMUNIDAD</span>
               : isLibraryView
               ? <span className="revision-chip">BIBLIOTECA · CATÁLOGO</span>
-              : isGradeEntryDemoView
-              ? <span className="revision-chip">CALIFICACIONES · DEMO</span>
-              : isStudentDemoView
-              ? <span className="revision-chip">VIDA ACADÉMICA · DEMO</span>
               : isRoleAccessView
               ? <span className="revision-chip">PERFILES · IDENTIDAD</span>
               : isAdmissionsView
@@ -588,9 +541,9 @@ function ApplicationShell({
           </div>
         </header>
 
-        <main id={isStudentServicesView ? 'estudiantes' : isLibraryView ? 'biblioteca' : isNoticesView ? 'avisos' : isNoticesAdminView ? 'avisos-admin' : isStudentDemoView ? 'estudiante-demo' : isGradeEntryDemoView ? 'calificaciones-demo' : isRoomAllocationDemoView ? 'aulas-demo' : view === 'identity' ? 'inicio' : view === 'programs' ? 'programas' : isAdmissionsView ? 'admisiones' : isSpacesView ? 'espacios' : isRoleAccessView ? 'accesos' : 'academia'}
-          className={isStudentServicesView ? 'student-services-page-content' : isLibraryView ? 'library-page-content' : isNoticesView ? 'my-notices-page-content' : isNoticesAdminView ? 'notices-admin-page-content' : isStudentDemoView ? 'student-week-page-content' : isGradeEntryDemoView ? 'grade-entry-page-content' : isRoomAllocationDemoView ? 'room-allocation-page-content' : isRoleAccessView ? 'role-access-page-content' : isAdmissionsView ? 'admissions-page-content' : isSpacesView ? 'spaces-page-content' : isProgramsView ? 'catalog-page-content' : isAcademicOperationsView ? 'academic-page-content' : 'page-content identity-page-content'}>
-          {isLocalPreviewSession && (
+        <main id={isHomeView ? 'resumen' : isStudentServicesView ? 'estudiantes' : isLibraryView ? 'biblioteca' : isNoticesView ? 'avisos' : isNoticesAdminView ? 'avisos-admin' : view === 'identity' ? 'inicio' : view === 'programs' ? 'programas' : isAdmissionsView ? 'admisiones' : isSpacesView ? 'espacios' : isRoleAccessView ? 'accesos' : 'academia'}
+          className={isHomeView ? 'workspace-home-page-content' : isStudentServicesView ? 'student-services-page-content' : isLibraryView ? 'library-page-content' : isNoticesView ? 'my-notices-page-content' : isNoticesAdminView ? 'notices-admin-page-content' : isRoleAccessView ? 'role-access-page-content' : isAdmissionsView ? 'admissions-page-content' : isSpacesView ? 'spaces-page-content' : isProgramsView ? 'catalog-page-content' : isAcademicOperationsView ? 'academic-page-content' : 'page-content identity-page-content'}>
+          {isLocalPreviewSession && !isHomeView && (
             <aside className="local-preview-session-banner" role="status">
               <strong>Desarrollador local · modo preview</strong>
               <span>Permisos de demostración en este entorno; usa únicamente datos sintéticos. Esta sesión no es institucional.</span>
@@ -606,12 +559,8 @@ function ApplicationShell({
 
           <ModuleLoadBoundary
             key={view}
-            fallback={<ModuleLoadFailure label={isGradeEntryDemoView
-              ? 'el registro de calificaciones de ejemplo'
-              : isRoomAllocationDemoView
-                ? 'la asignación de aulas de ejemplo'
-              : isStudentDemoView
-              ? 'la experiencia académica de ejemplo'
+            fallback={<ModuleLoadFailure label={isHomeView
+              ? 'la portada del portal'
               : isStudentServicesView
                 ? 'el directorio de servicios estudiantiles'
               : isLibraryView
@@ -631,18 +580,11 @@ function ApplicationShell({
                 : 'el centro de identidad visual'} />}
           >
             <Suspense fallback={<p className="module-loading" role="status" aria-live="polite">
-              Cargando {isNoticesAdminView ? 'la administración de avisos' : isNoticesView ? 'tus avisos institucionales' : isStudentServicesView ? 'directorio de servicios estudiantiles' : isLibraryView ? 'catálogo de biblioteca' : isRoomAllocationDemoView ? 'asignación de aulas de ejemplo' : isGradeEntryDemoView ? 'registro de calificaciones de ejemplo' : isStudentDemoView ? 'experiencia académica de ejemplo' : isRoleAccessView ? 'consola de accesos' : isAdmissionsView ? 'agenda de admisiones' : isSpacesView ? 'guía de espacios' : isProgramsView || isAcademicOperationsView ? 'módulo académico' : 'centro de identidad visual'}…
+              Cargando {isHomeView ? 'portada del portal' : isNoticesAdminView ? 'la administración de avisos' : isNoticesView ? 'tus avisos institucionales' : isStudentServicesView ? 'directorio de servicios estudiantiles' : isLibraryView ? 'catálogo de biblioteca' : isRoleAccessView ? 'consola de accesos' : isAdmissionsView ? 'agenda de admisiones' : isSpacesView ? 'guía de espacios' : isProgramsView || isAcademicOperationsView ? 'módulo académico' : 'centro de identidad visual'}…
             </p>}>
-              {isRoomAllocationDemoView && RoomAllocationDemo
-                ? <RoomAllocationDemo
-                  session={isLocalPreviewSession && authenticatedIdentity
-                    ? { type: 'local-preview', accessToken: authenticatedIdentity.accessToken }
-                    : null}
-                />
-                : isGradeEntryDemoView && GradeEntryDemo
-                ? <GradeEntryDemo />
-                : isStudentDemoView && StudentAcademicWeekDemo
-                ? <StudentAcademicWeekDemo />
+              {isHomeView
+                ? <WorkspaceHomePage branding={branding} permissions={authenticatedIdentity?.permissions ?? []}
+                  isLocalPreview={isLocalPreviewSession} />
                 : isStudentServicesView
                   ? <StudentServicesPage />
                 : isRoleAccessView
@@ -684,7 +626,9 @@ function ApplicationShell({
             </Suspense>
           </ModuleLoadBoundary>
 
-          <footer className="page-footer"><span>{branding.institutionName}</span><span>{isNoticesAdminView
+          <footer className="page-footer"><span>{branding.institutionName}</span><span>{isHomeView
+            ? 'Portada institucional · accesos administrativos según permisos efectivos'
+            : isNoticesAdminView
             ? noticesAuthorization?.canWrite
               ? 'Publicación con referencia institucional · El aviso publicado no se edita'
               : 'Consulta de avisos · Publicar requiere autorización institucional'
@@ -698,14 +642,8 @@ function ApplicationShell({
             ? roleAccessAuthorization?.canWrite
               ? 'Gestión de perfiles · permisos asignados y auditados en el servidor'
               : 'Consulta de perfiles · escritura requiere autorización institucional'
-            : isGradeEntryDemoView
-              ? 'Laboratorio DEV · Datos sintéticos · Borrador volátil sin integración institucional'
-              : isRoomAllocationDemoView
-                ? 'Laboratorio DEV · Escenarios sintéticos · Sin reservas ni persistencia'
             : isStudentServicesView
               ? 'Fuentes públicas UPTC · Sin credenciales ni trámites'
-            : isStudentDemoView
-              ? 'Semana y asignaturas ficticias · Sin matrícula institucional ni consulta de datos personales'
             : isAdmissionsView
             ? admissionsAuthorization?.canRead && admissionsAuthorization.canWrite
               ? 'Calendario versionado · Publicación protegida y auditada'
@@ -713,7 +651,7 @@ function ApplicationShell({
             : isSpacesView
               ? 'Guía pública de ubicaciones · Consulta la fuente oficial antes de desplazarte'
             : isProgramsView
-            ? 'Vista previa de programas · Sin publicación institucional'
+            ? 'Directorio público de programas de pregrado · Fuente UPTC'
           : isAcademicOperationsView
               ? periodAuthorization?.canWrite
                 ? 'Control del estado del periodo · Oferta y matrícula independientes'
@@ -728,10 +666,9 @@ function ApplicationShell({
 export default App
 
 function readApplicationView(): ApplicationView {
-  if (typeof window === 'undefined') return 'identity'
-  if (import.meta.env.DEV && window.location.hash === '#aulas-demo') return 'room-allocation-demo'
-  if (import.meta.env.DEV && window.location.hash === '#calificaciones-demo') return 'gradebook-demo'
-  if (import.meta.env.DEV && window.location.hash === '#estudiante-demo') return 'student-demo'
+  if (typeof window === 'undefined') return 'home'
+  if (window.location.hash === '#resumen') return 'home'
+  if (window.location.hash === '#inicio') return 'identity'
   if (window.location.hash === '#estudiantes') return 'student-services'
   if (window.location.hash === '#biblioteca') return 'library'
   if (window.location.hash === '#avisos') return 'notices'
@@ -741,7 +678,7 @@ function readApplicationView(): ApplicationView {
   if (window.location.hash === '#admisiones') return 'admissions'
   if (window.location.hash === '#espacios') return 'spaces'
   if (window.location.hash === '#accesos') return 'access'
-  return 'identity'
+  return 'home'
 }
 
 function isAcademicCatalogPermission(permission: string): permission is AcademicCatalogPermission {

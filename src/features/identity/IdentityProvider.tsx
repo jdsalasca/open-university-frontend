@@ -30,7 +30,7 @@ interface IdentityProviderProps extends PropsWithChildren {
   localPreviewSessionClient?: LocalPreviewSessionClient
 }
 
-const KNOWN_RETURN_HASHES = new Set(['#inicio', '#programas', '#academia'])
+const KNOWN_RETURN_HASHES = new Set(['#resumen', '#inicio', '#programas', '#academia'])
 const DEFAULT_CONFIGURATION: OidcConfigurationResult = typeof window === 'undefined'
   ? { status: 'unconfigured' }
   : parseOidcConfiguration({

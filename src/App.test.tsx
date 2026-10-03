@@ -2,6 +2,7 @@ import { cleanup, render, screen, waitFor, within } from '@testing-library/react
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { App } from './App'
+import publicUndergraduateSnapshot from './features/academics/publicCatalog/uptcUndergraduateCatalog.snapshot.json'
 import { AcademicOperationsApiError } from './features/academics/academicOperationsClient'
 import { BrandingProvider } from './features/branding/BrandingProvider'
 import { DEFAULT_BRANDING } from './features/branding/contracts'
@@ -67,8 +68,16 @@ function readOnlyRoleAccessClient(): RoleAccessClient {
 
 afterEach(() => {
   cleanup()
+  vi.unstubAllGlobals()
   window.history.replaceState(null, '', '#inicio')
 })
+
+function stubPublicUndergraduateSnapshot() {
+  vi.stubGlobal('fetch', vi.fn(async () => ({
+    ok: true,
+    json: async () => publicUndergraduateSnapshot,
+  }) as Response))
+}
 
 function emptyAcademicCatalogClient(): AcademicCatalogClient {
   return {
@@ -161,10 +170,10 @@ function publicSpaceGuideClient(): SpaceGuideClient {
 }
 
 describe('App', () => {
-  it('offers mobile destinations while keeping unavailable and unauthorized routes out', async () => {
+  it('opens student services from the portal home and keeps the identity center on its own route', async () => {
     // Arrange
     const user = userEvent.setup()
-    window.history.replaceState(null, '', '#inicio')
+    window.history.replaceState(null, '', '#resumen')
     render(
       <BrandingProvider loader={async () => DEFAULT_BRANDING}>
         <App
@@ -176,72 +185,75 @@ describe('App', () => {
     )
 
     // Act
-    const mobileNavigation = await screen.findByRole('navigation', { name: 'Navegación móvil' }, { timeout: 5_000 })
-    await user.click(within(mobileNavigation).getByRole('button', { name: 'Más secciones' }))
+    await screen.findByRole('heading', { name: /tu universidad, en un mismo lugar/i }, { timeout: 10_000 })
+    await user.click(await screen.findByRole('link', { name: /servicios académicos/i }, { timeout: 10_000 }))
 
     // Assert
-    expect(within(mobileNavigation).getByRole('link', { name: 'Inicio' })).toHaveAttribute('aria-current', 'page')
-    expect(within(mobileNavigation).getByRole('link', { name: 'Programas' })).toBeInTheDocument()
-    expect(within(mobileNavigation).getByRole('link', { name: 'Estructura académica' })).toBeInTheDocument()
-    expect(within(mobileNavigation).queryByRole('link', { name: 'Accesos y perfiles' })).not.toBeInTheDocument()
-    expect(within(mobileNavigation).queryByRole('link', { name: 'Resumen' })).not.toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Servicios para acompañar tu vida universitaria' })).toBeVisible()
+    expect(window.location.hash).toBe('#estudiantes')
+    expect(within(screen.getByRole('navigation', { name: 'Principal' }))
+      .getByRole('link', { name: 'Servicios estudiantiles' })).toHaveAttribute('aria-current', 'page')
   })
 
-  it('opens the local student week experience from development navigation', async () => {
+  it('opens the portal summary by default and preserves the visual identity center route', async () => {
     // Arrange
     const user = userEvent.setup()
-    window.history.replaceState(null, '', '#inicio')
+    window.history.replaceState(null, '', '/')
     render(
       <BrandingProvider loader={async () => DEFAULT_BRANDING}>
         <App
-          oidcConfiguration={{ status: 'unconfigured' }}
-          currentIdentityClient={identityClientWithPermissions([])}
-          localPreviewSessionClient={null}
+          catalogClient={emptyAcademicCatalogClient()}
         />
       </BrandingProvider>,
     )
 
     // Act
-    const studentPreviewLink = await screen.findByRole('link', { name: 'Vida académica · demo' })
-    await user.click(studentPreviewLink)
+    const summaryLink = within(screen.getByRole('navigation', { name: 'Principal' }))
+      .getByRole('link', { name: 'Resumen' })
 
     // Assert
-    expect(await screen.findByRole('heading', { name: 'Mi semana académica' })).toBeVisible()
-    expect(screen.getAllByText('Vida académica · demo')).toHaveLength(2)
-    expect(screen.getByText('VIDA ACADÉMICA · DEMO')).toBeVisible()
-    expect(studentPreviewLink).toHaveAttribute('aria-current', 'page')
-    expect(window.location.hash).toBe('#estudiante-demo')
+    expect(await screen.findByRole('heading', { name: /tu universidad, en un mismo lugar/i })).toBeVisible()
+    expect(summaryLink).toHaveAttribute('href', '#resumen')
+    expect(summaryLink).toHaveAttribute('aria-current', 'page')
+    const identityLink = within(screen.getByRole('navigation', { name: 'Principal' }))
+      .getByRole('link', { name: 'Identidad visual' })
+    expect(identityLink).toHaveAttribute('href', '#inicio')
+
+    // Act
+    await user.click(identityLink)
+
+    // Assert
+    expect(await screen.findByRole('heading', { name: /centro de identidad visual/i })).toBeVisible()
+    expect(window.location.hash).toBe('#inicio')
   })
 
-  it('opens the local grade-entry prototype from development navigation', async () => {
+  it('shows administrative home links only for effective permissions', async () => {
     // Arrange
-    const user = userEvent.setup()
-    window.history.replaceState(null, '', '#inicio')
+    window.history.replaceState(null, '', '#resumen')
     render(
       <BrandingProvider loader={async () => DEFAULT_BRANDING}>
         <App
-          oidcConfiguration={{ status: 'unconfigured' }}
-          currentIdentityClient={identityClientWithPermissions([])}
+          oidcConfiguration={oidcConfiguration}
+          identityManager={authenticatedSessionManager()}
+          currentIdentityClient={identityClientWithPermissions(['academic:period:read'])}
           localPreviewSessionClient={null}
         />
       </BrandingProvider>,
     )
 
     // Act
-    const gradeEntryLink = await screen.findByRole('link', { name: 'Registro de calificaciones · demo' })
-    await user.click(gradeEntryLink)
+    await screen.findByText('Sesión institucional activa')
+    const administration = await screen.findByRole('region', { name: /herramientas administrativas/i })
 
     // Assert
-    expect(await screen.findByRole('heading', { name: 'Registro de calificaciones · demo' })).toBeVisible()
-    expect(screen.getByText('DEMO-ALU-001')).toBeVisible()
-    expect(screen.getByText(/borrador solo se guarda en memoria/i)).toBeVisible()
-    expect(gradeEntryLink).toHaveAttribute('aria-current', 'page')
-    expect(window.location.hash).toBe('#calificaciones-demo')
+    expect(within(administration).getByRole('link', { name: /estructura, periodos y oferta/i }))
+      .toHaveAttribute('href', '#academia')
+    expect(within(administration).queryByRole('link', { name: /accesos y perfiles/i }))
+      .not.toBeInTheDocument()
   })
 
-  it('opens the room-allocation preview in development without sending a request before local preview access', async () => {
+  it('does not expose synthetic student, grade, or classroom demos through product navigation', async () => {
     // Arrange
-    const user = userEvent.setup()
     window.history.replaceState(null, '', '#inicio')
     render(
       <BrandingProvider loader={async () => DEFAULT_BRANDING}>
@@ -254,15 +266,11 @@ describe('App', () => {
     )
 
     // Act
-    const roomAllocationLink = await screen.findByRole('link', { name: 'Asignación de aulas · demo' })
-    await user.click(roomAllocationLink)
+    await screen.findByRole('heading', { name: /centro de identidad visual/i })
 
     // Assert
-    expect(await screen.findByRole('heading', { name: 'Asignación de aulas · demo' })).toBeVisible()
-    expect(screen.getByText(/escenarios totalmente sintéticos/i)).toBeVisible()
-    expect(screen.getByRole('button', { name: /calcular propuesta/i })).toBeDisabled()
-    expect(roomAllocationLink).toHaveAttribute('aria-current', 'page')
-    expect(window.location.hash).toBe('#aulas-demo')
+    expect(screen.queryAllByRole('link', { name: /demo|vida académica|registro de calificaciones|asignación de aulas/i }))
+      .toHaveLength(0)
   })
 
   it('labels local developer access and opens only modules returned by the current-identity API', async () => {
@@ -425,9 +433,10 @@ describe('App', () => {
     expect(screen.getByText('Cargando módulo académico…')).toBeVisible()
   })
 
-  it('opens Programs as a keyboard accessible development preview while branding availability stays false', async () => {
+  it('opens the public undergraduate directory by keyboard while curriculum controls stay unavailable', async () => {
     // Arrange
     const user = userEvent.setup()
+    stubPublicUndergraduateSnapshot()
     render(
       <BrandingProvider loader={async () => DEFAULT_BRANDING}>
         <App catalogClient={emptyAcademicCatalogClient()} />
@@ -435,18 +444,17 @@ describe('App', () => {
     )
 
     // Act
-    const programsLink = await screen.findByRole('link', { name: /programas.*vista previa/i })
-    await user.tab()
-    await user.tab()
-    await user.tab()
+    const programsLink = within(screen.getByRole('navigation', { name: 'Principal' }))
+      .getByRole('link', { name: 'Programas' })
+    for (let tabs = 0; tabs < 12 && !programsLink.matches(':focus'); tabs += 1) await user.tab()
     expect(programsLink).toHaveFocus()
     await user.keyboard('{Enter}')
 
     // Assert
-    expect(await screen.findByRole('heading', { name: 'Programas de pregrado presencial' })).toBeVisible()
+    expect(await screen.findByRole('heading', { name: 'Programas de pregrado UPTC' })).toBeVisible()
     expect(programsLink).toHaveAttribute('aria-current', 'page')
     expect(DEFAULT_BRANDING.modules.find((module) => module.key === 'programs')?.available).toBe(false)
-    expect(screen.getByText(/Este módulo es una vista previa y no está habilitado para operación institucional/i)).toBeVisible()
+    expect(screen.getByRole('link', { name: /catálogo público UPTC/i })).toHaveAttribute('href', 'https://www.uptc.edu.co/sitio/portal/sitios/programas_ofer/pregrado.html')
   })
 
   it('opens academic structure and periods from the application navigation', async () => {
@@ -481,21 +489,19 @@ describe('App', () => {
 
     // Act
     const link = await screen.findByRole('link', { name: /admisiones/i })
-    expect(link).toHaveAccessibleName(/admisiones.*aspirante y equipo.*demo/i)
+    expect(link).toHaveAccessibleName(/admisiones.*información pública/i)
     await user.click(link)
-    expect(await screen.findByRole('tab', { name: /aspirante · demo/i }, { timeout: 5_000 }))
-      .toHaveAttribute('aria-selected', 'true')
-    await user.click(screen.getByRole('tab', { name: /calendario público/i }))
 
     // Assert
     expect(await screen.findByRole('heading', { name: /pregrado presencial.*2027-i/i })).toBeVisible()
+    expect(screen.queryByRole('tab', { name: /demo/i })).not.toBeInTheDocument()
+    expect(screen.queryByText(/programa ficticio|datos sintéticos/i)).not.toBeInTheDocument()
     expect(link).toHaveAttribute('href', '#admisiones')
     expect(link).toHaveAttribute('aria-current', 'page')
   })
 
   it('hides admissions from navigation when branding disables visibility but keeps its public route accessible', async () => {
     // Arrange
-    const user = userEvent.setup()
     const branding = {
       ...DEFAULT_BRANDING,
       modules: DEFAULT_BRANDING.modules.map((module) => module.key === 'admissions'
@@ -510,8 +516,6 @@ describe('App', () => {
     )
 
     // Act
-    const calendarTab = await screen.findByRole('tab', { name: /calendario público/i })
-    await user.click(calendarTab)
     const pageHeading = await screen.findByRole('heading', { name: /pregrado presencial.*2027-i/i })
 
     // Assert
@@ -573,6 +577,7 @@ describe('App', () => {
   it('uses backend branding permission without granting academic catalog controls', async () => {
     // Arrange
     const user = userEvent.setup()
+    stubPublicUndergraduateSnapshot()
     const catalogClient = {
       ...emptyAcademicCatalogClient(),
       listDrafts: vi.fn().mockResolvedValue({ pageSize: 25, totalItems: 0, nextCursor: null, drafts: [] }),
@@ -591,8 +596,9 @@ describe('App', () => {
 
     // Act
     expect(await screen.findByText('Sesión institucional activa')).toBeVisible()
-    await user.click(screen.getByRole('link', { name: /programas.*vista previa/i }))
-    expect(await screen.findByRole('heading', { name: 'Programas de pregrado presencial' })).toBeVisible()
+    await user.click(within(screen.getByRole('navigation', { name: 'Principal' }))
+      .getByRole('link', { name: 'Programas' }))
+    expect(await screen.findByRole('heading', { name: 'Programas de pregrado UPTC' })).toBeVisible()
 
     // Assert
     expect(catalogClient.listDrafts).not.toHaveBeenCalled()
@@ -755,8 +761,10 @@ describe('App', () => {
     expect(screen.queryByRole('button', { name: 'Abrir periodo 2026-2' })).not.toBeInTheDocument()
 
     // Act: navigating away and back must keep the token rejected for period writes.
-    await user.click(screen.getByRole('link', { name: 'Programas · Vista previa' }))
-    await user.click(screen.getByRole('link', { name: 'Estructura y periodos · Vista previa' }))
+    await user.click(within(screen.getByRole('navigation', { name: 'Principal' }))
+      .getByRole('link', { name: 'Programas' }))
+    await user.click(within(screen.getByRole('navigation', { name: 'Principal' }))
+      .getByRole('link', { name: 'Estructura y periodos' }))
 
     // Assert
     expect(screen.queryByRole('button', { name: 'Abrir periodo 2026-2' })).not.toBeInTheDocument()
@@ -878,8 +886,10 @@ describe('App', () => {
     expect(operations.changeOrganizationUnitOrder).toHaveBeenCalledOnce()
 
     // Act: return to the academic view after its page component has unmounted.
-    await user.click(screen.getByRole('link', { name: 'Programas · Vista previa' }))
-    await user.click(screen.getByRole('link', { name: 'Estructura y periodos · Vista previa' }))
+    await user.click(within(screen.getByRole('navigation', { name: 'Principal' }))
+      .getByRole('link', { name: 'Programas' }))
+    await user.click(within(screen.getByRole('navigation', { name: 'Principal' }))
+      .getByRole('link', { name: 'Estructura y periodos' }))
     await waitFor(() => expect(getStructure.mock.calls.length).toBeGreaterThanOrEqual(3))
 
     // Assert: a denied token cannot regain its editor after route navigation.

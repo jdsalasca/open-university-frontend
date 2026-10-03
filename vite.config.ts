@@ -18,6 +18,7 @@ export default defineConfig(({ mode }) => {
     },
     test: {
       environment: 'jsdom',
+      pool: 'vmThreads',
       setupFiles: ['./src/test/setup.ts'],
       maxWorkers: 4,
       restoreMocks: true,

@@ -145,6 +145,8 @@
 .theme-selector { flex: 0 0 auto; }
 
 .page-content { max-width: 1440px; margin: 0 auto; padding: 34px 42px 20px; }
+.workspace-home-page-content { min-width: 0; min-height: calc(100vh - 69px); padding: 0; }
+.workspace-home-page-content > .page-footer { width: min(calc(100% - clamp(36px, 6.4vw, 96px)), 1510px); margin: 0 auto 18px; }
 .module-loading { display: grid; min-height: clamp(220px, 54vh, 520px); place-items: center; color: #74766e; font-size: 12px; }
 .module-load-failure { display: grid; min-height: clamp(220px, 54vh, 520px); align-content: center; justify-items: center; gap: 12px; color: #74766e; font-size: 12px; }
 .module-load-failure p { margin: 0; }

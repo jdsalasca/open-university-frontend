@@ -4,7 +4,7 @@ export const OFFICIAL_ADMISSIONS_CALENDAR_2027_I: PublicAdmissionsCalendar = {
   title: 'Pregrado presencial 2027-I',
   callName: 'Primer semestre académico de 2027',
   updatedAt: '15 de septiembre de 2026',
-  checkedAt: '1 de octubre de 2026',
+  checkedAt: '2 de octubre de 2026',
   source: {
     label: 'Calendario oficial de ACRA',
     url: 'https://reportes.uptc.edu.co/sitio/portal/sitios/universidad/vic_aca/adm_reg/1aspi/pre/',

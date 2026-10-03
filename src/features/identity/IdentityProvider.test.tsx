@@ -425,6 +425,21 @@ describe('IdentityProvider', () => {
     expect(manager.signinRedirect).toHaveBeenCalledWith({ state: { returnHash: '#academia' } })
   })
 
+  it('preserves the portal summary as the internal return route after login', async () => {
+    // Arrange
+    const user = userEvent.setup()
+    const manager = makeManager()
+    window.history.replaceState(null, '', '/#resumen')
+    await renderProvider({ manager })
+    await screen.findByRole('status')
+
+    // Act
+    await user.click(screen.getByRole('button', { name: 'Iniciar sesión' }))
+
+    // Assert
+    expect(manager.signinRedirect).toHaveBeenCalledWith({ state: { returnHash: '#resumen' } })
+  })
+
   it('retries permission discovery after a transient backend failure', async () => {
     // Arrange
     const user = userEvent.setup()

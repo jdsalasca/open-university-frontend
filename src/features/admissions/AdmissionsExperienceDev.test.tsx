@@ -1,5 +1,4 @@
-import { cleanup, render, screen, within } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
+import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AdmissionsExperience } from './AdmissionsExperience'
 import type { AdmissionsCallClient } from './admissionsCallContracts'
@@ -17,49 +16,38 @@ function publicCalendarClient(): AdmissionsCallClient {
   }
 }
 
-describe('AdmissionsExperience in the local Vite preview', () => {
-  it('opens the applicant experience, preserves the public calendar, and makes no application API calls', async () => {
+describe('AdmissionsExperience in a local Vite build', () => {
+  it('shows the public calendar without applicant or operator demo routes', async () => {
     // Arrange
-    const user = userEvent.setup()
     const client = publicCalendarClient()
     render(<AdmissionsExperience client={client} />)
 
     // Act
-    expect(await screen.findByRole('tab', { name: /aspirante · demo/i })).toHaveAttribute('aria-selected', 'true')
-    await user.click(screen.getByRole('tab', { name: /calendario público/i }))
+    const calendar = await screen.findByRole('heading', { name: /pregrado presencial.*2027-i/i })
 
     // Assert
-    expect(await screen.findByRole('heading', { name: /pregrado presencial.*2027-i/i })).toBeVisible()
+    expect(calendar).toBeVisible()
     expect(screen.getByText(/no hay una convocatoria administrada publicada/i)).toBeVisible()
+    expect(screen.queryByRole('tab', { name: /aspirante|equipo de admisiones/i })).not.toBeInTheDocument()
+    expect(screen.queryByText(/ficha demo-|datos ficticios|solicitar ajuste demo/i)).not.toBeInTheDocument()
     expect(client.getPublicCalls).toHaveBeenCalledOnce()
     expect(client.getAdminCalls).not.toHaveBeenCalled()
     expect(client.createCall).not.toHaveBeenCalled()
   })
 
-  it('shares the correction loop between the synthetic applicant and admissions-team views', async () => {
+  it('keeps the public reference calendar when the published-call API fails', async () => {
     // Arrange
-    const user = userEvent.setup()
     const client = publicCalendarClient()
+    client.getPublicCalls = vi.fn(async () => { throw new Error('network unavailable') })
     render(<AdmissionsExperience client={client} />)
 
     // Act
-    await user.click(await screen.findByRole('tab', { name: /equipo de admisiones/i }))
-    const adminCase = screen.getByRole('article', { name: /ficha demo-0001/i })
-    await user.click(within(adminCase).getByRole('button', { name: /ver detalle/i }))
-    await user.click(screen.getByRole('button', { name: /iniciar revisión demo/i }))
-    await user.selectOptions(screen.getByLabelText(/motivo de ajuste demo/i), 'DEMO_COMPLETE_CHECKLIST')
-    await user.click(screen.getByRole('button', { name: /solicitar ajuste demo/i }))
-    await user.click(screen.getByRole('tab', { name: /aspirante/i }))
-    const applicantCase = screen.getByRole('article', { name: /ficha demo-0001/i })
-    await user.click(within(applicantCase).getByRole('button', { name: /confirmo la respuesta demo/i }))
-    await user.click(screen.getByRole('tab', { name: /equipo de admisiones/i }))
+    const calendar = await screen.findByRole('heading', { name: /pregrado presencial.*2027-i/i })
 
     // Assert
-    await user.click(within(adminCase).getByRole('button', { name: /ver detalle/i }))
-    const detail = screen.getByRole('region', { name: /detalle de ficha DEMO-0001/i })
-    expect(within(detail).getByRole('status')).toHaveTextContent(/respuesta demo recibida/i)
-    expect(screen.getByRole('button', { name: /reanudar revisión demo/i })).toBeVisible()
-    expect(client.createCall).not.toHaveBeenCalled()
-    expect(client.getAdminCalls).not.toHaveBeenCalled()
+    expect(calendar).toBeVisible()
+    expect(screen.getByText(/no fue posible consultar la agenda versionada/i)).toBeVisible()
+    expect(screen.queryByRole('tab', { name: /aspirante|equipo de admisiones/i })).not.toBeInTheDocument()
+    expect(client.getPublicCalls).toHaveBeenCalledOnce()
   })
 })
