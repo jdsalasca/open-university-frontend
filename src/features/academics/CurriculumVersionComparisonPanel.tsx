@@ -63,8 +63,8 @@ function ComparedCurriculumVersion({ comparison }: {
           <div className="catalog-version-comparison-category" key={category.name}>
             <h5>{category.name}</h5>
             <ul>
-              {category.samples.map((sample) => (
-                <li key={sample.subjectCode}>
+              {category.samples.map((sample, index) => (
+                <li key={`${sample.subjectCode}-${index}`}>
                   <code>{sample.subjectCode}</code>
                   {sample.changedFields.length > 0 && (
                     <span>Cambios: {sample.changedFields.map((field) => changedFieldLabels[field]).join(', ')}</span>

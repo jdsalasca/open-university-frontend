@@ -851,6 +851,42 @@ describe('AcademicCatalogPage', () => {
     expect(screen.getByText(/hasta diez ejemplos/i)).toBeVisible()
   })
 
+  it('renders repeated subject codes in one category without duplicate React keys', async () => {
+    // Arrange: a curriculum may legitimately repeat a subject code (electives, retakes).
+    const compared = comparedPreview.comparison
+    if (compared?.status !== 'COMPARED') throw new Error('fixture must be a compared preview')
+    const repeatedCodePreview: CurriculumImportPreview = {
+      ...comparedPreview,
+      comparison: {
+        status: 'COMPARED',
+        reference: compared.reference,
+        counts: { added: 2, removed: 0, modified: 0, unchanged: 0 },
+        addedSamples: [
+          { subjectCode: 'OPT-101', changedFields: [] },
+          { subjectCode: 'OPT-101', changedFields: [] },
+        ],
+        removedSamples: [],
+        modifiedSamples: [],
+        unchangedSamples: [],
+      },
+    }
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const client = createClient({ previewCsv: vi.fn().mockResolvedValue(repeatedCodePreview) })
+    await renderCatalogPage({ client, authorization })
+    const input = await screen.findByLabelText(/archivo CSV/i)
+    fireEvent.change(input, { target: { files: [new File(['csv'], 'plan.csv', { type: 'text/csv' })] } })
+
+    // Act
+    await userEvent.click(screen.getByRole('button', { name: /validar csv/i }))
+    await screen.findByText(/Nuevas: 2/)
+
+    // Assert
+    const duplicateKeyWarning = consoleError.mock.calls.find((call) =>
+      call.some((argument) => typeof argument === 'string' && /same key|duplicate key/i.test(argument)))
+    expect(duplicateKeyWarning).toBeUndefined()
+    consoleError.mockRestore()
+  })
+
   it('does not import when the preview is rejected', async () => {
     // Arrange
     const client = createClient({ previewCsv: vi.fn().mockRejectedValue(new Error('No fue posible validar el archivo.')) })
