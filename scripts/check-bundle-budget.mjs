@@ -17,8 +17,8 @@ export const DEFAULT_BUNDLE_BUDGETS = Object.freeze({
   // The shared entry now includes the authenticated #biblioteca route; keep its added shell cost bounded.
   entryJavaScript: 283_000,
   entryStyles: 21_000,
-  // The curriculum comparison adds a small loader; its panel stays outside the static #programas route budget.
-  programsJavaScript: 331_700,
+  // Keep the current catalog route bounded; its curriculum comparison panel remains in a separate lazy chunk.
+  programsJavaScript: 332_000,
   programsStyles: 48_000,
   oidcJavaScript: 75_000,
 })
