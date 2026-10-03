@@ -11,6 +11,8 @@ export type ApplicationPermission =
   | 'identity:roles:write'
   | 'library:read'
   | 'library:write'
+  | 'notices:read'
+  | 'notices:write'
 
 const academicPermissionAreas: readonly AcademicPermissionArea[] = ['catalog', 'structure', 'period', 'offerings']
 const permissionActions: readonly PermissionAction[] = ['read', 'write']
@@ -27,6 +29,8 @@ export const APPLICATION_PERMISSIONS: readonly ApplicationPermission[] = [
   'identity:roles:write',
   'library:read',
   'library:write',
+  'notices:read',
+  'notices:write',
 ]
 
 export interface CurrentIdentity {
