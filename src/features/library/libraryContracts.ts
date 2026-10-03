@@ -13,6 +13,9 @@ export interface LibraryCopy {
   barcode: string
   location: string
   active: boolean
+  withdrawnBy: string | null
+  withdrawnReference: string | null
+  withdrawnAt: string | null
 }
 
 export interface LibraryLoan {

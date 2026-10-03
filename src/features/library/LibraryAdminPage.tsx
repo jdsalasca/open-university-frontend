@@ -230,7 +230,11 @@ function LibraryAdminPageContent({
                       <span className="library-copy-barcode">{copy.barcode}</span>
                       <span className="library-copy-location">{copy.location}</span>
                       <span className={copy.active ? 'library-copy-active' : 'library-copy-inactive'}>
-                        {copy.active ? 'En circulación' : 'Retirado'}
+                        {copy.active
+                          ? 'En circulación'
+                          : copy.withdrawnReference
+                            ? `Retirado · ${copy.withdrawnReference}`
+                            : 'Retirado'}
                       </span>
                       {canWrite && copy.active && (
                         <button

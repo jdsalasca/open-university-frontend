@@ -32,9 +32,18 @@ const ACTIVE_COPY: LibraryCopy = {
   barcode: 'BC-0001',
   location: 'Estante A-3',
   active: true,
+  withdrawnBy: null,
+  withdrawnReference: null,
+  withdrawnAt: null,
 }
 
-const WITHDRAWN_COPY: LibraryCopy = { ...ACTIVE_COPY, active: false }
+const WITHDRAWN_COPY: LibraryCopy = {
+  ...ACTIVE_COPY,
+  active: false,
+  withdrawnBy: 'librarian',
+  withdrawnReference: 'Resolución de descarte 7 de 2026',
+  withdrawnAt: '2026-10-03T14:00:00Z',
+}
 
 function fakeClient(overrides: Partial<LibraryClient> = {}): LibraryClient {
   return {
@@ -123,6 +132,6 @@ describe('LibraryAdminPage', () => {
 
     // Assert
     await waitFor(() => expect(client.withdrawCopy).toHaveBeenCalledWith('copy-1', 'Resolución de descarte 7 de 2026', 'token'))
-    expect(await screen.findByText('Retirado')).toBeTruthy()
+    expect(await screen.findByText('Retirado · Resolución de descarte 7 de 2026')).toBeTruthy()
   })
 })
