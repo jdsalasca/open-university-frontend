@@ -80,6 +80,9 @@ describe('TerritorialCatalogSelector', () => {
 
     // Act
     const departmentFields = await screen.findAllByLabelText('Departamento de referencia')
+    await waitFor(() => {
+      expect(screen.getAllByRole('option', { name: 'ANTIOQUIA · 05' })).toHaveLength(2)
+    })
     await user.selectOptions(departmentFields[0]!, '05')
     await user.selectOptions(departmentFields[1]!, '15')
     await screen.findAllByLabelText('Buscar entidad territorial')
