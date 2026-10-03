@@ -66,11 +66,11 @@ function LibraryAdminPageContent({
     }
   }, [accessToken, onAuthorizationRejected])
 
-  const fetchCatalogue = useCallback(async (signal: AbortSignal) => {
+  const fetchCatalogue = useCallback(async (query: string, signal: AbortSignal) => {
     try {
       const [loans, catalogue] = await Promise.all([
         client.getOpenLoans(accessToken, signal),
-        client.getTitles(titleQuery, accessToken, signal),
+        client.getTitles(query, accessToken, signal),
       ])
       if (signal.aborted) return
       setOpenLoans(loans)
@@ -85,12 +85,12 @@ function LibraryAdminPageContent({
       setLoadState('error')
       await reportAuthorizationRejection(error)
     }
-  }, [accessToken, client, reportAuthorizationRejection, titleQuery])
+  }, [accessToken, client, reportAuthorizationRejection])
 
   useEffect(() => {
     const controller = new AbortController()
     // Deferred so the initial load is not a synchronous setState inside the effect.
-    const handle = setTimeout(() => { void fetchCatalogue(controller.signal) }, 0)
+    const handle = setTimeout(() => { void fetchCatalogue('', controller.signal) }, 0)
     return () => {
       clearTimeout(handle)
       controller.abort()
@@ -100,7 +100,7 @@ function LibraryAdminPageContent({
   function reload() {
     setLoadState('loading')
     setLoadError(null)
-    void fetchCatalogue(new AbortController().signal)
+    void fetchCatalogue(titleQuery, new AbortController().signal)
   }
 
   const selectTitle = useCallback(async (titleId: string) => {
@@ -123,7 +123,7 @@ function LibraryAdminPageContent({
     try {
       await client.returnLoan(loanId, returnReference.trim(), accessToken)
       setReturnReference('')
-      await fetchCatalogue(new AbortController().signal)
+      await fetchCatalogue(titleQuery, new AbortController().signal)
     } catch (error) {
       setActionError(ACTION_ERROR)
       await reportAuthorizationRejection(error)
@@ -162,7 +162,7 @@ function LibraryAdminPageContent({
         sourceReference: String(form.get('reference') ?? '').trim(),
       }, accessToken)
       event.currentTarget.reset()
-      await fetchCatalogue(new AbortController().signal)
+      await fetchCatalogue(titleQuery, new AbortController().signal)
     } catch (error) {
       setActionError(ACTION_ERROR)
       await reportAuthorizationRejection(error)
@@ -250,7 +250,10 @@ function LibraryAdminPageContent({
           <form className="library-form" onSubmit={(event) => {
             event.preventDefault()
             setLoadState('loading')
-            setTitleQuery(titleQueryInput.trim())
+            const nextQuery = titleQueryInput.trim()
+            setTitleQuery(nextQuery)
+            // Fetch explicitly so re-submitting the same text still refreshes instead of hanging on loading.
+            void fetchCatalogue(nextQuery, new AbortController().signal)
           }}>
             <label className="library-field">
               <span>Buscar título</span>

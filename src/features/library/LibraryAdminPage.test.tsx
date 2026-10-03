@@ -157,6 +157,25 @@ describe('LibraryAdminPage', () => {
     expect(await screen.findByText('No hay títulos que coincidan con la búsqueda.')).toBeTruthy()
   })
 
+  it('keeps the catalogue usable when the same search is submitted twice', async () => {
+    // Arrange: re-submitting the same text must not leave the page stuck loading.
+    const client = fakeClient({ getTitles: vi.fn(async () => [TITLE]) })
+    const user = userEvent.setup()
+    render(<LibraryAdminPage client={client} authorization={{ accessToken: 'token', canRead: true, canWrite: false }} />)
+
+    // Act
+    await screen.findByLabelText('Seleccionar título')
+    await user.type(screen.getByLabelText('Buscar título'), 'álgebra')
+    await user.click(screen.getByRole('button', { name: 'Buscar' }))
+    await screen.findByRole('option', { name: /Álgebra lineal/ })
+    await user.click(screen.getByRole('button', { name: 'Buscar' }))
+
+    // Assert
+    expect(await screen.findByLabelText('Seleccionar título')).toBeTruthy()
+    expect(screen.queryByText(/Consultando la biblioteca/)).toBeNull()
+    expect(client.getTitles).toHaveBeenCalledTimes(3)
+  })
+
   it('renders nothing when the session cannot read the library', () => {
     // Arrange + Act
     const { container } = render(
