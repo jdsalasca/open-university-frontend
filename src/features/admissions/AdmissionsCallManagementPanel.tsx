@@ -232,6 +232,10 @@ export function AdmissionsCallManagementPanel({
     }
   }
 
+  function retryLoad() {
+    setReloadNumber((current) => current + 1)
+  }
+
   function upsertCall(call: AdmissionsCallAdmin) {
     setCalls((current) => {
       const found = current.some((entry) => entry.id === call.id)
@@ -270,7 +274,12 @@ export function AdmissionsCallManagementPanel({
       </div>
 
       {requestState === 'loading' && <p className="admissions-admin-status" role="status">Cargando convocatorias…</p>}
-      {requestState === 'error' && <p className="admissions-admin-error" role="alert">No fue posible consultar la consola de convocatorias.</p>}
+      {requestState === 'error' && (
+        <>
+          <p className="admissions-admin-error" role="alert">No fue posible consultar la consola de convocatorias.</p>
+          <button className="admissions-admin-secondary" type="button" onClick={retryLoad}>Reintentar</button>
+        </>
+      )}
       {requestState === 'ready' && calls.length === 0 && (
         <p className="admissions-admin-empty" role="status">No hay convocatorias administradas todavía.</p>
       )}
