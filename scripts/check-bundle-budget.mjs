@@ -3,13 +3,17 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const ENTRY_KEY = 'index.html'
+const WORKSPACE_HOME_KEY = 'src/features/workspace/WorkspaceHomePage.tsx'
 const PROGRAMS_KEY = 'src/features/academics/AcademicCatalogPage.tsx'
 const CURRICULUM_COMPARISON_KEY = 'src/features/academics/CurriculumVersionComparisonPanel.tsx'
+const PUBLIC_DIRECTORY_KEY = 'src/features/academics/publicCatalog/PublicUndergraduateDirectory.tsx'
+const PUBLIC_CATALOG_KEY = 'src/features/academics/publicCatalog/uptcUndergraduateCatalog.snapshot.json'
 const OIDC_KEY = 'src/features/identity/identitySessionManager.ts'
 const ADMISSIONS_DEMO_PREFIX = 'src/features/admissions/demo/'
 const STUDENT_DEMO_PREFIX = 'src/features/students/demo/'
 const GRADEBOOK_DEMO_PREFIX = 'src/features/gradebook/demo/'
 const ROOM_PLANNING_DEMO_PREFIX = 'src/features/room-planning/demo/'
+const WORKSPACE_HOME_DEMO_PREFIX = 'src/features/workspace/demo/'
 const LOCAL_PREVIEW_CLIENT_KEY = 'src/features/identity/localPreviewSessionClient.ts'
 const LOCAL_PREVIEW_IDENTITY_KEY = 'src/features/identity/localPreviewIdentity.ts'
 
@@ -18,10 +22,12 @@ export const DEFAULT_BUNDLE_BUDGETS = Object.freeze({
   // shell cost bounded.
   entryJavaScript: 286_000,
   entryStyles: 21_000,
-  // The shared entry now includes the public #estudiantes route, the catalog curriculum comparison and the
-  // authenticated library and notices routes; keep its added shell cost bounded.
-  programsJavaScript: 334_500,
-  programsStyles: 48_000,
+  workspaceHomeJavaScript: 300_000,
+  workspaceHomeStyles: 30_000,
+  // The route budget includes the public directory chunk but excludes the on-demand curriculum comparison panel.
+  programsJavaScript: 350_000,
+  programsStyles: 56_000,
+  programsDataBytes: 42_000,
   oidcJavaScript: 75_000,
 })
 
@@ -29,6 +35,7 @@ function collectStaticAssets(manifest, roots) {
   const visitedChunks = new Set()
   const javascript = new Set()
   const styles = new Set()
+  const assets = new Set()
   const pending = [...roots]
 
   while (pending.length > 0) {
@@ -41,10 +48,11 @@ function collectStaticAssets(manifest, roots) {
 
     if (chunk.file?.endsWith('.js')) javascript.add(chunk.file)
     for (const style of chunk.css ?? []) styles.add(style)
+    for (const asset of chunk.assets ?? []) assets.add(asset)
     for (const dependency of chunk.imports ?? []) pending.push(dependency)
   }
 
-  return { javascript: [...javascript], styles: [...styles] }
+  return { javascript: [...javascript], styles: [...styles], assets: [...assets] }
 }
 
 function sumAssets(assets, sizeOf) {
@@ -63,8 +71,13 @@ export function inspectBundleBudget(
   budgets = DEFAULT_BUNDLE_BUDGETS,
 ) {
   const entryAssets = collectStaticAssets(manifest, [ENTRY_KEY])
-  const programsAssets = collectStaticAssets(manifest, [PROGRAMS_KEY])
+  const workspaceHomeAssets = collectStaticAssets(manifest, [ENTRY_KEY, WORKSPACE_HOME_KEY])
+  const programsPageAssets = collectStaticAssets(manifest, [PROGRAMS_KEY])
+  const programsAssets = collectStaticAssets(manifest, [PROGRAMS_KEY, PUBLIC_DIRECTORY_KEY])
   const comparisonPanel = manifest[CURRICULUM_COMPARISON_KEY]
+  const workspaceHomeChunk = manifest[WORKSPACE_HOME_KEY]
+  const publicDirectoryChunk = manifest[PUBLIC_DIRECTORY_KEY]
+  const publicCatalogAsset = manifest[PUBLIC_CATALOG_KEY]
   const oidcChunk = manifest[OIDC_KEY]
   if (!oidcChunk?.file) throw new Error(`Falta el chunk ${OIDC_KEY} en el manifiesto de Vite`)
   const oidcAssets = collectStaticAssets(manifest, [OIDC_KEY])
@@ -72,8 +85,11 @@ export function inspectBundleBudget(
   const measurements = {
     entryJavaScript: sumAssets(entryAssets.javascript, sizeOf),
     entryStyles: sumAssets(entryAssets.styles, sizeOf),
+    workspaceHomeJavaScript: sumAssets(workspaceHomeAssets.javascript, sizeOf),
+    workspaceHomeStyles: sumAssets(workspaceHomeAssets.styles, sizeOf),
     programsJavaScript: sumAssets(programsAssets.javascript, sizeOf),
     programsStyles: sumAssets(programsAssets.styles, sizeOf),
+    programsDataBytes: sumAssets(programsAssets.assets, sizeOf),
     oidcJavaScript: sumAssets(oidcAssets.javascript, sizeOf),
   }
 
@@ -81,8 +97,11 @@ export function inspectBundleBudget(
   const checks = [
     ['entry JavaScript', measurements.entryJavaScript, budgets.entryJavaScript],
     ['entry CSS', measurements.entryStyles, budgets.entryStyles],
+    ['ruta #resumen JavaScript', measurements.workspaceHomeJavaScript, budgets.workspaceHomeJavaScript],
+    ['ruta #resumen CSS', measurements.workspaceHomeStyles, budgets.workspaceHomeStyles],
     ['ruta #programas JavaScript', measurements.programsJavaScript, budgets.programsJavaScript],
     ['ruta #programas CSS', measurements.programsStyles, budgets.programsStyles],
+    ['datos estáticos de #programas', measurements.programsDataBytes, budgets.programsDataBytes],
     ['chunk OIDC JavaScript', measurements.oidcJavaScript, budgets.oidcJavaScript],
   ]
   for (const [label, size, limit] of checks) {
@@ -90,6 +109,29 @@ export function inspectBundleBudget(
   }
 
   const entry = manifest[ENTRY_KEY]
+  if (
+    !entry?.dynamicImports?.includes(WORKSPACE_HOME_KEY)
+    || !workspaceHomeChunk?.file
+    || entryAssets.javascript.includes(workspaceHomeChunk.file)
+  ) {
+    violations.push('La portada #resumen debe permanecer en un chunk dinámico separado')
+  }
+
+  if (
+    !manifest[PROGRAMS_KEY]?.dynamicImports?.includes(PUBLIC_DIRECTORY_KEY)
+    || !publicDirectoryChunk?.file
+    || programsPageAssets.javascript.includes(publicDirectoryChunk.file)
+  ) {
+    violations.push('El directorio público de #programas debe permanecer en un chunk dinámico medido')
+  }
+
+  if (
+    !publicCatalogAsset?.file
+    || !programsAssets.assets.includes(publicCatalogAsset.file)
+  ) {
+    violations.push('La instantánea pública UPTC debe quedar como asset estático asociado al directorio de #programas')
+  }
+
   if (
     !entry?.dynamicImports?.includes(OIDC_KEY)
     || oidcAssets.javascript.some((asset) => entryAssets.javascript.includes(asset))
@@ -117,6 +159,9 @@ export function inspectBundleBudget(
   if (Object.keys(manifest).some((key) => key.startsWith(ROOM_PLANNING_DEMO_PREFIX))) {
     violations.push('El laboratorio de asignación de aulas de desarrollo no debe entrar al build de producción')
   }
+  if (Object.keys(manifest).some((key) => key.startsWith(WORKSPACE_HOME_DEMO_PREFIX))) {
+    violations.push('Los recorridos locales de la portada no deben entrar al build de producción')
+  }
   if (Object.hasOwn(manifest, LOCAL_PREVIEW_CLIENT_KEY)) {
     violations.push('El cliente de sesión de desarrollador local no debe entrar al build de producción')
   }
@@ -137,7 +182,8 @@ function verifyBuiltBundle() {
 
   console.log(
     `Bundles: entry ${measurements.entryJavaScript} B JS / ${measurements.entryStyles} B CSS; `
-      + `#programas ${measurements.programsJavaScript} B JS / ${measurements.programsStyles} B CSS; `
+      + `#resumen ${measurements.workspaceHomeJavaScript} B JS / ${measurements.workspaceHomeStyles} B CSS; `
+      + `#programas ${measurements.programsJavaScript} B JS / ${measurements.programsStyles} B CSS / ${measurements.programsDataBytes} B JSON; `
       + `OIDC diferido ${measurements.oidcJavaScript} B JS.`,
   )
 
