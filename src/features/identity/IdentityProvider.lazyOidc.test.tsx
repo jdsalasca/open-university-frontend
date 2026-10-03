@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { IdentityProvider } from './IdentityProvider'
@@ -83,7 +83,8 @@ describe('IdentityProvider OIDC loading', () => {
     )
 
     // Assert
-    expect(await screen.findByRole('status')).toHaveTextContent('anonymous')
+    // Wait for the content, not just for a status node: the loading state already has role="status".
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('anonymous'))
     expect(oidcImplementation.loadCount).toBe(1)
   })
 
@@ -99,11 +100,11 @@ describe('IdentityProvider OIDC loading', () => {
     )
 
     // Act
-    expect(await screen.findByRole('status')).toHaveTextContent('error')
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('error'))
     await user.click(screen.getByRole('button', { name: 'Reintentar' }))
 
     // Assert
-    expect(await screen.findByRole('status')).toHaveTextContent('anonymous')
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('anonymous'))
     expect(oidcImplementation.managerCreateCount).toBe(2)
   })
 })
