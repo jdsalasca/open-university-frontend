@@ -76,6 +76,7 @@ export function AcademicOfferingDraftPanel({
   const [editingOfferingId, setEditingOfferingId] = useState<string | null>(null)
   const [editingValues, setEditingValues] = useState<FormValues>(EMPTY_FORM)
   const [historyOfferingId, setHistoryOfferingId] = useState<string | null>(null)
+  const [historyAttempt, setHistoryAttempt] = useState(0)
   const [history, setHistory] = useState<AcademicOfferingAuditPage | null>(null)
   const [historyState, setHistoryState] = useState<RequestState>('ready')
   const [historyError, setHistoryError] = useState('')
@@ -232,7 +233,7 @@ export function AcademicOfferingDraftPanel({
       historyMoreControllerRef.current?.abort()
       historyMoreControllerRef.current = null
     }
-  }, [accessToken, canRead, client, handleAuthorizationError, historyOfferingId, isCurrentAccess])
+  }, [accessToken, canRead, client, handleAuthorizationError, historyAttempt, historyOfferingId, isCurrentAccess])
 
   useEffect(() => {
     if (!canWrite) {
@@ -259,6 +260,10 @@ export function AcademicOfferingDraftPanel({
 
   const periodOptions = useMemo(() => [...periods].sort((first, second) => second.startsOn.localeCompare(first.startsOn)), [periods])
   const selectedPeriod = periodOptions.find((period) => period.id === selectedPeriodId) ?? null
+
+  function retryHistory() {
+    setHistoryAttempt((attempt) => attempt + 1)
+  }
 
   async function loadMore() {
     if (!nextCursor || !canRead || !accessToken || !selectedPeriodId || loadingMore) return
@@ -564,7 +569,7 @@ export function AcademicOfferingDraftPanel({
                   </form>
                 )}
                 {historyOfferingId === draft.id && <AuditHistory state={historyState} error={historyError} history={history}
-                  loadingMore={loadingMoreHistory} onLoadMore={() => void loadMoreHistory()} />}
+                  loadingMore={loadingMoreHistory} onLoadMore={() => void loadMoreHistory()} onRetry={retryHistory} />}
               </article>
             </li>
           ))}
@@ -575,15 +580,21 @@ export function AcademicOfferingDraftPanel({
   )
 }
 
-function AuditHistory({ state, error, history, loadingMore, onLoadMore }: {
+function AuditHistory({ state, error, history, loadingMore, onLoadMore, onRetry }: {
   state: RequestState
   error: string
   history: AcademicOfferingAuditPage | null
   loadingMore: boolean
   onLoadMore: () => void
+  onRetry: () => void
 }) {
   if (state === 'loading') return <p className="academic-offering-inline-status" role="status">Consultando el historial…</p>
-  if (state === 'error') return <p className="academic-offering-inline-error" role="alert">{error}</p>
+  if (state === 'error') {
+    return <div className="academic-offering-inline-error" role="alert">
+      <span>{error}</span>
+      <button type="button" onClick={onRetry}>Reintentar consulta</button>
+    </div>
+  }
   if (!history || history.events.length === 0) return <p className="academic-offering-inline-status">Este borrador todavía no tiene eventos de historial.</p>
   return (
     <ol className="academic-offering-audit-list">
