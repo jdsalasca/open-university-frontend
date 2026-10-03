@@ -7,6 +7,7 @@ import {
 
 const ENTRY = 'index.html'
 const CATALOG = 'src/features/academics/AcademicCatalogPage.tsx'
+const CURRICULUM_COMPARISON_PANEL = 'src/features/academics/CurriculumVersionComparisonPanel.tsx'
 const OIDC = 'src/features/identity/identitySessionManager.ts'
 const ADMISSIONS_DEMO = 'src/features/admissions/demo/AdmissionsWorkflowLab.tsx'
 const STUDENT_DEMO = 'src/features/students/demo/MyAcademicWeekDemo.tsx'
@@ -29,7 +30,12 @@ function createManifest() {
     [CATALOG]: {
       file: 'assets/catalog.js',
       imports: [ENTRY],
+      dynamicImports: [CURRICULUM_COMPARISON_PANEL],
       css: ['assets/catalog.css'],
+    },
+    [CURRICULUM_COMPARISON_PANEL]: {
+      file: 'assets/curriculum-comparison.js',
+      isDynamicEntry: true,
     },
     [OIDC]: {
       file: 'assets/oidc.js',
@@ -43,6 +49,7 @@ function sizeOfSyntheticAsset(asset) {
     'assets/entry.js': 40,
     'assets/shared.js': 10,
     'assets/catalog.js': 20,
+    'assets/curriculum-comparison.js': 20,
     'assets/oidc.js': 30,
     'assets/entry.css': 12,
     'assets/catalog.css': 5,
@@ -65,6 +72,34 @@ test('mide los assets estáticos de la ruta y deja OIDC en un chunk dinámico', 
     oidcJavaScript: 30,
   })
   assert.deepEqual(result.violations, [])
+})
+
+test('mantiene la comparación curricular en un chunk dinámico de la ruta de programas', () => {
+  // Arrange
+  const manifest = createManifest()
+  manifest[CATALOG].dynamicImports = [CURRICULUM_COMPARISON_PANEL]
+  manifest[CURRICULUM_COMPARISON_PANEL] = { file: 'assets/curriculum-comparison.js' }
+
+  // Act
+  const result = inspectBundleBudget(manifest, sizeOfSyntheticAsset)
+
+  // Assert
+  assert.deepEqual(result.violations, [])
+  assert.equal(result.measurements.programsJavaScript, 70)
+})
+
+test('rechaza cargar la comparación curricular de forma estática con la ruta de programas', () => {
+  // Arrange
+  const manifest = createManifest()
+  manifest[CATALOG].dynamicImports = [CURRICULUM_COMPARISON_PANEL]
+  manifest[CATALOG].imports.push(CURRICULUM_COMPARISON_PANEL)
+  manifest[CURRICULUM_COMPARISON_PANEL] = { file: 'assets/curriculum-comparison.js' }
+
+  // Act
+  const result = inspectBundleBudget(manifest, sizeOfSyntheticAsset)
+
+  // Assert
+  assert.ok(result.violations.includes('La comparación curricular debe permanecer en un chunk dinámico separado'))
 })
 
 test('reporta cuando la ruta de programas supera el límite de JavaScript', () => {

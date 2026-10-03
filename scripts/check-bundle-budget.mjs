@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 
 const ENTRY_KEY = 'index.html'
 const PROGRAMS_KEY = 'src/features/academics/AcademicCatalogPage.tsx'
+const CURRICULUM_COMPARISON_KEY = 'src/features/academics/CurriculumVersionComparisonPanel.tsx'
 const OIDC_KEY = 'src/features/identity/identitySessionManager.ts'
 const ADMISSIONS_DEMO_PREFIX = 'src/features/admissions/demo/'
 const STUDENT_DEMO_PREFIX = 'src/features/students/demo/'
@@ -16,8 +17,8 @@ export const DEFAULT_BUNDLE_BUDGETS = Object.freeze({
   // The shared entry now includes the authenticated #biblioteca route; keep its added shell cost bounded.
   entryJavaScript: 283_000,
   entryStyles: 21_000,
-  // The shared entry now includes the public #estudiantes and authenticated #biblioteca routes; keep its added shell cost bounded.
-  programsJavaScript: 331_500,
+  // The curriculum comparison adds a small loader; its panel stays outside the static #programas route budget.
+  programsJavaScript: 331_700,
   programsStyles: 48_000,
   oidcJavaScript: 75_000,
 })
@@ -61,6 +62,7 @@ export function inspectBundleBudget(
 ) {
   const entryAssets = collectStaticAssets(manifest, [ENTRY_KEY])
   const programsAssets = collectStaticAssets(manifest, [PROGRAMS_KEY])
+  const comparisonPanel = manifest[CURRICULUM_COMPARISON_KEY]
   const oidcChunk = manifest[OIDC_KEY]
   if (!oidcChunk?.file) throw new Error(`Falta el chunk ${OIDC_KEY} en el manifiesto de Vite`)
   const oidcAssets = collectStaticAssets(manifest, [OIDC_KEY])
@@ -91,6 +93,14 @@ export function inspectBundleBudget(
     || oidcAssets.javascript.some((asset) => entryAssets.javascript.includes(asset))
   ) {
     violations.push('OIDC debe permanecer en un chunk dinámico separado')
+  }
+
+  if (
+    !manifest[PROGRAMS_KEY]?.dynamicImports?.includes(CURRICULUM_COMPARISON_KEY)
+    || !comparisonPanel?.file
+    || programsAssets.javascript.includes(comparisonPanel.file)
+  ) {
+    violations.push('La comparación curricular debe permanecer en un chunk dinámico separado')
   }
 
   if (Object.keys(manifest).some((key) => key.startsWith(ADMISSIONS_DEMO_PREFIX))) {
