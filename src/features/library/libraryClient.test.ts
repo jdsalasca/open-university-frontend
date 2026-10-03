@@ -12,7 +12,7 @@ describe('libraryClient', () => {
     const client = createLibraryClient(fetcher)
 
     // Act
-    await client.getTitles('token')
+    await client.getTitles('', 'token')
     await client.getOpenLoans('token')
 
     // Assert: the default limits would silently hide part of the catalogue.

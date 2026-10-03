@@ -139,6 +139,24 @@ describe('LibraryAdminPage', () => {
     expect(await screen.findByText(/Mostrando los primeros 100 títulos/)).toBeTruthy()
   })
 
+  it('asks the server to search the catalogue by name', async () => {
+    // Arrange: the catalogue is too large to browse, so the desk narrows it by text.
+    const client = fakeClient({
+      getTitles: vi.fn(async (query: string) => (query === '' ? [TITLE] : [])),
+    })
+    const user = userEvent.setup()
+    render(<LibraryAdminPage client={client} authorization={{ accessToken: 'token', canRead: true, canWrite: false }} />)
+
+    // Act
+    await screen.findByLabelText('Seleccionar título')
+    await user.type(screen.getByLabelText('Buscar título'), 'física')
+    await user.click(screen.getByRole('button', { name: 'Buscar' }))
+
+    // Assert
+    await waitFor(() => expect(client.getTitles).toHaveBeenCalledWith('física', 'token', expect.anything()))
+    expect(await screen.findByText('No hay títulos que coincidan con la búsqueda.')).toBeTruthy()
+  })
+
   it('renders nothing when the session cannot read the library', () => {
     // Arrange + Act
     const { container } = render(

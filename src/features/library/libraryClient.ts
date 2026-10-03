@@ -7,7 +7,7 @@ import type {
 } from './libraryContracts'
 
 export interface LibraryClient {
-  getTitles(accessToken: string, signal?: AbortSignal): Promise<LibraryTitle[]>
+  getTitles(query: string, accessToken: string, signal?: AbortSignal): Promise<LibraryTitle[]>
   getCopies(titleId: string, accessToken: string, signal?: AbortSignal): Promise<LibraryCopy[]>
   getOpenLoans(accessToken: string, signal?: AbortSignal): Promise<LibraryLoan[]>
   registerTitle(input: RegisterLibraryTitleInput, accessToken: string): Promise<LibraryTitle>
@@ -58,7 +58,12 @@ export function createLibraryClient(fetcher: typeof fetch = fetch): LibraryClien
   }
 
   return {
-    getTitles: (accessToken, signal) => request<LibraryTitle[]>(`/titles?limit=${LIST_LIMIT}`, accessToken, { signal }),
+    getTitles: (query, accessToken, signal) =>
+      request<LibraryTitle[]>(
+        `/titles?limit=${LIST_LIMIT}${query ? `&query=${encodeURIComponent(query)}` : ''}`,
+        accessToken,
+        { signal },
+      ),
     getCopies: (titleId, accessToken, signal) =>
       request<LibraryCopy[]>(`/titles/${encodeURIComponent(titleId)}/copies?limit=${LIST_LIMIT}`, accessToken, { signal }),
     getOpenLoans: (accessToken, signal) =>

@@ -52,6 +52,8 @@ function LibraryAdminPageContent({
   const [withdrawing, setWithdrawing] = useState(false)
   const [returnReference, setReturnReference] = useState('')
   const [returning, setReturning] = useState(false)
+  const [titleQueryInput, setTitleQueryInput] = useState('')
+  const [titleQuery, setTitleQuery] = useState('')
 
   /** A refused bearer means the cached permissions are stale, so the institutional session is revalidated. */
   const reportAuthorizationRejection = useCallback(async (error: unknown) => {
@@ -68,7 +70,7 @@ function LibraryAdminPageContent({
     try {
       const [loans, catalogue] = await Promise.all([
         client.getOpenLoans(accessToken, signal),
-        client.getTitles(accessToken, signal),
+        client.getTitles(titleQuery, accessToken, signal),
       ])
       if (signal.aborted) return
       setOpenLoans(loans)
@@ -83,7 +85,7 @@ function LibraryAdminPageContent({
       setLoadState('error')
       await reportAuthorizationRejection(error)
     }
-  }, [accessToken, client, reportAuthorizationRejection])
+  }, [accessToken, client, reportAuthorizationRejection, titleQuery])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -245,8 +247,26 @@ function LibraryAdminPageContent({
 
         <section className="library-section" aria-labelledby="library-catalogue-title">
           <h3 id="library-catalogue-title">Catálogo</h3>
+          <form className="library-form" onSubmit={(event) => {
+            event.preventDefault()
+            setLoadState('loading')
+            setTitleQuery(titleQueryInput.trim())
+          }}>
+            <label className="library-field">
+              <span>Buscar título</span>
+              <input
+                aria-label="Buscar título"
+                value={titleQueryInput}
+                maxLength={240}
+                onChange={(event) => setTitleQueryInput(event.currentTarget.value)}
+              />
+            </label>
+            <button type="submit">Buscar</button>
+          </form>
           {titles.length === 0
-            ? <p className="library-empty">Todavía no hay títulos registrados.</p>
+            ? <p className="library-empty">{titleQuery
+              ? 'No hay títulos que coincidan con la búsqueda.'
+              : 'Todavía no hay títulos registrados.'}</p>
             : <>
               {titles.length >= LIST_LIMIT && (
                 <p className="library-hint">Mostrando los primeros {LIST_LIMIT} títulos del catálogo.</p>
