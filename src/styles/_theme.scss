@@ -228,6 +228,12 @@
   color: #ffc0b7;
 }
 
+:root[data-theme='dark'] .workspace main .visual-identity-center :is(.identity-revision-chip, .contrast-hint, .preview-local-badge, .summary-icon) {
+  border-color: var(--ui-border);
+  background: var(--ui-surface-raised);
+  color: var(--ui-text-primary);
+}
+
 :root[data-theme='dark'] .workspace main :is(a, button):focus-visible,
 :root[data-theme='dark'] button:focus-visible,
 :root[data-theme='dark'] input:focus-visible,

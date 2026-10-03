@@ -81,6 +81,22 @@ test('dark theme gives structure audit events a readable raised surface', () => 
   assertReadableContrast(declarations)
 })
 
+test('dark theme gives identity center chrome a readable surface', () => {
+  // Arrange: these elements keep light backgrounds but inherit the light dark-mode text color,
+  // so without a dark rule they render light-on-light (Lighthouse contrast 1.03–2.11).
+  const selector = ':root[data-theme=dark] .workspace main .visual-identity-center :is('
+    + '.identity-revision-chip, .contrast-hint, .preview-local-badge, .summary-icon)'
+
+  // Act
+  const declarations = darkRule(selector)
+
+  // Assert
+  assert.ok(declarations, 'dark identity center chrome rule must be present')
+  assert.match(declarations, /background:\s*var\(--ui-surface-raised\);/)
+  assert.match(declarations, /color:\s*var\(--ui-text-primary\);/)
+  assertReadableContrast(declarations)
+})
+
 test('library page styles reference only tokens the theme defines, so dark mode can override them', () => {
   // Arrange: a component that invents token names silently keeps light colors in dark mode.
   const libraryStylesheet = readFileSync(
