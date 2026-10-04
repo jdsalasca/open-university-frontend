@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type {
+  SpaceAnnouncement,
   SpaceDirectorySnapshot,
   SpaceLocation,
   SpaceLocationKind,
@@ -269,6 +270,7 @@ function SpaceLocationCard({ location }: { location: SpaceLocation }) {
         {location.address && <p>{location.address}</p>}
         {location.locationDetail && <p className="spaces-location-detail">{location.locationDetail}</p>}
       </div>
+      {location.announcement && <SpaceAnnouncementDetails announcement={location.announcement} />}
       <div className="spaces-card-actions">
         {mapUrl
           ? <a className="spaces-map-link" href={mapUrl} target="_blank" rel="noreferrer">
@@ -286,6 +288,38 @@ function SpaceLocationCard({ location }: { location: SpaceLocation }) {
         Consultada {formatDate(location.source.checkedAt)}
       </p>
     </article>
+  )
+}
+
+function SpaceAnnouncementDetails({ announcement }: { announcement: SpaceAnnouncement }) {
+  return (
+    <section className="spaces-announcement" aria-label="Capacidades anunciadas">
+      <h3>Capacidades anunciadas</h3>
+      <ul className="spaces-announcement-capacities">
+        {announcement.capacities.map((capacity) => (
+          <li key={capacity.areaName}>
+            <span>{capacity.areaName}</span>
+            <strong>{capacity.announcedCapacityPersons} personas</strong>
+          </li>
+        ))}
+      </ul>
+      <p className="spaces-announcement-note">
+        {announcement.locationNote} Las cifras son anuncios publicados; no indican disponibilidad actual.
+      </p>
+      <ul className="spaces-announcement-references" aria-label="Referencias oficiales de ubicación">
+        {announcement.locationReferences.map((source) => (
+          <li key={source.url}>
+            <a href={source.url} target="_blank" rel="noreferrer">
+              {source.label} <span aria-hidden="true">↗</span>
+            </a>
+            <span className="spaces-source-date">
+              {source.sourceUpdatedAt ? `Actualizada ${formatDate(source.sourceUpdatedAt)} · ` : ''}
+              Consultada {formatDate(source.checkedAt)}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </section>
   )
 }
 

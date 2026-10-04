@@ -164,6 +164,7 @@ function publicSpaceGuideClient(): SpaceGuideClient {
           checkedAt: '2026-10-01',
           sourceUpdatedAt: '2026-07-03',
         },
+        announcement: null,
       }],
     }),
   }

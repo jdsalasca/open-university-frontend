@@ -17,6 +17,17 @@ export interface SpaceSource {
   sourceUpdatedAt: string | null
 }
 
+export interface SpaceCapacityAnnouncement {
+  areaName: string
+  announcedCapacityPersons: number
+}
+
+export interface SpaceAnnouncement {
+  capacities: SpaceCapacityAnnouncement[]
+  locationNote: string
+  locationReferences: SpaceSource[]
+}
+
 export interface SpaceLocation {
   id: string
   kind: SpaceLocationKind
@@ -27,6 +38,7 @@ export interface SpaceLocation {
   locationDetail: string | null
   mapQuery: string | null
   source: SpaceSource
+  announcement: SpaceAnnouncement | null
 }
 
 export interface SpaceUsePathway {
@@ -97,6 +109,13 @@ function parseSpaceLocation(input: unknown): SpaceLocation {
     throw new Error('Un espacio de la respuesta no cumple el contrato público.')
   }
 
+  const announcement = input.announcement === undefined || input.announcement === null
+    ? null
+    : parseSpaceAnnouncement(input.announcement)
+  if (announcement && (input.kind !== 'SERVICE' || input.address !== null || input.mapQuery !== null)) {
+    throw new Error('El anuncio de un espacio no cumple el contrato público.')
+  }
+
   return {
     id: input.id,
     kind: input.kind as SpaceLocationKind,
@@ -107,7 +126,49 @@ function parseSpaceLocation(input: unknown): SpaceLocation {
     locationDetail: input.locationDetail,
     mapQuery: input.mapQuery,
     source: parseSpaceSource(input.source, 'La fuente de un espacio no cumple el contrato público.'),
+    announcement,
   }
+}
+
+function parseSpaceAnnouncement(input: unknown): SpaceAnnouncement {
+  if (!isRecord(input)
+    || !Array.isArray(input.capacities) || input.capacities.length === 0
+    || typeof input.locationNote !== 'string' || !input.locationNote.trim()
+    || !Array.isArray(input.locationReferences) || input.locationReferences.length === 0) {
+    throw new Error('El anuncio de un espacio no cumple el contrato público.')
+  }
+
+  const areaNames = new Set<string>()
+  const capacities = input.capacities.map((item) => {
+    if (!isRecord(item)
+      || typeof item.areaName !== 'string' || !item.areaName.trim()
+      || typeof item.announcedCapacityPersons !== 'number'
+      || !Number.isSafeInteger(item.announcedCapacityPersons)
+      || item.announcedCapacityPersons <= 0) {
+      throw new Error('Un área anunciada no cumple el contrato público.')
+    }
+    const normalizedAreaName = item.areaName.trim().normalize('NFD')
+      .replace(/\p{Diacritic}/gu, '').toLocaleLowerCase('es-CO')
+    if (areaNames.has(normalizedAreaName)) {
+      throw new Error('El anuncio de un espacio repite un área.')
+    }
+    areaNames.add(normalizedAreaName)
+    return { areaName: item.areaName, announcedCapacityPersons: item.announcedCapacityPersons }
+  })
+
+  const locationReferences = input.locationReferences.map((item) => parseSpaceSource(
+    item,
+    'Una referencia de ubicación no cumple el contrato público.',
+  ))
+  const referenceUrls = new Set<string>()
+  for (const reference of locationReferences) {
+    if (referenceUrls.has(reference.url)) {
+      throw new Error('El anuncio de un espacio repite una referencia de ubicación.')
+    }
+    referenceUrls.add(reference.url)
+  }
+
+  return { capacities, locationNote: input.locationNote, locationReferences }
 }
 
 function parseSpaceUsePathway(input: unknown): SpaceUsePathway {

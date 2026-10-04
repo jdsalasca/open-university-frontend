@@ -51,12 +51,88 @@ describe('public space guide client', () => {
 
     // Assert
     expect(result.locations[0]).toMatchObject({ id: 'cread-bogota', department: null })
+    expect(result.locations[0].announcement).toBeNull()
     expect(result.requestPathways[0]).toMatchObject({ id: 'library-rooms', kind: 'LIBRARY_ROOM' })
     expect(fetcher).toHaveBeenCalledWith('/api/v1/spaces', {
       credentials: 'omit',
       headers: { Accept: 'application/json' },
       signal: controller.signal,
     })
+  })
+
+  it('preserves separately announced capacities and validates their official location references', async () => {
+    // Arrange
+    const announcement = {
+      capacities: [
+        { areaName: 'Zona de estudio teórico e histórico', announcedCapacityPersons: 30 },
+        { areaName: 'Zona de atención central', announcedCapacityPersons: 8 },
+        { areaName: 'Sala de estudio', announcedCapacityPersons: 25 },
+      ],
+      locationNote: 'El comunicado ubica los nuevos espacios en el segundo piso; la ficha de biblioteca aún indica el primero. Confirma antes de desplazarte.',
+      locationReferences: [{
+        label: 'Biblioteca presencial UPTC · Biblioteca Especializada en Música',
+        url: 'https://www.uptc.edu.co/sitio/portal/sitios/universidad/vic_aca/bibl/4_bpd/blbl_pres.html',
+        checkedAt: '2026-10-03',
+        sourceUpdatedAt: '2022-08-11',
+      }],
+    }
+    const payloadWithAnnouncement = structuredClone(payload) as typeof payload & { locations: Array<Record<string, unknown>> }
+    payloadWithAnnouncement.locations[0] = {
+      ...payloadWithAnnouncement.locations[0],
+      id: 'service-music-library-2026',
+      kind: 'SERVICE',
+      address: null as unknown as string,
+      locationDetail: 'Segundo piso del Edificio de Música, según comunicado UPTC.',
+      mapQuery: null as unknown as string,
+      announcement,
+    }
+    const client = createSpaceGuideClient(vi.fn().mockResolvedValue(jsonResponse(payloadWithAnnouncement)))
+
+    // Act
+    const result = await client.listSpaces()
+
+    // Assert
+    expect(result.locations[0].announcement).toEqual(announcement)
+  })
+
+  it('rejects an announced capacity that is zero or negative', async () => {
+    // Arrange
+    for (const announcedCapacityPersons of [0, -1]) {
+      const invalidPayload = structuredClone(payload) as typeof payload & { locations: Array<Record<string, unknown>> }
+      invalidPayload.locations[0].announcement = {
+        capacities: [{ areaName: 'Sala de estudio', announcedCapacityPersons }],
+        locationNote: 'Confirma la ubicación con Biblioteca.',
+        locationReferences: [{
+          label: 'Biblioteca presencial UPTC',
+          url: 'https://www.uptc.edu.co/sitio/portal/sitios/universidad/vic_aca/bibl/4_bpd/blbl_pres.html',
+          checkedAt: '2026-10-03',
+          sourceUpdatedAt: '2022-08-11',
+        }],
+      }
+      const client = createSpaceGuideClient(vi.fn().mockResolvedValue(jsonResponse(invalidPayload)))
+
+      // Act + Assert
+      await expect(client.listSpaces()).rejects.toThrow('Un área anunciada no cumple el contrato público.')
+    }
+  })
+
+  it('rejects announced capacities on a regular location with an address or map query', async () => {
+    // Arrange
+    const invalidPayload = structuredClone(payload) as typeof payload & { locations: Array<Record<string, unknown>> }
+    invalidPayload.locations[0].announcement = {
+      capacities: [{ areaName: 'Sala de estudio', announcedCapacityPersons: 25 }],
+      locationNote: 'Confirma la ubicación con Biblioteca.',
+      locationReferences: [{
+        label: 'Biblioteca presencial UPTC',
+        url: 'https://www.uptc.edu.co/sitio/portal/sitios/universidad/vic_aca/bibl/4_bpd/blbl_pres.html',
+        checkedAt: '2026-10-03',
+        sourceUpdatedAt: '2022-08-11',
+      }],
+    }
+    const client = createSpaceGuideClient(vi.fn().mockResolvedValue(jsonResponse(invalidPayload)))
+
+    // Act + Assert
+    await expect(client.listSpaces()).rejects.toThrow('El anuncio de un espacio no cumple el contrato público.')
   })
 
   it('rejects a source URL outside the official UPTC domain', async () => {

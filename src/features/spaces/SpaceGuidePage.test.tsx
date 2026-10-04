@@ -16,6 +16,7 @@ const locations: SpaceLocation[] = [
       label: 'Localización y sedes UPTC', url: 'https://uptc.edu.co/sitio/portal/sitios/localizacion/',
       checkedAt: '2026-10-01', sourceUpdatedAt: '2026-07-03',
     },
+    announcement: null,
   },
   {
     id: 'cread-chiquinquira', kind: 'CREAD', name: 'CREAD Chiquinquirá', municipality: 'Chiquinquirá',
@@ -25,6 +26,7 @@ const locations: SpaceLocation[] = [
       label: 'Localización y sedes UPTC', url: 'https://uptc.edu.co/sitio/portal/sitios/localizacion/',
       checkedAt: '2026-10-01', sourceUpdatedAt: '2026-07-03',
     },
+    announcement: null,
   },
   {
     id: 'service-acra', kind: 'SERVICE', name: 'Admisiones y Control de Registro Académico (ACRA)',
@@ -35,6 +37,7 @@ const locations: SpaceLocation[] = [
       label: 'Contacto ACRA UPTC', url: 'https://uptc.edu.co/sitio/portal/sitios/universidad/vic_aca/adm_reg/cont.html',
       checkedAt: '2026-10-01', sourceUpdatedAt: null,
     },
+    announcement: null,
   },
 ]
 
@@ -85,6 +88,66 @@ function clientReturning(data: SpaceDirectorySnapshot = snapshot): SpaceGuideCli
 }
 
 describe('SpaceGuidePage', () => {
+  it('shows Music capacities as separate announcements, links both source contexts, and offers no map', async () => {
+    // Arrange
+    const music = {
+      id: 'service-music-library-2026',
+      kind: 'SERVICE',
+      name: 'Biblioteca de Música y Sala de Estudio · UPTC',
+      municipality: 'Tunja',
+      department: null,
+      address: null,
+      locationDetail: 'Segundo piso del Edificio de Música, según comunicado UPTC.',
+      mapQuery: null,
+      source: {
+        label: 'Comunicado UPTC n.º 067 · Escuela de Música',
+        url: 'https://www.uptc.edu.co/sitio/mercury-demo/detail-pages/article/Escuela-de-Musica-de-la-UPTC-estrena-biblioteca-y-sala-de-estudio-nuevos-espacios-para-la-formacion-y-la-creacion-artistica/',
+        checkedAt: '2026-10-03',
+        sourceUpdatedAt: '2026-03-24',
+      },
+      announcement: {
+        capacities: [
+          { areaName: 'Zona de estudio teórico e histórico', announcedCapacityPersons: 30 },
+          { areaName: 'Zona de atención central', announcedCapacityPersons: 8 },
+          { areaName: 'Sala de estudio', announcedCapacityPersons: 25 },
+        ],
+        locationNote: 'El comunicado ubica los nuevos espacios en el segundo piso; la ficha de biblioteca aún indica el primero. Confirma antes de desplazarte.',
+        locationReferences: [{
+          label: 'Biblioteca de la Facultad de Estudios a Distancia · Biblioteca de Música',
+          url: 'https://www.uptc.edu.co/sitio/portal/sitios/universidad/vic_aca/bibl/7secc/06fac/index.html',
+          checkedAt: '2026-10-03',
+          sourceUpdatedAt: '2024-10-10',
+        }, {
+          label: 'Biblioteca presencial UPTC · Biblioteca Especializada en Música',
+          url: 'https://www.uptc.edu.co/sitio/portal/sitios/universidad/vic_aca/bibl/4_bpd/blbl_pres.html',
+          checkedAt: '2026-10-03',
+          sourceUpdatedAt: '2022-08-11',
+        }],
+      },
+    } as unknown as SpaceLocation
+    render(<SpaceGuidePage client={clientReturning({ ...snapshot, locations: [music] })} />)
+
+    // Act
+    const card = await screen.findByRole('article', { name: 'Biblioteca de Música y Sala de Estudio · UPTC' })
+
+    // Assert
+    expect(within(card).getByRole('heading', { name: 'Capacidades anunciadas' })).toBeVisible()
+    expect(within(card).getByText('30 personas')).toBeVisible()
+    expect(within(card).getByText('8 personas')).toBeVisible()
+    expect(within(card).getByText('25 personas')).toBeVisible()
+    expect(card).toHaveTextContent('no indican disponibilidad actual')
+    expect(card).toHaveTextContent(/segundo piso.*primer.*Confirma/i)
+    expect(within(card).getByRole('link', { name: 'Comunicado UPTC n.º 067 · Escuela de Música' }))
+      .toHaveAttribute('href', music.source.url)
+    expect(within(card).getByRole('link', {
+      name: 'Biblioteca de la Facultad de Estudios a Distancia · Biblioteca de Música',
+    })).toHaveAttribute('href', music.announcement!.locationReferences[0].url)
+    expect(within(card).getByRole('link', { name: 'Biblioteca presencial UPTC · Biblioteca Especializada en Música' }))
+      .toHaveAttribute('href', music.announcement!.locationReferences[1].url)
+    expect(within(card).queryByRole('link', { name: /abrir búsqueda de mapa/i })).not.toBeInTheDocument()
+    expect(within(card).queryByText('63 personas')).not.toBeInTheDocument()
+  })
+
   it('loads the sourced campus, CREAD and service cards with map and source links', async () => {
     // Arrange
     const client = clientReturning()
