@@ -115,7 +115,12 @@ export function AdmissionsCalendarPage({
           <div>
             <p className="admissions-eyebrow">FUENTE Y SEGUIMIENTO</p>
             <h2 id="admissions-source-title">Mantente al día con UPTC</h2>
-            <p>Las fechas pueden tener ajustes. Revisa la página de ACRA y el comunicado institucional antes de realizar cualquier trámite.</p>
+            <p>Las fechas pueden tener ajustes. Consulta el acto enlazado por ACRA y el comunicado institucional antes de realizar cualquier trámite.</p>
+            {calendar.officialActSource && (
+              <a href={calendar.officialActSource.url} target="_blank" rel="noreferrer">
+                Consultar {calendar.officialActSource.label} <span aria-hidden="true">↗</span>
+              </a>
+            )}
             <a href={calendar.confirmationSource.url} target="_blank" rel="noreferrer">
               {calendar.confirmationSource.label} <span aria-hidden="true">↗</span>
             </a>

@@ -45,11 +45,45 @@ describe('AdmissionsCalendarPage', () => {
     expect(officialCalendar).toHaveAttribute('target', '_blank')
     expect(officialCalendar).toHaveAttribute('rel', 'noreferrer')
     expect(screen.getByText(/fuente.*acra.*actualizada el 15 de septiembre de 2026/i)).toBeVisible()
-    expect(screen.getByText(/consultada el 2 de octubre de 2026/i)).toBeVisible()
+    expect(screen.getByText(/consultada el 4 de octubre de 2026/i)).toBeVisible()
     expect(screen.getByRole('link', { name: /comunicado institucional.*2027-i/i })).toHaveAttribute(
       'href',
       'https://dsp.uptc.edu.co/sitio/portal/cal_not_eve/noticias/det/UPTC-abre-inscripciones-para-estudiar-un-pregrado-presencial-a-distancia-o-virtual-el-proximo-semestre/',
     )
+  })
+
+  it('links the 2027-I public calendar to its official Resolution 111 source safely', () => {
+    // Arrange
+    render(<AdmissionsCalendarPage />)
+
+    // Act
+    const resolution = screen.getByRole('link', { name: /resolución 111 de 2026/i })
+
+    // Assert
+    expect(resolution).toHaveAttribute(
+      'href',
+      'https://apps3.uptc.edu.co/compilacion-normativa-web/#/compilaciones-normativas/detalle-documento/9906',
+    )
+    expect(resolution).toHaveAttribute('target', '_blank')
+    expect(resolution).toHaveAttribute('rel', 'noreferrer')
+  })
+
+  it('does not attach the 2027-I resolution link to another published call', () => {
+    // Arrange
+    const laterCall = {
+      ...OFFICIAL_ADMISSIONS_CALENDAR_2027_I,
+      title: 'Pregrado presencial 2028-I',
+      callName: 'Primer semestre académico de 2028',
+      revisionNumber: 2,
+      officialReference: 'Resolución institucional 12 de 2028',
+      officialActSource: undefined,
+    }
+
+    // Act
+    render(<AdmissionsCalendarPage calendar={laterCall} />)
+
+    // Assert
+    expect(screen.queryByRole('link', { name: /resolución 111 de 2026/i })).toBeNull()
   })
 
   it('downloads a personal calendar snapshot only after an explicit request', () => {

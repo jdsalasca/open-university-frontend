@@ -4,7 +4,7 @@ export const OFFICIAL_ADMISSIONS_CALENDAR_2027_I: PublicAdmissionsCalendar = {
   title: 'Pregrado presencial 2027-I',
   callName: 'Primer semestre académico de 2027',
   updatedAt: '15 de septiembre de 2026',
-  checkedAt: '2 de octubre de 2026',
+  checkedAt: '4 de octubre de 2026',
   source: {
     label: 'Calendario oficial de ACRA',
     url: 'https://reportes.uptc.edu.co/sitio/portal/sitios/universidad/vic_aca/adm_reg/1aspi/pre/',
@@ -12,6 +12,10 @@ export const OFFICIAL_ADMISSIONS_CALENDAR_2027_I: PublicAdmissionsCalendar = {
   confirmationSource: {
     label: 'Comunicado institucional sobre la convocatoria 2027-I',
     url: 'https://dsp.uptc.edu.co/sitio/portal/cal_not_eve/noticias/det/UPTC-abre-inscripciones-para-estudiar-un-pregrado-presencial-a-distancia-o-virtual-el-proximo-semestre/',
+  },
+  officialActSource: {
+    label: 'Resolución 111 de 2026',
+    url: 'https://apps3.uptc.edu.co/compilacion-normativa-web/#/compilaciones-normativas/detalle-documento/9906',
   },
   milestones: [
     {

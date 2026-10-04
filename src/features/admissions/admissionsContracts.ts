@@ -24,5 +24,6 @@ export interface PublicAdmissionsCalendar {
   checkedAt: string
   source: AdmissionsCalendarSource
   confirmationSource: AdmissionsCalendarSource
+  officialActSource?: AdmissionsCalendarSource
   milestones: readonly AdmissionsMilestone[]
 }
