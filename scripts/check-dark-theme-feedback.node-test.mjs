@@ -237,3 +237,63 @@ test('dark theme keeps admissions muted text readable on its cards', () => {
   assert.match(muted, /color:\s*var\(--ui-text-secondary\);/)
   assert.ok(contrastRatio(secondary, raised) >= 4.5, 'admissions muted text must meet WCAG AA')
 })
+
+test('dark theme keeps the visual identity editor action bar readable', () => {
+  // Arrange: measured in the browser, .editor-actions keeps a white background while its buttons
+  // inherit the light dark-mode text, rendering "Publicar cambios" invisible (contrast 1.11-1.53).
+  const dark = darkRule(':root[data-theme=dark]')
+  const token = (name) => dark?.match(new RegExp(`--${name}:\\s*(#[0-9a-f]{6});`, 'i'))?.[1]
+  const text = token('ui-text-primary')
+  const raised = token('ui-surface-raised')
+  assert.ok(text && raised, 'dark tokens must be defined')
+
+  // Act
+  const declarations = darkRule(':root[data-theme=dark] .workspace main .visual-identity-center :is(.editor-actions, .banner-editor-card)')
+
+  // Assert
+  assert.ok(declarations, 'dark identity editor action rule must be present')
+  assert.match(declarations, /background:\s*var\(--ui-surface-raised\);/)
+  assert.ok(contrastRatio(text, raised) >= 4.5, 'identity editor actions must meet WCAG AA')
+})
+
+test('dark theme gives the identity status icon a readable badge', () => {
+  // Arrange: the icon keeps a light yellow badge, so dark mode needs its own dark badge color.
+  const declarations = darkRule(':root[data-theme=dark] .workspace main .status-banner-icon')
+
+  // Assert
+  assert.ok(declarations, 'dark identity status icon rule must be present')
+  assert.match(declarations, /background: #4a4326;/)
+  assert.match(declarations, /color: #f0dfa0;/)
+  assertReadableContrast(declarations)
+})
+
+test('dark theme keeps a disabled primary button legible', () => {
+  // Arrange: the disabled button kept a light gray background with white text (contrast 1.53).
+  const declarations = darkRule(':root[data-theme=dark] .workspace main .button-primary:disabled')
+  const dark = darkRule(':root[data-theme=dark]')
+  const muted = dark?.match(/--ui-text-muted:\s*(#[0-9a-f]{6});/i)?.[1]
+
+  // Assert
+  assert.ok(declarations && muted, 'dark disabled button rule and muted token must exist')
+  assert.match(declarations, /background: #383d36;/)
+  assert.ok(contrastRatio(muted, '#383d36') >= 4.5, 'disabled button label must meet WCAG AA')
+})
+
+test('the visual identity preview keeps its light-on-light labels readable', () => {
+  // Arrange: the preview surface stays light in every theme, so its muted labels must clear WCAG AA
+  // against white in the component stylesheet rather than through a dark-theme override.
+  const branding = readFileSync(
+    fileURLToPath(new URL('../src/features/branding/VisualIdentityCenter.scss', import.meta.url)), 'utf8')
+
+  // Act
+  const note = branding.match(/\.preview-module-note\s*\{([^}]*)\}/)?.[1]
+  const disabled = branding.match(/\.preview-navigation span\[aria-disabled='true'\]\s*\{([^}]*)\}/)?.[1]
+
+  // Assert
+  assert.ok(note && disabled, 'the preview label rules must be present')
+  const noteColor = note.match(/color:\s*(#[0-9a-f]{6});/i)?.[1]
+  const disabledColor = disabled.match(/color:\s*(#[0-9a-f]{6});/i)?.[1]
+  assert.ok(noteColor && disabledColor, 'the preview labels must set an explicit color')
+  assert.ok(contrastRatio(noteColor, '#ffffff') >= 4.5, 'preview module note must meet WCAG AA on white')
+  assert.ok(contrastRatio(disabledColor, '#ffffff') >= 4.5, 'disabled preview navigation must meet WCAG AA on white')
+})

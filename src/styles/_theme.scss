@@ -309,3 +309,19 @@
 :root[data-theme='dark'] .workspace main :is(.admissions-eyebrow, .admissions-checklist-footnote) {
   color: var(--ui-text-secondary);
 }
+
+:root[data-theme='dark'] .workspace main .visual-identity-center :is(.editor-actions, .banner-editor-card) {
+  border-color: var(--ui-border);
+  background: var(--ui-surface-raised);
+  color: var(--ui-text-primary);
+}
+
+:root[data-theme='dark'] .workspace main .status-banner-icon {
+  background: #4a4326;
+  color: #f0dfa0;
+}
+
+:root[data-theme='dark'] .workspace main .button-primary:disabled {
+  background: #383d36;
+  color: var(--ui-text-muted);
+}

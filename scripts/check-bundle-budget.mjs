@@ -24,9 +24,9 @@ export const DEFAULT_BUNDLE_BUDGETS = Object.freeze({
   // The shared entry now includes the authenticated #biblioteca, #avisos and #avisos-admin routes; keep their added
   // shell cost bounded.
   entryJavaScript: 286_000,
-  // The public program and admissions directories need dark-mode surface rules so their hardcoded
-  // light cards stay readable (WCAG AA); those accessibility fixes add ~0.9 kB to the entry styles.
-  entryStyles: 21_600,
+  // The public program, admissions and visual identity screens need dark-mode surface rules so their
+  // hardcoded light cards stay readable (WCAG AA); those accessibility fixes add ~1.4 kB to the entry.
+  entryStyles: 22_000,
   workspaceHomeJavaScript: 300_000,
   workspaceHomeStyles: 30_000,
   // The route budget includes the public directory chunk but excludes the on-demand curriculum comparison panel.
