@@ -163,12 +163,12 @@ export function AcademicCatalogPage({
       </Suspense>
       <section className="catalog-hero" aria-labelledby="catalog-title">
         <div className="catalog-hero-copy">
-          <p className="catalog-eyebrow"><span aria-hidden="true" /> VIDA UNIVERSITARIA <span aria-hidden="true">/</span> CATÁLOGO ACADÉMICO</p>
-          <h1 id="catalog-title">Programas de <em>pregrado presencial</em></h1>
-          <p className="catalog-intro">Consulta los planes de estudio publicados por programa y cohorte. Las versiones anteriores se conservan para acompañar el recorrido académico.</p>
+          <p className="catalog-eyebrow"><span aria-hidden="true" /> VIDA UNIVERSITARIA <span aria-hidden="true">/</span> MALLAS CURRICULARES</p>
+          <h1 id="catalog-title">Mallas curriculares de <em>pregrado</em></h1>
+          <p className="catalog-intro">Consulta las versiones cargadas en el catálogo curricular. El directorio público de programas es independiente de este catálogo y aparece arriba.</p>
           <div className="catalog-hero-meta">
-            <span className="catalog-preview-badge"><span aria-hidden="true">◌</span> Vista previa de desarrollo</span>
-            <span>Solo consulta pública · Sin datos personales</span>
+            <span className="catalog-preview-badge"><span aria-hidden="true">◌</span> Entorno de desarrollo</span>
+            <span>Catálogo curricular · Sin datos personales</span>
           </div>
         </div>
         <div className="catalog-hero-art" aria-hidden="true">
@@ -183,7 +183,7 @@ export function AcademicCatalogPage({
 
       <div className="catalog-operation-note" role="note">
         <span className="catalog-note-icon" aria-hidden="true">i</span>
-        <p><strong>Este módulo es una vista previa y no está habilitado para operación institucional.</strong> El acceso oficial y la publicación requieren validación de la UPTC.</p>
+        <p><strong>Esta instancia aún no tiene mallas curriculares publicadas.</strong> La publicación institucional requiere validar fuentes y responsables con la UPTC.</p>
       </div>
 
       {programsState === 'loading' && <p className="catalog-loading" role="status">Cargando catálogo académico…</p>}
@@ -199,10 +199,10 @@ export function AcademicCatalogPage({
       {programsState === 'ready' && programs.length === 0 && (
         <section className="catalog-empty" aria-labelledby="catalog-empty-title">
           <div className="catalog-empty-art" aria-hidden="true"><span>⌁</span><i /><b /></div>
-          <p className="catalog-eyebrow">CATÁLOGO EN PREPARACIÓN</p>
-          <h2 id="catalog-empty-title">No hay programas publicados todavía</h2>
-          <p>Las versiones aparecerán aquí cuando exista un plan académico revisado y publicado por la institución.</p>
-          <span className="catalog-empty-footnote"><span aria-hidden="true">◇</span> No mostramos registros de ejemplo como si fueran oficiales.</span>
+          <p className="catalog-eyebrow">CATÁLOGO CURRICULAR</p>
+          <h2 id="catalog-empty-title">No hay mallas publicadas en este catálogo</h2>
+          <p>El directorio público de programas aparece arriba; su información no confirma que una malla esté cargada aquí.</p>
+          <span className="catalog-empty-footnote"><span aria-hidden="true">◇</span> Este catálogo no usa registros de ejemplo.</span>
         </section>
       )}
 

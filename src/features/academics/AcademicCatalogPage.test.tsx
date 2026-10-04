@@ -378,12 +378,13 @@ describe('AcademicCatalogPage', () => {
     await renderCatalogPage({ client })
 
     // Act
-    const heading = await screen.findByRole('heading', { name: 'Programas de pregrado presencial' })
+    const heading = await screen.findByRole('heading', { name: 'Mallas curriculares de pregrado' })
 
     // Assert
     expect(heading).toBeVisible()
-    expect(screen.getByText(/No hay programas publicados todavía/i)).toBeVisible()
-    expect(screen.getByText(/Vista previa de desarrollo/i)).toBeVisible()
+    expect(screen.getByText(/No hay mallas publicadas en este catálogo/i)).toBeVisible()
+    expect(screen.getByText(/El directorio público de programas es independiente de este catálogo/i)).toBeVisible()
+    expect(screen.getByText(/Entorno de desarrollo/i)).toBeVisible()
     expect(screen.getByText(/permisos institucionales/i)).toBeVisible()
     expect(screen.queryByLabelText(/archivo CSV/i)).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /publicar/i })).not.toBeInTheDocument()
@@ -1179,7 +1180,7 @@ describe('AcademicCatalogPage', () => {
 
     // Act
     const publicDirectoryHeading = await screen.findByRole('heading', { name: 'Programas de pregrado UPTC' })
-    const platformCatalogHeading = await screen.findByRole('heading', { name: 'Programas de pregrado presencial' })
+    const platformCatalogHeading = await screen.findByRole('heading', { name: 'Mallas curriculares de pregrado' })
 
     // Assert
     expect(publicDirectoryHeading.compareDocumentPosition(platformCatalogHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
@@ -1192,6 +1193,6 @@ describe('AcademicCatalogPage', () => {
       'https://www.uptc.edu.co/sitio/portal/programas/public-001/',
     )
     expect(fetchSnapshot).toHaveBeenCalledOnce()
-    expect(screen.getByText('No hay programas publicados todavía')).toBeVisible()
+    expect(screen.getByText('No hay mallas publicadas en este catálogo')).toBeVisible()
   })
 })
