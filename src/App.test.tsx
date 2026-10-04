@@ -202,33 +202,6 @@ describe('App', () => {
     expect(mainContent).toHaveFocus()
   })
 
-  it('updates the skip link target when the active route changes', async () => {
-    // Arrange
-    const user = userEvent.setup()
-    window.history.replaceState(null, '', '#resumen')
-    render(
-      <BrandingProvider loader={async () => DEFAULT_BRANDING}>
-        <App
-          oidcConfiguration={{ status: 'unconfigured' }}
-          currentIdentityClient={identityClientWithPermissions([])}
-          localPreviewSessionClient={null}
-        />
-      </BrandingProvider>,
-    )
-
-    const skipLink = screen.getByRole('link', { name: 'Saltar al contenido principal' })
-    const programsLink = within(screen.getByRole('navigation', { name: 'Principal' }))
-      .getByRole('link', { name: 'Programas' })
-
-    // Act
-    await user.click(programsLink)
-    const mainContent = await screen.findByRole('main')
-
-    // Assert
-    await waitFor(() => expect(skipLink).toHaveAttribute('href', '#programas'))
-    expect(mainContent).toHaveAttribute('id', 'programas')
-  })
-
   it('opens student services from the portal home and keeps the identity center on its own route', async () => {
     // Arrange
     const user = userEvent.setup()
@@ -512,6 +485,33 @@ describe('App', () => {
 
     // Assert
     expect(screen.getByText('Cargando módulo académico…')).toBeVisible()
+  })
+
+  it('updates the skip link target when the active route changes', async () => {
+    // Arrange
+    const user = userEvent.setup()
+    window.history.replaceState(null, '', '#resumen')
+    render(
+      <BrandingProvider loader={async () => DEFAULT_BRANDING}>
+        <App
+          oidcConfiguration={{ status: 'unconfigured' }}
+          currentIdentityClient={identityClientWithPermissions([])}
+          localPreviewSessionClient={null}
+        />
+      </BrandingProvider>,
+    )
+
+    const skipLink = screen.getByRole('link', { name: 'Saltar al contenido principal' })
+    const programsLink = within(screen.getByRole('navigation', { name: 'Principal' }))
+      .getByRole('link', { name: 'Programas' })
+
+    // Act
+    await user.click(programsLink)
+    const mainContent = await screen.findByRole('main')
+
+    // Assert
+    await waitFor(() => expect(skipLink).toHaveAttribute('href', '#programas'))
+    expect(mainContent).toHaveAttribute('id', 'programas')
   })
 
   it('opens the public undergraduate directory by keyboard while curriculum controls stay unavailable', async () => {
