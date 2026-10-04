@@ -171,6 +171,64 @@ function publicSpaceGuideClient(): SpaceGuideClient {
 }
 
 describe('App', () => {
+  it('lets keyboard users skip the application shell and focus the main region', async () => {
+    // Arrange
+    const user = userEvent.setup()
+    window.history.replaceState(null, '', '#resumen')
+    render(
+      <BrandingProvider loader={async () => DEFAULT_BRANDING}>
+        <App
+          oidcConfiguration={{ status: 'unconfigured' }}
+          currentIdentityClient={identityClientWithPermissions([])}
+          localPreviewSessionClient={null}
+        />
+      </BrandingProvider>,
+    )
+
+    const skipLink = screen.getByRole('link', { name: 'Saltar al contenido principal' })
+
+    // Act
+    await user.tab()
+
+    // Assert
+    expect(skipLink).toHaveFocus()
+
+    // Act
+    await user.keyboard('{Enter}')
+    const mainContent = screen.getByRole('main')
+
+    // Assert
+    expect(mainContent).toHaveAttribute('tabindex', '-1')
+    expect(mainContent).toHaveFocus()
+  })
+
+  it('updates the skip link target when the active route changes', async () => {
+    // Arrange
+    const user = userEvent.setup()
+    window.history.replaceState(null, '', '#resumen')
+    render(
+      <BrandingProvider loader={async () => DEFAULT_BRANDING}>
+        <App
+          oidcConfiguration={{ status: 'unconfigured' }}
+          currentIdentityClient={identityClientWithPermissions([])}
+          localPreviewSessionClient={null}
+        />
+      </BrandingProvider>,
+    )
+
+    const skipLink = screen.getByRole('link', { name: 'Saltar al contenido principal' })
+    const programsLink = within(screen.getByRole('navigation', { name: 'Principal' }))
+      .getByRole('link', { name: 'Programas' })
+
+    // Act
+    await user.click(programsLink)
+    const mainContent = await screen.findByRole('main')
+
+    // Assert
+    await waitFor(() => expect(skipLink).toHaveAttribute('href', '#programas'))
+    expect(mainContent).toHaveAttribute('id', 'programas')
+  })
+
   it('opens student services from the portal home and keeps the identity center on its own route', async () => {
     // Arrange
     const user = userEvent.setup()

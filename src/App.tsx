@@ -211,6 +211,17 @@ function ApplicationShell({
   const isNoticesView = view === 'notices'
   const isNoticesAdminView = view === 'notices-admin'
   const isIdentityView = view === 'identity'
+  const mainContentId = isHomeView ? 'resumen'
+    : isStudentServicesView ? 'estudiantes'
+      : isLibraryView ? 'biblioteca'
+        : isNoticesView ? 'avisos'
+          : isNoticesAdminView ? 'avisos-admin'
+            : isIdentityView ? 'inicio'
+              : isProgramsView ? 'programas'
+                : isAdmissionsView ? 'admisiones'
+                  : isSpacesView ? 'espacios'
+                    : isRoleAccessView ? 'accesos'
+                      : 'academia'
   const authenticatedIdentity = identity.status === 'authenticated' ? identity : null
   const hasAuthenticatedSession = authenticatedIdentity !== null
   const isLocalPreviewSession = import.meta.env.DEV && authenticatedIdentity?.sessionType === 'local-preview'
@@ -378,6 +389,13 @@ function ApplicationShell({
 
   return (
     <div className="platform-shell">
+      <a
+        className="skip-link"
+        href={`#${mainContentId}`}
+        onClick={() => document.getElementById(mainContentId)?.focus()}
+      >
+        Saltar al contenido principal
+      </a>
       <aside className="sidebar" aria-label="Navegación del sistema">
         <a className="brand-lockup" href="#resumen" aria-label={`${branding.institutionName}, inicio`}>
           {institutionLogo
@@ -544,7 +562,7 @@ function ApplicationShell({
           </div>
         </header>
 
-        <main id={isHomeView ? 'resumen' : isStudentServicesView ? 'estudiantes' : isLibraryView ? 'biblioteca' : isNoticesView ? 'avisos' : isNoticesAdminView ? 'avisos-admin' : view === 'identity' ? 'inicio' : view === 'programs' ? 'programas' : isAdmissionsView ? 'admisiones' : isSpacesView ? 'espacios' : isRoleAccessView ? 'accesos' : 'academia'}
+        <main id={mainContentId} tabIndex={-1}
           className={isHomeView ? 'workspace-home-page-content' : isStudentServicesView ? 'student-services-page-content' : isLibraryView ? 'library-page-content' : isNoticesView ? 'my-notices-page-content' : isNoticesAdminView ? 'notices-admin-page-content' : isRoleAccessView ? 'role-access-page-content' : isAdmissionsView ? 'admissions-page-content' : isSpacesView ? 'spaces-page-content' : isProgramsView ? 'catalog-page-content' : isAcademicOperationsView ? 'academic-page-content' : 'page-content identity-page-content'}>
           {isLocalPreviewSession && !isHomeView && (
             <aside className="local-preview-session-banner" role="status">

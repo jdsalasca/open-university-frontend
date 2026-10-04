@@ -7,6 +7,27 @@
   background: tokens.$page-background;
 }
 
+.skip-link {
+  position: fixed;
+  z-index: 20;
+  top: 12px;
+  left: 12px;
+  transform: translateY(calc(-100% - 20px));
+  border-radius: 8px;
+  padding: 10px 14px;
+  background: tokens.$institution-dark;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+  box-shadow: 0 5px 18px rgb(0 0 0 / 22%);
+
+  &:focus-visible {
+    transform: translateY(0);
+    @include tokens.focus-ring(3px);
+  }
+}
+
 .sidebar {
   position: sticky;
   top: 0;
