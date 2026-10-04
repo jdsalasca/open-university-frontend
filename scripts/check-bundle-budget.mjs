@@ -6,8 +6,11 @@ const ENTRY_KEY = 'index.html'
 const WORKSPACE_HOME_KEY = 'src/features/workspace/WorkspaceHomePage.tsx'
 const PROGRAMS_KEY = 'src/features/academics/AcademicCatalogPage.tsx'
 const CURRICULUM_COMPARISON_KEY = 'src/features/academics/CurriculumVersionComparisonPanel.tsx'
+const PUBLIC_SELECTOR_KEY = 'src/features/academics/publicCatalog/PublicProgramDirectories.tsx'
 const PUBLIC_DIRECTORY_KEY = 'src/features/academics/publicCatalog/PublicUndergraduateDirectory.tsx'
+const POSTGRADUATE_DIRECTORY_KEY = 'src/features/academics/publicCatalog/PublicPostgraduateDirectory.tsx'
 const PUBLIC_CATALOG_KEY = 'src/features/academics/publicCatalog/uptcUndergraduateCatalog.snapshot.json'
+const POSTGRADUATE_CATALOG_KEY = 'src/features/academics/publicCatalog/uptcPostgraduateCatalog.snapshot.json'
 const OIDC_KEY = 'src/features/identity/identitySessionManager.ts'
 const ADMISSIONS_DEMO_PREFIX = 'src/features/admissions/demo/'
 const STUDENT_DEMO_PREFIX = 'src/features/students/demo/'
@@ -27,7 +30,8 @@ export const DEFAULT_BUNDLE_BUDGETS = Object.freeze({
   // The route budget includes the public directory chunk but excludes the on-demand curriculum comparison panel.
   programsJavaScript: 350_000,
   programsStyles: 56_000,
-  programsDataBytes: 42_000,
+  // The larger selected public snapshot is loaded on demand; the two directories are not combined in the initial route.
+  programsDataBytes: 70_000,
   oidcJavaScript: 75_000,
 })
 
@@ -73,11 +77,23 @@ export function inspectBundleBudget(
   const entryAssets = collectStaticAssets(manifest, [ENTRY_KEY])
   const workspaceHomeAssets = collectStaticAssets(manifest, [ENTRY_KEY, WORKSPACE_HOME_KEY])
   const programsPageAssets = collectStaticAssets(manifest, [PROGRAMS_KEY])
-  const programsAssets = collectStaticAssets(manifest, [PROGRAMS_KEY, PUBLIC_DIRECTORY_KEY])
+  const selectorAssets = collectStaticAssets(manifest, [PROGRAMS_KEY, PUBLIC_SELECTOR_KEY])
+  const undergraduateAssets = collectStaticAssets(manifest, [PROGRAMS_KEY, PUBLIC_SELECTOR_KEY, PUBLIC_DIRECTORY_KEY])
+  const postgraduateAssets = collectStaticAssets(manifest, [PROGRAMS_KEY, PUBLIC_SELECTOR_KEY, POSTGRADUATE_DIRECTORY_KEY])
+  const programsAssets = collectStaticAssets(manifest, [
+    PROGRAMS_KEY,
+    PUBLIC_SELECTOR_KEY,
+    PUBLIC_DIRECTORY_KEY,
+    POSTGRADUATE_DIRECTORY_KEY,
+  ])
+  const branchAssets = [undergraduateAssets, postgraduateAssets]
   const comparisonPanel = manifest[CURRICULUM_COMPARISON_KEY]
   const workspaceHomeChunk = manifest[WORKSPACE_HOME_KEY]
+  const publicSelectorChunk = manifest[PUBLIC_SELECTOR_KEY]
   const publicDirectoryChunk = manifest[PUBLIC_DIRECTORY_KEY]
+  const postgraduateDirectoryChunk = manifest[POSTGRADUATE_DIRECTORY_KEY]
   const publicCatalogAsset = manifest[PUBLIC_CATALOG_KEY]
+  const postgraduateCatalogAsset = manifest[POSTGRADUATE_CATALOG_KEY]
   const oidcChunk = manifest[OIDC_KEY]
   if (!oidcChunk?.file) throw new Error(`Falta el chunk ${OIDC_KEY} en el manifiesto de Vite`)
   const oidcAssets = collectStaticAssets(manifest, [OIDC_KEY])
@@ -87,9 +103,9 @@ export function inspectBundleBudget(
     entryStyles: sumAssets(entryAssets.styles, sizeOf),
     workspaceHomeJavaScript: sumAssets(workspaceHomeAssets.javascript, sizeOf),
     workspaceHomeStyles: sumAssets(workspaceHomeAssets.styles, sizeOf),
-    programsJavaScript: sumAssets(programsAssets.javascript, sizeOf),
-    programsStyles: sumAssets(programsAssets.styles, sizeOf),
-    programsDataBytes: sumAssets(programsAssets.assets, sizeOf),
+    programsJavaScript: Math.max(...branchAssets.map((assets) => sumAssets(assets.javascript, sizeOf))),
+    programsStyles: Math.max(...branchAssets.map((assets) => sumAssets(assets.styles, sizeOf))),
+    programsDataBytes: Math.max(...branchAssets.map((assets) => sumAssets(assets.assets, sizeOf))),
     oidcJavaScript: sumAssets(oidcAssets.javascript, sizeOf),
   }
 
@@ -118,11 +134,22 @@ export function inspectBundleBudget(
   }
 
   if (
-    !manifest[PROGRAMS_KEY]?.dynamicImports?.includes(PUBLIC_DIRECTORY_KEY)
-    || !publicDirectoryChunk?.file
-    || programsPageAssets.javascript.includes(publicDirectoryChunk.file)
+    !manifest[PROGRAMS_KEY]?.dynamicImports?.includes(PUBLIC_SELECTOR_KEY)
+    || !publicSelectorChunk?.file
+    || programsPageAssets.javascript.includes(publicSelectorChunk.file)
   ) {
-    violations.push('El directorio público de #programas debe permanecer en un chunk dinámico medido')
+    violations.push('El selector público de #programas debe permanecer en un chunk dinámico separado')
+  }
+
+  if (
+    !publicSelectorChunk?.dynamicImports?.includes(PUBLIC_DIRECTORY_KEY)
+    || !publicSelectorChunk?.dynamicImports?.includes(POSTGRADUATE_DIRECTORY_KEY)
+    || !publicDirectoryChunk?.file
+    || !postgraduateDirectoryChunk?.file
+    || selectorAssets.javascript.includes(publicDirectoryChunk.file)
+    || selectorAssets.javascript.includes(postgraduateDirectoryChunk.file)
+  ) {
+    violations.push('Los directorios de pregrado y posgrado deben permanecer como chunks diferidos del selector público')
   }
 
   if (
@@ -130,6 +157,13 @@ export function inspectBundleBudget(
     || !programsAssets.assets.includes(publicCatalogAsset.file)
   ) {
     violations.push('La instantánea pública UPTC debe quedar como asset estático asociado al directorio de #programas')
+  }
+
+  if (
+    !postgraduateCatalogAsset?.file
+    || !postgraduateAssets.assets.includes(postgraduateCatalogAsset.file)
+  ) {
+    violations.push('La instantánea pública UPTC de posgrado debe quedar como asset estático asociado a su directorio')
   }
 
   if (

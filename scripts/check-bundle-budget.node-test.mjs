@@ -9,8 +9,11 @@ const ENTRY = 'index.html'
 const WORKSPACE_HOME = 'src/features/workspace/WorkspaceHomePage.tsx'
 const CATALOG = 'src/features/academics/AcademicCatalogPage.tsx'
 const CURRICULUM_COMPARISON_PANEL = 'src/features/academics/CurriculumVersionComparisonPanel.tsx'
+const PUBLIC_SELECTOR = 'src/features/academics/publicCatalog/PublicProgramDirectories.tsx'
 const PUBLIC_DIRECTORY = 'src/features/academics/publicCatalog/PublicUndergraduateDirectory.tsx'
+const POSTGRADUATE_DIRECTORY = 'src/features/academics/publicCatalog/PublicPostgraduateDirectory.tsx'
 const PUBLIC_CATALOG = 'src/features/academics/publicCatalog/uptcUndergraduateCatalog.snapshot.json'
+const POSTGRADUATE_CATALOG = 'src/features/academics/publicCatalog/uptcPostgraduateCatalog.snapshot.json'
 const OIDC = 'src/features/identity/identitySessionManager.ts'
 const ADMISSIONS_DEMO = 'src/features/admissions/demo/AdmissionsWorkflowLab.tsx'
 const STUDENT_DEMO = 'src/features/students/demo/MyAcademicWeekDemo.tsx'
@@ -39,8 +42,14 @@ function createManifest() {
     [CATALOG]: {
       file: 'assets/catalog.js',
       imports: [ENTRY],
-      dynamicImports: [CURRICULUM_COMPARISON_PANEL, PUBLIC_DIRECTORY],
+      dynamicImports: [CURRICULUM_COMPARISON_PANEL, PUBLIC_SELECTOR],
       css: ['assets/catalog.css'],
+    },
+    [PUBLIC_SELECTOR]: {
+      file: 'assets/public-selector.js',
+      imports: [ENTRY],
+      dynamicImports: [PUBLIC_DIRECTORY, POSTGRADUATE_DIRECTORY],
+      css: ['assets/public-selector.css'],
     },
     [CURRICULUM_COMPARISON_PANEL]: {
       file: 'assets/curriculum-comparison.js',
@@ -52,7 +61,14 @@ function createManifest() {
       assets: ['assets/catalog-data.json'],
       css: ['assets/public-directory.css'],
     },
+    [POSTGRADUATE_DIRECTORY]: {
+      file: 'assets/postgraduate-directory.js',
+      imports: [ENTRY],
+      assets: ['assets/postgraduate-data.json'],
+      css: ['assets/public-directory.css'],
+    },
     [PUBLIC_CATALOG]: { file: 'assets/catalog-data.json', isAsset: true },
+    [POSTGRADUATE_CATALOG]: { file: 'assets/postgraduate-data.json', isAsset: true },
     [OIDC]: {
       file: 'assets/oidc.js',
       isDynamicEntry: true,
@@ -67,13 +83,17 @@ function sizeOfSyntheticAsset(asset) {
     'assets/workspace-home.js': 25,
     'assets/catalog.js': 20,
     'assets/public-directory.js': 35,
+    'assets/public-selector.js': 15,
+    'assets/postgraduate-directory.js': 42,
     'assets/curriculum-comparison.js': 20,
     'assets/oidc.js': 30,
     'assets/entry.css': 12,
     'assets/workspace-home.css': 7,
     'assets/catalog.css': 5,
     'assets/public-directory.css': 9,
+    'assets/public-selector.css': 6,
     'assets/catalog-data.json': 30,
+    'assets/postgraduate-data.json': 60,
   }[asset]
 }
 
@@ -90,9 +110,9 @@ test('mide los assets estáticos de la ruta y deja OIDC en un chunk dinámico', 
     entryStyles: 12,
     workspaceHomeJavaScript: 75,
     workspaceHomeStyles: 19,
-    programsJavaScript: 105,
-    programsStyles: 26,
-    programsDataBytes: 30,
+    programsJavaScript: 127,
+    programsStyles: 32,
+    programsDataBytes: 60,
     oidcJavaScript: 30,
   })
   assert.deepEqual(result.violations, [])
@@ -104,7 +124,7 @@ test('aplica los límites de la portada y la ruta completa de programas', () => 
     ...DEFAULT_BUNDLE_BUDGETS,
     workspaceHomeJavaScript: 74,
   }
-  const programBudget = { ...budgets, programsJavaScript: 104 }
+  const programBudget = { ...budgets, programsJavaScript: 126 }
 
   // Act
   const result = inspectBundleBudget(createManifest(), sizeOfSyntheticAsset, programBudget)
@@ -112,7 +132,7 @@ test('aplica los límites de la portada y la ruta completa de programas', () => 
   // Assert
   assert.deepEqual(result.violations, [
     'ruta #resumen JavaScript: 75 B excede el límite de 74 B',
-    'ruta #programas JavaScript: 105 B excede el límite de 104 B',
+    'ruta #programas JavaScript: 127 B excede el límite de 126 B',
   ])
 })
 
@@ -122,26 +142,29 @@ test('exige portada y directorio público como chunks dinámicos independientes'
   manifest[ENTRY].dynamicImports = [CATALOG, OIDC]
   manifest[ENTRY].imports.push(WORKSPACE_HOME)
   manifest[CATALOG].dynamicImports = [CURRICULUM_COMPARISON_PANEL]
-  manifest[CATALOG].imports.push(PUBLIC_DIRECTORY)
+  manifest[CATALOG].imports.push(PUBLIC_SELECTOR)
+  manifest[PUBLIC_SELECTOR].imports.push(PUBLIC_DIRECTORY, POSTGRADUATE_DIRECTORY)
+  manifest[PUBLIC_SELECTOR].dynamicImports = []
 
   // Act
   const result = inspectBundleBudget(manifest, sizeOfSyntheticAsset)
 
   // Assert
   assert.ok(result.violations.includes('La portada #resumen debe permanecer en un chunk dinámico separado'))
-  assert.ok(result.violations.includes('El directorio público de #programas debe permanecer en un chunk dinámico medido'))
+  assert.ok(result.violations.includes('El selector público de #programas debe permanecer en un chunk dinámico separado'))
+  assert.ok(result.violations.includes('Los directorios de pregrado y posgrado deben permanecer como chunks diferidos del selector público'))
 })
 
 test('limita el JSON público y exige que el directorio lo declare como asset asociado', () => {
   // Arrange
-  const tooSmallBudget = { ...DEFAULT_BUNDLE_BUDGETS, programsDataBytes: 29 }
+  const tooSmallBudget = { ...DEFAULT_BUNDLE_BUDGETS, programsDataBytes: 59 }
   const manifest = createManifest()
 
   // Act
   const result = inspectBundleBudget(manifest, sizeOfSyntheticAsset, tooSmallBudget)
 
   // Assert
-  assert.ok(result.violations.includes('datos estáticos de #programas: 30 B excede el límite de 29 B'))
+  assert.ok(result.violations.includes('datos estáticos de #programas: 60 B excede el límite de 59 B'))
 })
 
 test('rechaza la instantánea pública cuando el manifest no la asocia al directorio', () => {
@@ -156,10 +179,34 @@ test('rechaza la instantánea pública cuando el manifest no la asocia al direct
   assert.ok(result.violations.includes('La instantánea pública UPTC debe quedar como asset estático asociado al directorio de #programas'))
 })
 
+test('rechaza la instantánea de posgrado cuando el manifest no la asocia al directorio diferido', () => {
+  // Arrange
+  const manifest = createManifest()
+  delete manifest[POSTGRADUATE_DIRECTORY].assets
+
+  // Act
+  const result = inspectBundleBudget(manifest, sizeOfSyntheticAsset)
+
+  // Assert
+  assert.ok(result.violations.includes('La instantánea pública UPTC de posgrado debe quedar como asset estático asociado a su directorio'))
+})
+
+test('mantiene los dos niveles del directorio público en chunks diferidos', () => {
+  // Arrange
+  const manifest = createManifest()
+  manifest[PUBLIC_SELECTOR].dynamicImports = [PUBLIC_DIRECTORY]
+
+  // Act
+  const result = inspectBundleBudget(manifest, sizeOfSyntheticAsset)
+
+  // Assert
+  assert.ok(result.violations.includes('Los directorios de pregrado y posgrado deben permanecer como chunks diferidos del selector público'))
+})
+
 test('mantiene la comparación curricular en un chunk dinámico de la ruta de programas', () => {
   // Arrange
   const manifest = createManifest()
-  manifest[CATALOG].dynamicImports = [CURRICULUM_COMPARISON_PANEL, PUBLIC_DIRECTORY]
+  manifest[CATALOG].dynamicImports = [CURRICULUM_COMPARISON_PANEL, PUBLIC_SELECTOR]
   manifest[CURRICULUM_COMPARISON_PANEL] = { file: 'assets/curriculum-comparison.js' }
 
   // Act
@@ -167,7 +214,7 @@ test('mantiene la comparación curricular en un chunk dinámico de la ruta de pr
 
   // Assert
   assert.deepEqual(result.violations, [])
-  assert.equal(result.measurements.programsJavaScript, 105)
+  assert.equal(result.measurements.programsJavaScript, 127)
 })
 
 test('rechaza cargar la comparación curricular de forma estática con la ruta de programas', () => {
@@ -186,13 +233,13 @@ test('rechaza cargar la comparación curricular de forma estática con la ruta d
 
 test('reporta cuando la ruta de programas supera el límite de JavaScript', () => {
   // Arrange
-  const budgets = { ...DEFAULT_BUNDLE_BUDGETS, programsJavaScript: 69 }
+  const budgets = { ...DEFAULT_BUNDLE_BUDGETS, programsJavaScript: 126 }
 
   // Act
   const result = inspectBundleBudget(createManifest(), sizeOfSyntheticAsset, budgets)
 
   // Assert
-  assert.deepEqual(result.violations, ['ruta #programas JavaScript: 105 B excede el límite de 69 B'])
+  assert.deepEqual(result.violations, ['ruta #programas JavaScript: 127 B excede el límite de 126 B'])
 })
 
 test('incluye las dependencias estáticas del chunk OIDC en su presupuesto', () => {

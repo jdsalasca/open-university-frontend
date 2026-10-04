@@ -23,8 +23,8 @@ import {
 import './AcademicCatalogPage.scss'
 
 const CurriculumVersionComparisonPanel = lazy(() => import('./CurriculumVersionComparisonPanel'))
-const PublicUndergraduateDirectory = lazy(() => import('./publicCatalog/PublicUndergraduateDirectory').then((module) => ({
-  default: module.PublicUndergraduateDirectory,
+const PublicProgramDirectories = lazy(() => import('./publicCatalog/PublicProgramDirectories').then((module) => ({
+  default: module.PublicProgramDirectories,
 })))
 
 interface AcademicCatalogPageProps {
@@ -159,7 +159,7 @@ export function AcademicCatalogPage({
   return (
     <div className="academic-catalog">
       <Suspense fallback={<div className="catalog-loading" role="status">Cargando el directorio público de programas…</div>}>
-        <PublicUndergraduateDirectory />
+        <PublicProgramDirectories />
       </Suspense>
       <section className="catalog-hero" aria-labelledby="catalog-title">
         <div className="catalog-hero-copy">

@@ -1,10 +1,17 @@
-import snapshotUrl from './uptcUndergraduateCatalog.snapshot.json?url'
-import type { PublicUndergraduateCatalogSnapshot, PublicUndergraduateProgram } from './publicUndergraduateCatalog'
-import { isIsoCalendarDate, isNonEmptyString, isOfficialUptcUrl, isRecord } from './publicCatalogShared'
+import snapshotUrl from './uptcPostgraduateCatalog.snapshot.json?url'
+import type { PublicPostgraduateCatalogSnapshot, PublicPostgraduateProgram } from './publicPostgraduateCatalog'
+import {
+  isIsoCalendarDate,
+  isNonEmptyString,
+  isOfficialUptcUrl,
+  isRecord,
+} from './publicCatalogShared'
 
-export async function fetchPublicUndergraduateCatalog(
+export const PUBLIC_POSTGRADUATE_CATALOG_PAGE_URL = 'https://www.uptc.edu.co/sitio/portal/sitios/programas_ofer/posgrados.html'
+
+export async function fetchPublicPostgraduateCatalog(
   signal?: AbortSignal,
-): Promise<PublicUndergraduateCatalogSnapshot> {
+): Promise<PublicPostgraduateCatalogSnapshot> {
   const response = await fetch(snapshotUrl, {
     headers: { Accept: 'application/json' },
     cache: 'force-cache',
@@ -15,16 +22,17 @@ export async function fetchPublicUndergraduateCatalog(
     throw new Error(`No se pudo cargar la instantánea pública UPTC (HTTP ${response.status}).`)
   }
 
-  return parsePublicUndergraduateCatalog(await response.json())
+  return parsePublicPostgraduateCatalog(await response.json())
 }
 
-export function parsePublicUndergraduateCatalog(value: unknown): PublicUndergraduateCatalogSnapshot {
+export function parsePublicPostgraduateCatalog(value: unknown): PublicPostgraduateCatalogSnapshot {
   if (!isRecord(value) || value.schemaVersion !== 1 || !isRecord(value.source)) {
     throw new Error('La instantánea pública UPTC tiene una estructura no reconocida.')
   }
 
   if (
-    !isOfficialUptcUrl(value.source.pageUrl)
+    value.source.pageUrl !== PUBLIC_POSTGRADUATE_CATALOG_PAGE_URL
+    || !isOfficialUptcUrl(value.source.pageUrl)
     || !isIsoCalendarDate(value.source.pageUpdatedAt)
     || !isIsoCalendarDate(value.source.capturedAt)
     || !Array.isArray(value.programs)
@@ -33,33 +41,32 @@ export function parsePublicUndergraduateCatalog(value: unknown): PublicUndergrad
     throw new Error('La instantánea pública UPTC tiene una fuente, fecha o lista inválida.')
   }
 
-  const ids = new Set<string>()
+  const codes = new Set<string>()
   for (const candidate of value.programs) {
     if (!isPublicProgram(candidate)) {
       throw new Error('La instantánea pública UPTC tiene un registro de programa inválido.')
     }
-    if (ids.has(candidate.id)) {
-      throw new Error('La instantánea pública UPTC tiene un identificador de programa duplicado.')
+    if (codes.has(candidate.programCode)) {
+      throw new Error('La instantánea pública UPTC tiene un código de programa duplicado.')
     }
     if (!isOfficialUptcUrl(candidate.detailUrl)) {
       throw new Error('La instantánea pública UPTC contiene un enlace oficial inválido.')
     }
-    ids.add(candidate.id)
+    codes.add(candidate.programCode)
   }
 
-  return value as unknown as PublicUndergraduateCatalogSnapshot
+  return value as unknown as PublicPostgraduateCatalogSnapshot
 }
 
-function isPublicProgram(value: unknown): value is PublicUndergraduateProgram {
+function isPublicProgram(value: unknown): value is PublicPostgraduateProgram {
   return isRecord(value)
-    && isNonEmptyString(value.id)
+    && isNonEmptyString(value.programCode)
     && isNonEmptyString(value.name)
-    && isNonEmptyString(value.faculty)
+    && isNonEmptyString(value.facultyOrUnit)
     && isNonEmptyString(value.facultyCode)
     && isNonEmptyString(value.level)
     && isNonEmptyString(value.modality)
     && isNonEmptyString(value.placeLabel)
     && (value.locationsSummary === null || typeof value.locationsSummary === 'string')
-    && typeof value.markedOffered === 'boolean'
     && isNonEmptyString(value.detailUrl)
 }
