@@ -82,7 +82,7 @@ export function PublicUndergraduateDirectory({
   if (!snapshot) {
     return (
       <section className="public-undergraduate-directory" aria-labelledby="public-undergraduate-title">
-        <div className="catalog-error" role="status">
+        <div className="catalog-error" role="alert">
           <div>
             <strong id="public-undergraduate-title">No se pudo cargar el directorio público</strong>
             <p>No fue posible cargar los programas. Inténtalo de nuevo o consulta la publicación oficial de la UPTC.</p>

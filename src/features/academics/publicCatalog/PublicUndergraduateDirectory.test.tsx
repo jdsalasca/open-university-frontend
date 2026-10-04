@@ -73,7 +73,7 @@ describe('PublicUndergraduateDirectory', () => {
 
     // Act
     const retry = await screen.findByRole('button', { name: 'Reintentar' })
-    expect(screen.getByRole('status')).toHaveTextContent(/consulta la publicación oficial/i)
+    expect(screen.getByRole('alert')).toHaveTextContent(/consulta la publicación oficial/i)
     await user.click(retry)
 
     // Assert

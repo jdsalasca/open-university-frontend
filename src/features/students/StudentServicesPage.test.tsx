@@ -20,7 +20,7 @@ afterEach(() => {
 })
 
 describe('StudentServicesPage', () => {
-  it('shows Bienestar and Biblioteca services as source-attributed cards', async () => {
+  it('shows student services across categories as source-attributed cards', async () => {
     // Arrange
     renderStudentServicesPage()
 
@@ -29,26 +29,88 @@ describe('StudentServicesPage', () => {
 
     // Assert
     const cards = screen.getAllByRole('article')
-    expect(cards).toHaveLength(5)
+    expect(cards).toHaveLength(9)
     expect(cards.map((card) => within(card).getByRole('heading').textContent)).toEqual([
       'Bienestar Universitario',
       'Bienestar Virtual',
       'Apoyo socioeconómico',
       'Préstamo y consulta bibliográfica',
       'Biblioteca digital y catálogo',
+      'Horarios y calificaciones en UPTConecta',
+      'SIRA estudiante',
+      'Inscripción de materias',
+      'Fechas académicas de pregrado',
     ])
     expect(screen.getByRole('searchbox', { name: 'Buscar servicios estudiantiles' })).toBeVisible()
     expect(screen.queryAllByRole('form')).toHaveLength(0)
 
     const sourceLinks = screen.getAllByRole('link', { name: /en el portal oficial UPTC/i })
-    expect(sourceLinks).toHaveLength(5)
+    expect(sourceLinks).toHaveLength(9)
     for (const link of sourceLinks) {
       const sourceUrl = new URL(link.getAttribute('href') ?? '')
       expect(sourceUrl.protocol).toBe('https:')
-      expect(sourceUrl.hostname).toBe('www.uptc.edu.co')
+      expect(['uptc.edu.co', 'www.uptc.edu.co']).toContain(sourceUrl.hostname)
       expect(link).toHaveAttribute('target', '_blank')
       expect(link).toHaveAttribute('rel', 'noopener noreferrer')
     }
+  })
+
+  it('shows official entry points for UPTConecta, SIRA, subject registration and the undergraduate calendar', async () => {
+    // Arrange
+    renderStudentServicesPage()
+
+    // Act
+    await screen.findByRole('heading', { name: 'Servicios para acompañar tu vida universitaria' })
+
+    // Assert
+    expect(screen.getAllByRole('article')).toHaveLength(9)
+    const officialRoutes = [
+      {
+        title: 'Horarios y calificaciones en UPTConecta',
+        href: 'https://www.uptc.edu.co/sitio/portal/cal_not_eve/noticias/det/UPTConecta-la-App-institucional-incorpora-nuevos-servicios-para-la-comunidad-upetecista/',
+      },
+      {
+        title: 'SIRA estudiante',
+        href: 'https://www.uptc.edu.co/sitio/portal/campus_virtual/',
+      },
+      {
+        title: 'Inscripción de materias',
+        href: 'https://uptc.edu.co/sitio/portal/sitios/estudiantes/sis_inf/',
+      },
+      {
+        title: 'Fechas académicas de pregrado',
+        href: 'https://uptc.edu.co/sitio/portal/sitios/universidad/vic_aca/adm_reg/2estu/est_pre.html',
+      },
+    ]
+
+    for (const route of officialRoutes) {
+      const heading = screen.getByRole('heading', { name: route.title })
+      const card = heading.closest('article')
+      expect(card).not.toBeNull()
+      const link = within(card!).getByRole('link')
+      expect(link).toHaveAttribute('href', route.href)
+      expect(link).toHaveAttribute('target', '_blank')
+      expect(link).toHaveAttribute('rel', 'noopener noreferrer')
+    }
+
+    expect(screen.queryAllByRole('form')).toHaveLength(0)
+    expect(screen.queryByLabelText(/contraseña|documento|código estudiantil/i)).not.toBeInTheDocument()
+  })
+
+  it('filters institutional systems by category and accent-insensitive text', async () => {
+    // Arrange
+    const user = userEvent.setup()
+    renderStudentServicesPage()
+    await screen.findByRole('heading', { name: 'Servicios para acompañar tu vida universitaria' })
+
+    // Act
+    await user.click(screen.getByRole('button', { name: 'Sistemas institucionales' }))
+    await user.type(screen.getByRole('searchbox', { name: 'Buscar servicios estudiantiles' }), 'CALIFICACIONES')
+
+    // Assert
+    expect(screen.getAllByRole('article')).toHaveLength(1)
+    expect(screen.getByRole('heading', { name: 'Horarios y calificaciones en UPTConecta' })).toBeVisible()
+    expect(screen.queryByRole('heading', { name: 'SIRA estudiante' })).not.toBeInTheDocument()
   })
 
   it('separates socioeconomic support and attributes its official source date', async () => {
@@ -121,7 +183,7 @@ describe('StudentServicesPage', () => {
     expect(screen.getByText('0', { selector: 'strong' })).toBeVisible()
     expect(screen.getByRole('status')).toHaveTextContent('No encontramos servicios con esos filtros.')
     await user.click(screen.getByRole('button', { name: 'Limpiar búsqueda y filtros' }))
-    expect(screen.getAllByRole('article')).toHaveLength(5)
+    expect(screen.getAllByRole('article')).toHaveLength(9)
     expect(search).toHaveValue('')
     expect(search).toHaveFocus()
     expect(screen.getByRole('button', { name: 'Todos' })).toHaveAttribute('aria-pressed', 'true')

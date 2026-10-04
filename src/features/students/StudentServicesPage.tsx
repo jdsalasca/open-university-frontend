@@ -1,10 +1,13 @@
 import { useRef, useState } from 'react'
 import './StudentServicesPage.scss'
 
-type StudentServiceCategory = 'Bienestar' | 'Biblioteca'
+type StudentServiceCategory =
+  | 'Bienestar'
+  | 'Biblioteca'
+  | 'Sistemas institucionales'
+  | 'Gestiones académicas'
+  | 'Calendario académico'
 type StudentServiceFilter = 'Todos' | StudentServiceCategory
-
-const STUDENT_SERVICE_FILTERS: readonly StudentServiceFilter[] = ['Todos', 'Bienestar', 'Biblioteca']
 
 interface StudentService {
   id: string
@@ -13,6 +16,8 @@ interface StudentService {
   description: string
   searchTerms: readonly string[]
   sourceUrl: string
+  sourcePublishedLabel?: string
+  sourcePublishedDate?: string
   sourceUpdatedLabel?: string
   sourceUpdatedDate?: string
 }
@@ -63,6 +68,51 @@ const STUDENT_SERVICES: readonly StudentService[] = [
     sourceUrl: 'https://www.uptc.edu.co/sitio/portal/sitios/universidad/vic_aca/bibl/0_busq/index.html',
     sourceUpdatedLabel: '8 sep 2026',
   },
+  {
+    id: 'uptconecta-horarios-calificaciones',
+    category: 'Sistemas institucionales',
+    title: 'Horarios y calificaciones en UPTConecta',
+    description: 'El comunicado institucional describe la consulta de horarios, calificaciones y servicios académicos en la aplicación UPTConecta.',
+    searchTerms: ['uptconecta', 'horarios', 'calificaciones', 'sira', 'servicios académicos'],
+    sourceUrl: 'https://www.uptc.edu.co/sitio/portal/cal_not_eve/noticias/det/UPTConecta-la-App-institucional-incorpora-nuevos-servicios-para-la-comunidad-upetecista/',
+    sourcePublishedLabel: '31 jul 2025',
+    sourcePublishedDate: '2025-07-31',
+  },
+  {
+    id: 'sira-estudiante',
+    category: 'Sistemas institucionales',
+    title: 'SIRA estudiante',
+    description: 'Campus Virtual publica el acceso a SIRA para estudiantes. Continúa en el portal oficial; esta plataforma no solicita tus credenciales.',
+    searchTerms: ['campus virtual', 'sira', 'estudiante', 'sistemas de información'],
+    sourceUrl: 'https://www.uptc.edu.co/sitio/portal/campus_virtual/',
+    sourceUpdatedLabel: '20 may 2026',
+    sourceUpdatedDate: '2026-05-20',
+  },
+  {
+    id: 'inscripcion-materias',
+    category: 'Gestiones académicas',
+    title: 'Inscripción de materias',
+    description: 'La página institucional reúne las opciones publicadas para inscribir materias. Revisa allí cuál corresponde a tu trámite y su vigencia.',
+    searchTerms: ['inscripción de asignaturas', 'sistemas de información', 'estudiantes', 'materias'],
+    sourceUrl: 'https://uptc.edu.co/sitio/portal/sitios/estudiantes/sis_inf/',
+    sourceUpdatedLabel: '24 jun 2025',
+    sourceUpdatedDate: '2025-06-24',
+  },
+  {
+    id: 'fechas-pregrado-estudiantes',
+    category: 'Calendario académico',
+    title: 'Fechas académicas de pregrado',
+    description: 'Consulta las fechas que UPTC publica para estudiantes de pregrado y confirma el periodo vigente directamente en la fuente.',
+    searchTerms: ['calendario', 'fechas', 'trámites', 'pregrado', 'estudiante'],
+    sourceUrl: 'https://uptc.edu.co/sitio/portal/sitios/universidad/vic_aca/adm_reg/2estu/est_pre.html',
+    sourceUpdatedLabel: '17 sep 2026',
+    sourceUpdatedDate: '2026-09-17',
+  },
+]
+
+const STUDENT_SERVICE_FILTERS: readonly StudentServiceFilter[] = [
+  'Todos',
+  ...Array.from(new Set(STUDENT_SERVICES.map((service) => service.category))),
 ]
 
 function normalizeSearchText(value: string): string {
@@ -92,7 +142,7 @@ export function StudentServicesPage() {
           <p className="student-services-eyebrow"><span aria-hidden="true">✳</span> Vida universitaria · orientación</p>
           <h1 id="student-services-title">Servicios para acompañar tu vida universitaria</h1>
           <p className="student-services-intro">
-            Un punto de partida para encontrar apoyo, bienestar y recursos de aprendizaje. Cada enlace continúa en el portal oficial de la UPTC.
+            Encuentra información pública sobre rutas académicas, bienestar y recursos de aprendizaje. Cada enlace continúa en el portal oficial de la UPTC.
           </p>
         </div>
         <div className="student-services-hero-mark" aria-hidden="true">
@@ -114,7 +164,7 @@ export function StudentServicesPage() {
                 type="search"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder="Ej. biblioteca, bienestar, préstamo…"
+                placeholder="Ej. calificaciones, calendario, biblioteca…"
                 aria-describedby="student-services-privacy"
               />
             </div>
@@ -162,13 +212,13 @@ export function StudentServicesPage() {
           <div className="student-services-grid">
             {visibleServices.map((service) => (
               <article
-                className={`student-service-card student-service-card--${service.category.toLowerCase()}`}
+                className={`student-service-card student-service-card--${categoryClassName(service.category)}`}
                 key={service.id}
                 aria-labelledby={`student-service-title-${service.id}`}
               >
                 <div className="student-service-card-topline">
                   <span className="student-service-symbol" aria-hidden="true">
-                    {service.category === 'Bienestar' ? '◎' : '▤'}
+                    {service.category === 'Bienestar' ? '◎' : service.category === 'Sistemas institucionales' ? '◷' : '▤'}
                   </span>
                   <span className="student-service-category">{service.category}</span>
                 </div>
@@ -184,7 +234,10 @@ export function StudentServicesPage() {
                     Consultar fuente oficial <span aria-hidden="true">↗</span>
                   </a>
                   <small>
-                    Fuente UPTC · consultada 3 oct 2026
+                    Fuente oficial UPTC
+                    {service.sourcePublishedLabel && service.sourcePublishedDate
+                      ? <> · <time dateTime={service.sourcePublishedDate}>comunicado publicado {service.sourcePublishedLabel}</time></>
+                      : ''}
                     {service.sourceUpdatedLabel && service.sourceUpdatedDate
                       ? <> · <time dateTime={service.sourceUpdatedDate}>actualizada {service.sourceUpdatedLabel}</time></>
                       : service.sourceUpdatedLabel ? ` · actualizada ${service.sourceUpdatedLabel}` : ''}
@@ -197,4 +250,12 @@ export function StudentServicesPage() {
       </section>
     </section>
   )
+}
+
+function categoryClassName(category: StudentServiceCategory): string {
+  return category
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLocaleLowerCase('es')
+    .replace(/\s+/g, '-')
 }
