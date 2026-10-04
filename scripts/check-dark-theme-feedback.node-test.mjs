@@ -157,7 +157,7 @@ test('public program directory keeps its dark surfaces readable', () => {
   assert.ok(text && secondary && raised && surface, 'dark tokens must be defined')
 
   // Act + Assert: the consolidated surface rule must exist and its text must stay readable.
-  const surfaces = darkRule(':root[data-theme=dark] .workspace main .public-program-directory :is(.public-program-hero,\n.public-program-source-note,\n.public-program-results-count,\n.public-program-card,\n.public-program-empty)')
+  const surfaces = darkRule(':root[data-theme=dark] .workspace main .public-program-directory :is(.public-program-hero,\n.public-program-source-note,\n.public-program-results-count,\n.public-program-card,\n.public-program-empty,\n.public-program-more)')
   assert.ok(surfaces, 'the public directory surface rule must exist')
   assert.match(surfaces, /background:\s*var\(--ui-surface-raised\);/)
   assert.ok(contrastRatio(text, raised) >= 4.5, 'directory text on raised surface must meet WCAG AA')
@@ -296,4 +296,28 @@ test('the visual identity preview keeps its light-on-light labels readable', () 
   assert.ok(noteColor && disabledColor, 'the preview labels must set an explicit color')
   assert.ok(contrastRatio(noteColor, '#ffffff') >= 4.5, 'preview module note must meet WCAG AA on white')
   assert.ok(contrastRatio(disabledColor, '#ffffff') >= 4.5, 'disabled preview navigation must meet WCAG AA on white')
+})
+
+test('dark theme keeps the curriculum catalog hero readable', () => {
+  // Arrange: measured in the browser, .catalog-hero keeps a cream gradient while the global dark
+  // theme paints its heading light, so "Mallas curriculares de pregrado" rendered at ratio 1.0.
+  const dark = darkRule(':root[data-theme=dark]')
+  const token = (name) => dark?.match(new RegExp(`--${name}:\\s*(#[0-9a-f]{6});`, 'i'))?.[1]
+  const text = token('ui-text-primary')
+  const secondary = token('ui-text-secondary')
+  const raised = token('ui-surface-raised')
+  assert.ok(text && secondary && raised, 'dark tokens must be defined')
+
+  // Act
+  const declarations = darkRule(':root[data-theme=dark] .workspace main .catalog-hero')
+
+  // Assert
+  assert.ok(declarations, 'dark catalog hero rule must be present')
+  assert.match(declarations, /background:\s*var\(--ui-surface-raised\);/)
+  assert.ok(contrastRatio(text, raised) >= 4.5, 'catalog hero heading must meet WCAG AA')
+
+  const muted = darkRule(':root[data-theme=dark] .workspace main .catalog-intro')
+  assert.ok(muted, 'dark catalog intro rule must be present')
+  assert.match(muted, /color:\s*var\(--ui-text-secondary\);/)
+  assert.ok(contrastRatio(secondary, raised) >= 4.5, 'catalog hero intro must meet WCAG AA')
 })

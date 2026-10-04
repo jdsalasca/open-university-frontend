@@ -83,3 +83,9 @@
   .public-program-filters { grid-template-columns: 1fr; }
   .public-program-search-field { grid-column: auto; }
 }
+
+.public-program-window { display: grid; justify-items: center; gap: 9px; padding: 18px 0 4px; }
+.public-program-window p { margin: 0; color: #74766d; font-size: 12px; }
+.public-program-more { min-height: 40px; padding: 0 18px; border: 1px solid #c5c8be; border-radius: 7px; background: transparent; color: #4d5148; font: inherit; font-size: 12px; font-weight: 750; cursor: pointer; }
+.public-program-more:hover { background: #f1f1ec; }
+.public-program-more:focus-visible { @include tokens.focus-ring; }

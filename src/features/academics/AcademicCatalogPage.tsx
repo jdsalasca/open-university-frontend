@@ -158,7 +158,7 @@ export function AcademicCatalogPage({
 
   return (
     <div className="academic-catalog">
-      <Suspense fallback={<div className="catalog-loading" role="status">Cargando el directorio público de programas…</div>}>
+      <Suspense fallback={<div className="catalog-loading catalog-loading-directory" role="status">Cargando el directorio público de programas…</div>}>
         <PublicProgramDirectories />
       </Suspense>
       <section className="catalog-hero" aria-labelledby="catalog-title">

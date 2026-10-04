@@ -258,9 +258,14 @@
   .public-program-source-note,
   .public-program-results-count,
   .public-program-card,
-  .public-program-empty) {
+  .public-program-empty,
+  .public-program-more) {
   border-color: var(--ui-border);
   background: var(--ui-surface-raised);
+}
+
+:root[data-theme='dark'] .workspace main .public-program-directory .public-program-window p {
+  color: var(--ui-text-secondary);
 }
 
 :root[data-theme='dark'] .workspace main .public-program-directory .public-program-filters {
@@ -307,6 +312,16 @@
 }
 
 :root[data-theme='dark'] .workspace main :is(.admissions-eyebrow, .admissions-checklist-footnote) {
+  color: var(--ui-text-secondary);
+}
+
+:root[data-theme='dark'] .workspace main .catalog-hero {
+  border-color: var(--ui-border);
+  background: var(--ui-surface-raised);
+  color: var(--ui-text-primary);
+}
+
+:root[data-theme='dark'] .workspace main .catalog-intro {
   color: var(--ui-text-secondary);
 }
 

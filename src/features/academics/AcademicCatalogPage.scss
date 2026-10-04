@@ -65,6 +65,10 @@
 
 .catalog-loading { display: flex; min-height: 64px; align-items: center; gap: 10px; color: #76776f; font-size: 12px; }
 .catalog-loading::before { width: 13px; height: 13px; border: 2px solid #d9d9d0; border-top-color: #a98e18; border-radius: 50%; animation: catalog-spin .7s linear infinite; content: ''; }
+/* The public directory renders one result window of cards, so a 64 px placeholder leaves the catalog
+   hero sitting at the top of the viewport only to jump several thousand pixels down when the chunk
+   resolves (measured CLS 0.85). Reserving the space it will occupy keeps that shift out of view. */
+.catalog-loading-directory { min-height: 3404px; align-items: flex-start; padding-top: 18px; }
 @keyframes catalog-spin { to { transform: rotate(360deg); } }
 
 .catalog-empty { position: relative; display: grid; min-height: 318px; justify-items: center; align-content: center; margin: 0 0 26px; padding: 38px 24px; overflow: hidden; border: 1px solid #e6e7df; border-radius: 18px; background: linear-gradient(145deg, #fff, #fafaf6); text-align: center; }

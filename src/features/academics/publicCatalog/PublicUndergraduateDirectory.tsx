@@ -25,6 +25,9 @@ const INITIAL_FILTERS: PublicUndergraduateProgramFilters = {
   offered: 'all',
 }
 
+/** Cards shown before the visitor asks for the rest; about a screen and a half. */
+const RESULT_WINDOW = 24
+
 export function PublicUndergraduateDirectory({
   snapshot: providedSnapshot,
 }: PublicUndergraduateDirectoryProps) {
@@ -32,6 +35,10 @@ export function PublicUndergraduateDirectory({
   const [isLoading, setIsLoading] = useState(providedSnapshot === undefined)
   const [retryCount, setRetryCount] = useState(0)
   const [filters, setFilters] = useState(INITIAL_FILTERS)
+  // The 79-program snapshot renders about 9,600 px in one go, which pushes everything below it down
+  // after the deferred chunk resolves (CLS 0.85) and asks the visitor to scroll past a screen of
+  // cards before reaching the curriculum catalog. The window keeps the first block readable.
+  const [visibleCount, setVisibleCount] = useState(RESULT_WINDOW)
   const snapshot = providedSnapshot ?? loadedSnapshot
 
   useEffect(() => {
@@ -70,6 +77,7 @@ export function PublicUndergraduateDirectory({
     value: PublicUndergraduateProgramFilters[Key],
   ) {
     setFilters((current) => ({ ...current, [key]: value }))
+    setVisibleCount(RESULT_WINDOW)
   }
 
   if (!snapshot && isLoading) {
@@ -195,8 +203,9 @@ export function PublicUndergraduateDirectory({
         </div>
 
         {programs.length > 0 ? (
-          <ul className="public-program-results" aria-label="Programas encontrados">
-            {programs.map((program) => (
+          <>
+            <ul className="public-program-results" aria-label="Programas encontrados">
+              {programs.slice(0, visibleCount).map((program) => (
               <li className="public-program-card" key={program.id}>
                 <div className="public-program-card-topline">
                   <span className="public-program-card-level">{program.level}</span>
@@ -217,8 +226,23 @@ export function PublicUndergraduateDirectory({
                   Consultar ficha UPTC <span aria-hidden="true">↗</span>
                 </a>
               </li>
-            ))}
-          </ul>
+              ))}
+            </ul>
+            {visibleCount < programs.length && (
+              <div className="public-program-window">
+                <p>
+                  Mostrando {Math.min(visibleCount, programs.length)} de {programs.length} programas.
+                </p>
+                <button
+                  className="public-program-more"
+                  type="button"
+                  onClick={() => setVisibleCount((current) => current + RESULT_WINDOW)}
+                >
+                  Ver más ({programs.length - Math.min(visibleCount, programs.length)} restantes)
+                </button>
+              </div>
+            )}
+          </>
         ) : (
           <div className="public-program-empty" role="status">
             <span aria-hidden="true">⌕</span>
