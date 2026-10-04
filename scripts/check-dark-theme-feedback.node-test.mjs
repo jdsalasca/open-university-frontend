@@ -208,3 +208,32 @@ test('dark theme keeps the room allocation demo readable', () => {
   assert.match(declarations, /color:\s*var\(--ui-text-primary\);/)
   assertReadableContrast(declarations)
 })
+
+test('dark theme keeps the public admissions calendar readable', () => {
+  // Arrange: measured in the browser, these admissions surfaces rendered light-on-light in dark
+  // mode (contrast 1.02-2.27) because they keep hardcoded light backgrounds.
+  const selector = ':root[data-theme=dark] .workspace main :is(.admissions-fallback-status,\n.admissions-primary-link,\n.admissions-count,\n.admissions-note-icon,\n.admissions-source-seal,\n.admissions-timeline-index,\n.admissions-checklist,\n.admissions-official-source)'
+
+  // Act
+  const declarations = darkRule(selector)
+
+  // Assert
+  assert.ok(declarations, 'dark admissions surface rule must be present')
+  assert.match(declarations, /background:\s*var\(--ui-surface-raised\);/)
+  assertReadableContrast(declarations)
+})
+
+test('dark theme keeps admissions muted text readable on its cards', () => {
+  // Arrange: these admissions labels keep light muted colors that vanish on the dark card surface.
+  const dark = darkRule(':root[data-theme=dark]')
+  const token = (name) => dark?.match(new RegExp(`--${name}:\\s*(#[0-9a-f]{6});`, 'i'))?.[1]
+  const secondary = token('ui-text-secondary')
+  const raised = token('ui-surface-raised')
+  assert.ok(secondary && raised, 'dark tokens must be defined')
+
+  // Act + Assert
+  const muted = darkRule(':root[data-theme=dark] .workspace main :is(.admissions-eyebrow, .admissions-checklist-footnote)')
+  assert.ok(muted, 'dark admissions muted-text rule must be present')
+  assert.match(muted, /color:\s*var\(--ui-text-secondary\);/)
+  assert.ok(contrastRatio(secondary, raised) >= 4.5, 'admissions muted text must meet WCAG AA')
+})

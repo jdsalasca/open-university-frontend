@@ -291,3 +291,21 @@
   border-color: var(--ui-border-strong);
   background: var(--ui-surface-raised);
 }
+
+:root[data-theme='dark'] .workspace main :is(
+  .admissions-fallback-status,
+  .admissions-primary-link,
+  .admissions-count,
+  .admissions-note-icon,
+  .admissions-source-seal,
+  .admissions-timeline-index,
+  .admissions-checklist,
+  .admissions-official-source) {
+  border-color: var(--ui-border);
+  background: var(--ui-surface-raised);
+  color: var(--ui-text-primary);
+}
+
+:root[data-theme='dark'] .workspace main :is(.admissions-eyebrow, .admissions-checklist-footnote) {
+  color: var(--ui-text-secondary);
+}
