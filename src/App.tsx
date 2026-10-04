@@ -9,7 +9,6 @@ import type {
 } from './features/academics/academicOperationsContracts'
 import type { AcademicOfferingAuthorization } from './features/academics/academicOfferingDraftContracts'
 import { useBranding } from './features/branding/useBranding'
-import { spaceGuideClient as defaultSpaceGuideClient } from './features/spaces/spaceGuideClient'
 import type { SpaceGuideClient } from './features/spaces/spaceGuideClient'
 import { roleAccessClient as defaultRoleAccessClient } from './features/access/roleAccessClient'
 import type { RoleAccessClient, RoleScopeKind } from './features/access/roleAccessContracts'
@@ -117,7 +116,7 @@ const MODULE_SYMBOLS: Record<string, string> = {
 export function App({
   catalogClient = academicCatalogClient,
   academicOperationsClient: operationsClient,
-  spaceGuideClient: guideClient = defaultSpaceGuideClient,
+  spaceGuideClient: guideClient,
   oidcConfiguration,
   identityManager,
   currentIdentityClient,
@@ -162,7 +161,7 @@ function ApplicationShell({
 }: {
   catalogClient: AcademicCatalogClient
   operationsClient?: AcademicOperationsClient
-  spaceGuideClient: SpaceGuideClient
+  spaceGuideClient?: SpaceGuideClient
   roleAccessClient: RoleAccessClient
   admissionsCallClient: AdmissionsCallClient
 }) {
@@ -607,7 +606,7 @@ function ApplicationShell({
                     ? <AdmissionsExperience client={admissionsCallClient} authorization={admissionsAuthorization}
                       onAuthorizationRejected={revalidateRejectedAdmissionsAccess} />
                     : isSpacesView
-                      ? <SpaceGuidePage client={spaceGuideClient} />
+                      ? <SpaceGuidePage {...(spaceGuideClient ? { client: spaceGuideClient } : {})} />
                     : isLibraryView
                       ? <LibraryAdminPage
                         authorization={libraryAuthorization}

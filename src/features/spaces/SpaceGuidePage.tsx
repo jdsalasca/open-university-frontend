@@ -7,11 +7,12 @@ import type {
   SpaceUseKind,
   SpaceUsePathway,
 } from './spaceGuideContracts'
+import { spaceGuideClient as defaultSpaceGuideClient } from './spaceGuideClient'
 import type { SpaceGuideClient } from './spaceGuideClient'
 import './SpaceGuidePage.scss'
 
 interface SpaceGuidePageProps {
-  client: SpaceGuideClient
+  client?: SpaceGuideClient
 }
 
 type LoadState =
@@ -41,7 +42,7 @@ const USE_KIND_LABELS: Record<SpaceUseKind, string> = {
   INTERNAL_STAFF_SPACE: 'Uso interno',
 }
 
-export function SpaceGuidePage({ client }: SpaceGuidePageProps) {
+export function SpaceGuidePage({ client = defaultSpaceGuideClient }: SpaceGuidePageProps) {
   const [attempt, setAttempt] = useState(0)
   const [state, setState] = useState<LoadState>({ status: 'loading', attempt: 0 })
   const [search, setSearch] = useState('')
