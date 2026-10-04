@@ -89,6 +89,60 @@ describe('parseCurriculumImportPreview comparison contract', () => {
     expect(parsed).toMatchObject({ comparison: response.comparison })
   })
 
+  it('parses descriptive metadata for samples in every comparison category', async () => {
+    // Arrange
+    const response = {
+      ...preview,
+      entryCount: 3,
+      comparison: {
+        ...compared,
+        counts: { added: 1, removed: 1, modified: 1, unchanged: 1 },
+        addedSamples: [{ subjectCode: 'SUB-NEW', subjectName: 'Biología', semester: 2, changedFields: [] }],
+        removedSamples: [{ subjectCode: 'SUB-OLD', subjectName: 'Química', semester: 3, changedFields: [] }],
+        modifiedSamples: [{ subjectCode: 'SUB-EDIT', subjectName: 'Física moderna', semester: 4, changedFields: ['NAME'] }],
+        unchangedSamples: [{ subjectCode: 'SUB-SAME', subjectName: 'Álgebra', semester: 1, changedFields: [] }],
+      },
+    }
+
+    // Act
+    const parsed = await parseCurriculumImportPreview(response)
+
+    // Assert
+    expect(parsed.comparison).toMatchObject({
+      addedSamples: [{ subjectName: 'Biología', semester: 2 }],
+      removedSamples: [{ subjectName: 'Química', semester: 3 }],
+      modifiedSamples: [{ subjectName: 'Física moderna', semester: 4 }],
+      unchangedSamples: [{ subjectName: 'Álgebra', semester: 1 }],
+    })
+  })
+
+  it('rejects blank, oversized, out-of-range, or incomplete descriptive metadata', async () => {
+    // Arrange
+    const invalidSamples = [
+      { subjectCode: 'SUB-NEW', subjectName: ' ', semester: 1, changedFields: [] },
+      { subjectCode: 'SUB-NEW', subjectName: 'N'.repeat(241), semester: 1, changedFields: [] },
+      { subjectCode: 'SUB-NEW', subjectName: 'Biología', semester: 0, changedFields: [] },
+      { subjectCode: 'SUB-NEW', subjectName: 'Biología', semester: 32768, changedFields: [] },
+      { subjectCode: 'SUB-NEW', subjectName: 'Biología', changedFields: [] },
+    ]
+    const responses = invalidSamples.map((sample) => ({
+      ...preview,
+      comparison: {
+        ...compared,
+        counts: { added: 1, removed: 0, modified: 0, unchanged: 0 },
+        addedSamples: [sample],
+        removedSamples: [],
+        modifiedSamples: [],
+        unchangedSamples: [],
+      },
+    }))
+
+    // Act + Assert
+    for (const response of responses) {
+      await expect(parseCurriculumImportPreview(response)).rejects.toThrow()
+    }
+  })
+
   it('rejects inconsistent counts and samples larger than the ten-item limit', async () => {
     // Arrange
     const invalidCounts = { ...preview, comparison: { ...compared, counts: { added: 2, removed: 0, modified: 0, unchanged: 0 } } }

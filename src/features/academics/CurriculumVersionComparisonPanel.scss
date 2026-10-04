@@ -11,6 +11,8 @@
 .catalog-version-comparison-category li { display: flex; flex-wrap: wrap; gap: 5px 8px; color: #686b60; font-size: 8px; line-height: 1.5; }
 .catalog-version-comparison-category code { color: #494b42; font: 700 9px ui-monospace, SFMono-Regular, Consolas, monospace; }
 .catalog-version-comparison-category li span { flex-basis: 100%; color: #77796f; }
+.catalog-version-comparison-category li .catalog-version-comparison-subject-name { color: #494b42; font-size: 9px; font-weight: 600; }
+.catalog-version-comparison-category li .catalog-version-comparison-subject-semester { color: #77796f; }
 .catalog-version-comparison-note { color: #696d61; }
 
 @media (min-width: 761px) {

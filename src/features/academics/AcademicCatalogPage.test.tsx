@@ -226,9 +226,9 @@ const comparedPreview: CurriculumImportPreview = {
       publishedAt: '2025-01-10T10:00:00Z',
     },
     counts: { added: 1, removed: 1, modified: 1, unchanged: 0 },
-    addedSamples: [{ subjectCode: 'SUB-ADD', changedFields: [] }],
-    removedSamples: [{ subjectCode: 'SUB-REMOVE', changedFields: [] }],
-    modifiedSamples: [{ subjectCode: 'MAT-101', changedFields: ['CREDITS', 'ORDER'] }],
+    addedSamples: [{ subjectCode: 'SUB-ADD', subjectName: 'Biología', semester: 2, changedFields: [] }],
+    removedSamples: [{ subjectCode: 'SUB-REMOVE', subjectName: 'Química', semester: 2, changedFields: [] }],
+    modifiedSamples: [{ subjectCode: 'MAT-101', subjectName: 'Cálculo revisado', semester: 3, changedFields: ['CREDITS', 'ORDER'] }],
     unchangedSamples: [],
   },
 }
@@ -905,6 +905,10 @@ describe('AcademicCatalogPage', () => {
     expect(screen.getByText(/Modificadas: 1/)).toBeVisible()
     expect(screen.getByText('SUB-ADD')).toBeVisible()
     expect(screen.getByText('SUB-REMOVE')).toBeVisible()
+    expect(screen.getByText('Biología')).toBeVisible()
+    expect(screen.getByText('Química')).toBeVisible()
+    expect(screen.getByText('Cálculo revisado')).toBeVisible()
+    expect(screen.getAllByText(/Semestre 2|Semestre 3/)).toHaveLength(3)
     expect(screen.getByText(/Cambios: Créditos, Orden/)).toBeVisible()
     expect(screen.getByText(/hasta diez ejemplos/i)).toBeVisible()
   })

@@ -98,7 +98,18 @@ function parseComparisonSamples(
         typeof field === 'string' && allowedFields.includes(field as CurriculumVersionComparisonChangedField))
       || new Set(sample.changedFields).size !== sample.changedFields.length
       || (kind === 'modified' && sample.changedFields.length === 0)
-      || (kind === 'fieldless' && sample.changedFields.length > 0)) throw malformedResponse()
-    return { subjectCode: sample.subjectCode, changedFields: [...sample.changedFields] }
+      || (kind === 'fieldless' && sample.changedFields.length > 0)
+      || ((sample.subjectName === undefined) !== (sample.semester === undefined))
+      || (sample.subjectName !== undefined && !isBoundedText(sample.subjectName, 240))
+      || (sample.semester !== undefined
+        && (!Number.isInteger(sample.semester) || Number(sample.semester) < 1 || Number(sample.semester) > 32767))) {
+      throw malformedResponse()
+    }
+    return {
+      subjectCode: sample.subjectCode,
+      ...(sample.subjectName === undefined ? {} : { subjectName: sample.subjectName as string }),
+      ...(sample.semester === undefined ? {} : { semester: Number(sample.semester) }),
+      changedFields: [...sample.changedFields],
+    }
   })
 }

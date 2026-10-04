@@ -103,6 +103,8 @@ export type CurriculumVersionComparisonChangedField =
 
 export interface CurriculumVersionComparisonSample {
   subjectCode: string
+  subjectName?: string
+  semester?: number
   changedFields: CurriculumVersionComparisonChangedField[]
 }
 

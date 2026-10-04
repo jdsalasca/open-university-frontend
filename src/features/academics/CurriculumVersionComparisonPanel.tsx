@@ -66,6 +66,12 @@ function ComparedCurriculumVersion({ comparison }: {
               {category.samples.map((sample, index) => (
                 <li key={`${sample.subjectCode}-${index}`}>
                   <code>{sample.subjectCode}</code>
+                  {sample.subjectName !== undefined && sample.semester !== undefined && (
+                    <>
+                      <span className="catalog-version-comparison-subject-name">{sample.subjectName}</span>
+                      <span className="catalog-version-comparison-subject-semester">Semestre {sample.semester}</span>
+                    </>
+                  )}
                   {sample.changedFields.length > 0 && (
                     <span>Cambios: {sample.changedFields.map((field) => changedFieldLabels[field]).join(', ')}</span>
                   )}
