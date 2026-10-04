@@ -29,10 +29,11 @@ describe('StudentServicesPage', () => {
 
     // Assert
     const cards = screen.getAllByRole('article')
-    expect(cards).toHaveLength(4)
+    expect(cards).toHaveLength(5)
     expect(cards.map((card) => within(card).getByRole('heading').textContent)).toEqual([
       'Bienestar Universitario',
       'Bienestar Virtual',
+      'Apoyo socioeconómico',
       'Préstamo y consulta bibliográfica',
       'Biblioteca digital y catálogo',
     ])
@@ -40,7 +41,7 @@ describe('StudentServicesPage', () => {
     expect(screen.queryAllByRole('form')).toHaveLength(0)
 
     const sourceLinks = screen.getAllByRole('link', { name: /en el portal oficial UPTC/i })
-    expect(sourceLinks).toHaveLength(4)
+    expect(sourceLinks).toHaveLength(5)
     for (const link of sourceLinks) {
       const sourceUrl = new URL(link.getAttribute('href') ?? '')
       expect(sourceUrl.protocol).toBe('https:')
@@ -48,6 +49,24 @@ describe('StudentServicesPage', () => {
       expect(link).toHaveAttribute('target', '_blank')
       expect(link).toHaveAttribute('rel', 'noopener noreferrer')
     }
+  })
+
+  it('separates socioeconomic support and attributes its official source date', async () => {
+    // Arrange
+    renderStudentServicesPage()
+
+    // Act
+    const supportHeading = await screen.findByRole('heading', { name: 'Apoyo socioeconómico' })
+    const supportCard = supportHeading.closest('article')
+    const wellbeingCard = screen.getByRole('heading', { name: 'Bienestar Virtual' }).closest('article')
+
+    // Assert
+    expect(supportCard).not.toBeNull()
+    expect(within(supportCard!).getByRole('link', { name: /consultar apoyo socioeconómico en el portal oficial uptc/i }))
+      .toHaveAttribute('href', 'https://www.uptc.edu.co/sitio/portal/sitios/universidad/rectoria/bie_uni/lineas_accion/apoyo/')
+    expect(within(supportCard!).getByText('actualizada 20 jul 2025')).toHaveAttribute('datetime', '2025-07-20')
+    expect(within(wellbeingCard!).getByText(/rutas virtuales publicadas/i)).not.toHaveTextContent(/apoyo socioeconómico/i)
+    expect(within(supportCard!).getByText(/confirma.*vigencia|confirma.*requisitos/i)).toBeVisible()
   })
 
   it('matches accented service names with case-insensitive, unaccented text', async () => {
@@ -102,7 +121,7 @@ describe('StudentServicesPage', () => {
     expect(screen.getByText('0', { selector: 'strong' })).toBeVisible()
     expect(screen.getByRole('status')).toHaveTextContent('No encontramos servicios con esos filtros.')
     await user.click(screen.getByRole('button', { name: 'Limpiar búsqueda y filtros' }))
-    expect(screen.getAllByRole('article')).toHaveLength(4)
+    expect(screen.getAllByRole('article')).toHaveLength(5)
     expect(search).toHaveValue('')
     expect(search).toHaveFocus()
     expect(screen.getByRole('button', { name: 'Todos' })).toHaveAttribute('aria-pressed', 'true')

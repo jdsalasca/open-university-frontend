@@ -14,6 +14,7 @@ interface StudentService {
   searchTerms: readonly string[]
   sourceUrl: string
   sourceUpdatedLabel?: string
+  sourceUpdatedDate?: string
 }
 
 const STUDENT_SERVICES: readonly StudentService[] = [
@@ -30,10 +31,20 @@ const STUDENT_SERVICES: readonly StudentService[] = [
     id: 'bienestar-virtual',
     category: 'Bienestar',
     title: 'Bienestar Virtual',
-    description: 'Consulta las rutas virtuales publicadas para salud mental, Ruta Violeta, cultura, deporte y apoyo socioeconómico.',
-    searchTerms: ['salud mental', 'ruta violeta', 'cultura', 'deporte', 'socioeconómico'],
+    description: 'Consulta las rutas virtuales publicadas para salud mental y Ruta Violeta, además de la oferta de cultura, desarrollo humano, actividad física, deporte y salud.',
+    searchTerms: ['salud mental', 'ruta violeta', 'cultura', 'desarrollo humano', 'actividad física', 'deporte', 'salud'],
     sourceUrl: 'https://www.uptc.edu.co/sitio/portal/sitios/universidad/rectoria/bie_uni/bieVir.html',
     sourceUpdatedLabel: '11 sep 2026',
+  },
+  {
+    id: 'apoyo-socioeconomico',
+    category: 'Bienestar',
+    title: 'Apoyo socioeconómico',
+    description: 'Consulta la Línea de Apoyo Socioeconómico de la UPTC para conocer sus programas publicados y confirmar requisitos y vigencia directamente en la fuente.',
+    searchTerms: ['apoyo', 'socioeconómico', 'restaurante estudiantil', 'becas', 'residencias', 'renta joven', 'upetecitos'],
+    sourceUrl: 'https://www.uptc.edu.co/sitio/portal/sitios/universidad/rectoria/bie_uni/lineas_accion/apoyo/',
+    sourceUpdatedLabel: '20 jul 2025',
+    sourceUpdatedDate: '2025-07-20',
   },
   {
     id: 'biblioteca-servicios',
@@ -173,8 +184,10 @@ export function StudentServicesPage() {
                     Consultar fuente oficial <span aria-hidden="true">↗</span>
                   </a>
                   <small>
-                    Fuente UPTC · consultada 2 oct 2026
-                    {service.sourceUpdatedLabel ? ` · actualizada ${service.sourceUpdatedLabel}` : ''}
+                    Fuente UPTC · consultada 3 oct 2026
+                    {service.sourceUpdatedLabel && service.sourceUpdatedDate
+                      ? <> · <time dateTime={service.sourceUpdatedDate}>actualizada {service.sourceUpdatedLabel}</time></>
+                      : service.sourceUpdatedLabel ? ` · actualizada ${service.sourceUpdatedLabel}` : ''}
                   </small>
                 </div>
               </article>
