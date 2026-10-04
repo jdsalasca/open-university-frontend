@@ -181,7 +181,10 @@ function ApplicationShell({
     return () => window.removeEventListener('hashchange', onHashChange)
   }, [])
 
-  const modules = branding.modules.filter((module) => !['visual-identity', 'programs', 'admissions', 'spaces', 'students'].includes(module.key))
+  const modules = branding.modules.filter((module) =>
+    module.available
+      && module.visible
+      && !['home', 'visual-identity', 'programs', 'admissions', 'spaces', 'students'].includes(module.key))
   const identityModule = branding.modules.find((module) => module.key === 'visual-identity')
   const programsModule = branding.modules.find((module) => module.key === 'programs')
   const admissionsModule = branding.modules.find((module) => module.key === 'admissions')
@@ -464,18 +467,19 @@ function ApplicationShell({
           </nav>
         </div>
 
-        <div className="sidebar-group module-nav-group">
-          <p className="sidebar-caption">VIDA UNIVERSITARIA</p>
-          <nav className="primary-nav" aria-label="Módulos universitarios">
-            {modules.map((module) => (
-              <button className="nav-item subdued" type="button" disabled={!module.available} key={module.key}>
-                <span className="nav-glyph" aria-hidden="true">{MODULE_SYMBOLS[module.key] ?? '◦'}</span>
-                <span>{module.label}</span>
-                {!module.available && <span className="coming-soon">Próximo</span>}
-              </button>
-            ))}
-          </nav>
-        </div>
+        {modules.length > 0 && (
+          <div className="sidebar-group module-nav-group">
+            <p className="sidebar-caption">VIDA UNIVERSITARIA</p>
+            <nav className="primary-nav" aria-label="Módulos universitarios">
+              {modules.map((module) => (
+                <button className="nav-item subdued" type="button" key={module.key}>
+                  <span className="nav-glyph" aria-hidden="true">{MODULE_SYMBOLS[module.key] ?? '◦'}</span>
+                  <span>{module.label}</span>
+                </button>
+              ))}
+            </nav>
+          </div>
+        )}
 
         <div className="sidebar-footer">
           <span className="environment-indicator" aria-hidden="true" />

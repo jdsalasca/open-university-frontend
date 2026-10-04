@@ -274,6 +274,28 @@ describe('App', () => {
       .toHaveLength(0)
   })
 
+  it('hides unavailable university modules and keeps implemented routes visible', async () => {
+    // Arrange
+    window.history.replaceState(null, '', '#inicio')
+    render(
+      <BrandingProvider loader={async () => DEFAULT_BRANDING}>
+        <App
+          oidcConfiguration={{ status: 'unconfigured' }}
+          currentIdentityClient={identityClientWithPermissions([])}
+          localPreviewSessionClient={null}
+        />
+      </BrandingProvider>,
+    )
+
+    // Act
+    const primaryNavigation = await screen.findByRole('navigation', { name: 'Principal' })
+
+    // Assert
+    expect(within(primaryNavigation).getByRole('link', { name: 'Programas' })).toHaveAttribute('href', '#programas')
+    expect(within(primaryNavigation).getByRole('link', { name: 'Estructura y periodos' })).toHaveAttribute('href', '#academia')
+    expect(screen.queryByRole('navigation', { name: 'Módulos universitarios' })).not.toBeInTheDocument()
+  })
+
   it('labels local developer access and opens only modules returned by the current-identity API', async () => {
     // Arrange
     const user = userEvent.setup()
