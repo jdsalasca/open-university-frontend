@@ -234,7 +234,7 @@
   color: var(--ui-text-primary);
 }
 
-:root[data-theme='dark'] .workspace main :is(.academic-unit-copy strong, .academic-unit-copy small, .academic-sort-order, .spaces-type-badge, .spaces-pathway-kind, .spaces-pathway-note, .spaces-directory-footer, .catalog-operation-note, .catalog-locked-tag, .catalog-button, .academic-load-error, .room-allocation-synthetic-note, .room-allocation-controls, .room-allocation-input-summary, .room-allocation-session-needed) {
+:root[data-theme='dark'] .workspace main :is(.academic-unit-copy strong, .academic-unit-copy small, .academic-sort-order, .spaces-type-badge, .spaces-pathway-kind, .spaces-pathway-note, .spaces-announcement, .spaces-directory-footer, .catalog-operation-note, .catalog-locked-tag, .catalog-button, .academic-load-error, .room-allocation-synthetic-note, .room-allocation-controls, .room-allocation-input-summary, .room-allocation-session-needed) {
   border-color: var(--ui-border);
   background: var(--ui-surface-raised);
   color: var(--ui-text-primary);

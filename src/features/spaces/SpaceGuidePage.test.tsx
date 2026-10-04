@@ -148,6 +148,52 @@ describe('SpaceGuidePage', () => {
     expect(within(card).queryByText('63 personas')).not.toBeInTheDocument()
   })
 
+  it('shows the Goranchacha public opening notice with attributed approximate capacity and no invented map', async () => {
+    // Arrange
+    const goranchacha: SpaceLocation = {
+      id: 'auditorium-goranchacha-2026',
+      kind: 'SERVICE',
+      name: 'Auditorio Goranchacha · UPTC',
+      municipality: 'Tunja',
+      department: 'Boyacá',
+      address: null,
+      locationDetail: 'Edificio de Posgrados, Sede Central de Tunja, según el comunicado UPTC.',
+      mapQuery: null,
+      source: {
+        label: 'Comunicado UPTC n.º 230 · apertura del Auditorio Goranchacha',
+        url: 'https://uptc.edu.co/sitio/portal/cal_not_eve/noticias/det/Nuevo-Auditorio-Goranchacha-de-la-UPTC-abrio-sus-puertas-a-la-comunidad-universitaria/',
+        checkedAt: '2026-10-04',
+        sourceUpdatedAt: '2026-09-09',
+      },
+      announcement: {
+        capacities: [{ areaName: 'Capacidad aproximada', announcedCapacityPersons: 450 }],
+        locationNote: 'Comunicado del 9 de septiembre de 2026. El aforo es aproximado y no indica disponibilidad.',
+        locationReferences: [{
+          label: 'UPTC Radio · referencia pública del Auditorio Goranchacha',
+          url: 'https://dsp.uptc.edu.co/sitio/portal/cal_not_eve/noticias/det/UPTC-Radio-celebra-25-anos-al-aire-como-voz-academica-cultural-e-institucional-de-la-Universidad/',
+          checkedAt: '2026-10-04',
+          sourceUpdatedAt: '2026-09-29',
+        }],
+      },
+    }
+    render(<SpaceGuidePage client={clientReturning({ ...snapshot, locations: [goranchacha] })} />)
+
+    // Act
+    const card = await screen.findByRole('article', { name: 'Auditorio Goranchacha · UPTC' })
+
+    // Assert
+    expect(within(card).getByText('Edificio de Posgrados, Sede Central de Tunja, según el comunicado UPTC.'))
+      .toBeVisible()
+    expect(within(card).getByText('Capacidad aproximada')).toBeVisible()
+    expect(within(card).getByText('450 personas')).toBeVisible()
+    expect(within(card).getByText(/aforo es aproximado y no indica disponibilidad/i)).toBeVisible()
+    expect(within(card).getByRole('link', { name: 'Comunicado UPTC n.º 230 · apertura del Auditorio Goranchacha' }))
+      .toHaveAttribute('href', goranchacha.source.url)
+    expect(within(card).getByRole('link', { name: 'UPTC Radio · referencia pública del Auditorio Goranchacha' }))
+      .toHaveAttribute('target', '_blank')
+    expect(within(card).queryByRole('link', { name: /abrir búsqueda de mapa/i })).not.toBeInTheDocument()
+  })
+
   it('loads the sourced campus, CREAD and service cards with map and source links', async () => {
     // Arrange
     const client = clientReturning()
@@ -244,7 +290,9 @@ describe('SpaceGuidePage', () => {
     await user.selectOptions(screen.getByRole('combobox', { name: 'Filtrar por tipo' }), 'SERVICE')
 
     // Act
-    await user.type(screen.getByRole('searchbox', { name: 'Buscar espacios' }), 'lugar inexistente')
+    const search = screen.getByRole('searchbox', { name: 'Buscar espacios' })
+    await user.click(search)
+    await user.paste('lugar inexistente')
 
     // Assert
     expect(screen.getByText('No encontramos espacios con esos filtros.')).toBeVisible()
