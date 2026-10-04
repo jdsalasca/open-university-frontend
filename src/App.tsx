@@ -389,14 +389,14 @@ function ApplicationShell({
 
   return (
     <div className="platform-shell">
-      <a
-        className="skip-link"
-        href={`#${mainContentId}`}
-        onClick={() => document.getElementById(mainContentId)?.focus()}
-      >
-        Saltar al contenido principal
-      </a>
       <aside className="sidebar" aria-label="Navegación del sistema">
+        <a
+          className="nav-item active skip-link"
+          href={`#${mainContentId}`}
+          onClick={() => document.getElementById(mainContentId)?.focus()}
+        >
+          Saltar al contenido principal
+        </a>
         <a className="brand-lockup" href="#resumen" aria-label={`${branding.institutionName}, inicio`}>
           {institutionLogo
             ? <img className="brand-lockup-logo" src={institutionLogo} alt="" />
