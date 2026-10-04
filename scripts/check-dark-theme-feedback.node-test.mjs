@@ -125,23 +125,40 @@ test('library page surfaces keep WCAG AA contrast in dark mode', () => {
   assert.ok(contrastRatio(text, raised) >= 4.5, 'library text on raised surface must meet WCAG AA')
 })
 
-test('public undergraduate directory keeps its dark surfaces readable', () => {
-  // Arrange
-  const selectors = [
-    ':root[data-theme=dark] .workspace main .public-undergraduate-directory .public-undergraduate-hero',
-    ':root[data-theme=dark] .workspace main .public-undergraduate-directory .public-undergraduate-source-note',
-    ':root[data-theme=dark] .workspace main .public-undergraduate-directory .public-undergraduate-filters',
-    ':root[data-theme=dark] .workspace main .public-undergraduate-directory .public-undergraduate-results-count',
-    ':root[data-theme=dark] .workspace main .public-undergraduate-directory .public-undergraduate-offer-tag',
-    ':root[data-theme=dark] .workspace main .public-undergraduate-directory .public-undergraduate-offer-tag.is-marked',
-  ]
+test('public program directory keeps its dark surfaces readable', () => {
+  // Arrange: the component renders .public-program-* classes, so the dark rules must target those
+  // exact names; a rule for a class the component never renders leaves light-on-light text.
+  const dark = darkRule(':root[data-theme=dark]')
+  const token = (name) => dark?.match(new RegExp(`--${name}:\\s*(#[0-9a-f]{6});`, 'i'))?.[1]
+  const text = token('ui-text-primary')
+  const secondary = token('ui-text-secondary')
+  const raised = token('ui-surface-raised')
+  const surface = token('ui-surface')
+  assert.ok(text && secondary && raised && surface, 'dark tokens must be defined')
 
-  // Act + Assert
-  for (const selector of selectors) {
-    const declarations = darkRule(selector)
-    assert.ok(declarations, `dark theme rule must exist for ${selector}`)
-    assertReadableContrast(declarations)
-  }
+  // Act + Assert: the consolidated surface rule must exist and its text must stay readable.
+  const surfaces = darkRule(':root[data-theme=dark] .workspace main .public-program-directory :is(.public-program-hero,\n.public-program-source-note,\n.public-program-results-count,\n.public-program-card,\n.public-program-empty)')
+  assert.ok(surfaces, 'the public directory surface rule must exist')
+  assert.match(surfaces, /background:\s*var\(--ui-surface-raised\);/)
+  assert.ok(contrastRatio(text, raised) >= 4.5, 'directory text on raised surface must meet WCAG AA')
+
+  const filters = darkRule(':root[data-theme=dark] .workspace main .public-program-directory .public-program-filters')
+  assert.ok(filters, 'the public directory filters rule must exist')
+  assert.match(filters, /background:\s*var\(--ui-surface\);/)
+  assert.ok(contrastRatio(text, surface) >= 4.5, 'directory text on surface must meet WCAG AA')
+
+  const offerTag = darkRule(':root[data-theme=dark] .workspace main .public-program-directory .public-program-offer-tag')
+  assert.ok(offerTag, 'the public directory offer tag rule must exist')
+  assert.ok(contrastRatio(secondary, raised) >= 4.5, 'offer tag text must meet WCAG AA')
+
+  const marked = darkRule(':root[data-theme=dark] .workspace main .public-program-directory .public-program-offer-tag.is-marked')
+  assert.ok(marked, 'the marked offer tag rule must exist')
+  assertReadableContrast(marked)
+
+  const switchPressed = darkRule(':root[data-theme=dark] .workspace main .public-program-directories .public-program-directory-switch button[aria-pressed=true]')
+  assert.ok(switchPressed, 'the pressed directory switch rule must exist')
+  assert.match(switchPressed, /background:\s*var\(--ui-surface-raised\);/)
+  assert.ok(contrastRatio(text, raised) >= 4.5, 'pressed switch text must meet WCAG AA')
 })
 
 test('dark theme keeps academic, spaces, and catalog chrome readable', () => {

@@ -253,36 +253,41 @@
   color: #fffbed;
 }
 
-:root[data-theme='dark'] .workspace main .public-undergraduate-directory .public-undergraduate-hero {
+:root[data-theme='dark'] .workspace main .public-program-directory :is(
+  .public-program-hero,
+  .public-program-source-note,
+  .public-program-results-count,
+  .public-program-card,
+  .public-program-empty) {
   border-color: var(--ui-border);
   background: var(--ui-surface-raised);
-  color: var(--ui-text-primary);
 }
 
-:root[data-theme='dark'] .workspace main .public-undergraduate-directory .public-undergraduate-source-note {
-  border-color: var(--ui-border);
-  background: var(--ui-surface-raised);
-  color: var(--ui-text-primary);
-}
-
-:root[data-theme='dark'] .workspace main .public-undergraduate-directory .public-undergraduate-filters {
+:root[data-theme='dark'] .workspace main .public-program-directory .public-program-filters {
   border-color: var(--ui-border);
   background: var(--ui-surface);
-  color: var(--ui-text-primary);
 }
 
-:root[data-theme='dark'] .workspace main .public-undergraduate-directory .public-undergraduate-results-count {
-  border-color: var(--ui-border);
-  background: var(--ui-surface-raised);
-  color: var(--ui-text-primary);
-}
-
-:root[data-theme='dark'] .workspace main .public-undergraduate-directory .public-undergraduate-offer-tag {
+:root[data-theme='dark'] .workspace main .public-program-directory .public-program-offer-tag {
   background: var(--ui-surface-raised);
   color: var(--ui-text-secondary);
 }
 
-:root[data-theme='dark'] .workspace main .public-undergraduate-directory .public-undergraduate-offer-tag.is-marked {
+:root[data-theme='dark'] .workspace main .public-program-directory .public-program-offer-tag.is-marked {
   background: #29382a;
   color: #d5e8c9;
+}
+
+:root[data-theme='dark'] .workspace main .public-program-directories .public-program-directory-switch {
+  border-color: var(--ui-border);
+  background: var(--ui-surface);
+}
+
+:root[data-theme='dark'] .workspace main .public-program-directories .public-program-directory-switch button {
+  color: var(--ui-text-secondary);
+}
+
+:root[data-theme='dark'] .workspace main .public-program-directories .public-program-directory-switch button[aria-pressed='true'] {
+  border-color: var(--ui-border-strong);
+  background: var(--ui-surface-raised);
 }
