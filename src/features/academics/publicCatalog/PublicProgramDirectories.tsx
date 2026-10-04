@@ -23,7 +23,7 @@ export function PublicProgramDirectories() {
           Posgrado
         </button>
       </div>
-      <Suspense fallback={<div className="catalog-loading" role="status">Cargando el directorio público…</div>}>
+      <Suspense fallback={<div className="catalog-loading catalog-loading-directory" role="status">Cargando el directorio público…</div>}>
         {programLevel === 'pregrado' ? <PublicUndergraduateDirectory /> : <PublicPostgraduateDirectory />}
       </Suspense>
     </section>

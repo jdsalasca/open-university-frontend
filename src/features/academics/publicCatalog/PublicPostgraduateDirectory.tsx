@@ -24,11 +24,17 @@ const INITIAL_FILTERS: PublicPostgraduateProgramFilters = {
   level: '',
 }
 
+/** Cards shown before the visitor asks for the rest; about a screen and a half. */
+const RESULT_WINDOW = 24
+
 export function PublicPostgraduateDirectory({ snapshot: providedSnapshot }: PublicPostgraduateDirectoryProps) {
   const [loadedSnapshot, setLoadedSnapshot] = useState<PublicPostgraduateCatalogSnapshot | null>(null)
   const [isLoading, setIsLoading] = useState(providedSnapshot === undefined)
   const [retryCount, setRetryCount] = useState(0)
   const [filters, setFilters] = useState(INITIAL_FILTERS)
+  // The 139-program snapshot rendered about 15,700 px in one go, so switching to posgrado pushed the
+  // curriculum catalog thousands of pixels down (measured CLS 0.62) and asked for a 17,000 px scroll.
+  const [visibleCount, setVisibleCount] = useState(RESULT_WINDOW)
   const snapshot = providedSnapshot ?? loadedSnapshot
 
   useEffect(() => {
@@ -64,12 +70,13 @@ export function PublicPostgraduateDirectory({ snapshot: providedSnapshot }: Publ
     value: PublicPostgraduateProgramFilters[Key],
   ) {
     setFilters((current) => ({ ...current, [key]: value }))
+    setVisibleCount(RESULT_WINDOW)
   }
 
   if (!snapshot && isLoading) {
     return (
       <section className="public-program-directory" aria-labelledby="public-program-title">
-        <div className="catalog-loading" role="status">Cargando el directorio público de posgrado…</div>
+        <div className="catalog-loading catalog-loading-directory" role="status">Cargando el directorio público de posgrado…</div>
       </section>
     )
   }
@@ -178,8 +185,9 @@ export function PublicPostgraduateDirectory({ snapshot: providedSnapshot }: Publ
         </div>
 
         {programs.length > 0 ? (
-          <ul className="public-program-results" aria-label="Programas de posgrado encontrados">
-            {programs.map((program) => (
+          <>
+            <ul className="public-program-results" aria-label="Programas de posgrado encontrados">
+              {programs.slice(0, visibleCount).map((program) => (
               <li className="public-program-card" key={program.programCode}>
                 <div className="public-program-card-topline">
                   <span className="public-program-card-level">{program.level}</span>
@@ -198,8 +206,23 @@ export function PublicPostgraduateDirectory({ snapshot: providedSnapshot }: Publ
                   Consultar ficha UPTC <span aria-hidden="true">↗</span>
                 </a>
               </li>
-            ))}
-          </ul>
+              ))}
+            </ul>
+            {visibleCount < programs.length && (
+              <div className="public-program-window">
+                <p>
+                  Mostrando {Math.min(visibleCount, programs.length)} de {programs.length} programas.
+                </p>
+                <button
+                  className="public-program-more"
+                  type="button"
+                  onClick={() => setVisibleCount((current) => current + RESULT_WINDOW)}
+                >
+                  Ver más ({programs.length - Math.min(visibleCount, programs.length)} restantes)
+                </button>
+              </div>
+            )}
+          </>
         ) : (
           <div className="public-program-empty" role="status">
             <span aria-hidden="true">⌕</span>

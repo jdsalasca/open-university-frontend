@@ -83,7 +83,7 @@ export function PublicUndergraduateDirectory({
   if (!snapshot && isLoading) {
     return (
       <section className="public-program-directory" aria-labelledby="public-program-title">
-        <div className="catalog-loading" role="status">Cargando el directorio público de programas…</div>
+        <div className="catalog-loading catalog-loading-directory" role="status">Cargando el directorio público de programas…</div>
       </section>
     )
   }
