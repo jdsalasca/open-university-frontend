@@ -600,7 +600,11 @@ function ApplicationShell({
                 ? 'el módulo académico'
                 : 'el centro de identidad visual'} />}
           >
-            <Suspense fallback={<p className="module-loading" role="status" aria-live="polite">
+            <Suspense fallback={<p
+              className={isProgramsView || isAcademicOperationsView ? 'module-loading module-loading-tall' : 'module-loading'}
+              role="status"
+              aria-live="polite"
+            >
               Cargando {isHomeView ? 'portada del portal' : isNoticesAdminView ? 'la administración de avisos' : isNoticesView ? 'tus avisos institucionales' : isStudentServicesView ? 'directorio de servicios estudiantiles' : isLibraryView ? 'catálogo de biblioteca' : isRoleAccessView ? 'consola de accesos' : isAdmissionsView ? 'agenda de admisiones' : isSpacesView ? 'guía de espacios' : isProgramsView || isAcademicOperationsView ? 'módulo académico' : 'centro de identidad visual'}…
             </p>}>
               {isHomeView

@@ -26,7 +26,9 @@ export const DEFAULT_BUNDLE_BUDGETS = Object.freeze({
   entryJavaScript: 286_000,
   // The public program, admissions, curriculum and visual identity screens need dark-mode surface rules
   // so their hardcoded light cards stay readable (WCAG AA); those accessibility fixes add ~1.7 kB.
-  entryStyles: 22_400,
+  // The programs route also reserves its measured height while the lazy chunk loads, which removes a
+  // 0.75 cumulative layout shift; that reservation costs ~0.1 kB of shell CSS.
+  entryStyles: 22_500,
   workspaceHomeJavaScript: 300_000,
   workspaceHomeStyles: 30_000,
   // The route budget includes the public directory chunk but excludes the on-demand curriculum comparison panel.

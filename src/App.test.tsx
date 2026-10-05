@@ -487,6 +487,22 @@ describe('App', () => {
     expect(screen.getByText('Cargando módulo académico…')).toBeVisible()
   })
 
+  it('reserves the catalog height while the programs route chunk loads', () => {
+    // Arrange
+    window.history.replaceState(null, '', '#programas')
+    const catalogClient = emptyAcademicCatalogClient()
+
+    // Act
+    render(
+      <BrandingProvider loader={async () => DEFAULT_BRANDING}>
+        <App catalogClient={catalogClient} />
+      </BrandingProvider>,
+    )
+
+    // Assert: el footer no debe bajar miles de pixeles al montar la pagina.
+    expect(screen.getByRole('status')).toHaveClass('module-loading-tall')
+  })
+
   it('updates the skip link target when the active route changes', async () => {
     // Arrange
     const user = userEvent.setup()
