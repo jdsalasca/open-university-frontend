@@ -29,10 +29,12 @@ describe('StudentServicesPage', () => {
 
     // Assert
     const cards = screen.getAllByRole('article')
-    expect(cards).toHaveLength(9)
+    expect(cards).toHaveLength(11)
     expect(cards.map((card) => within(card).getByRole('heading').textContent)).toEqual([
       'Bienestar Universitario',
       'Bienestar Virtual',
+      'Cultura',
+      'Actividad Física',
       'Apoyo socioeconómico',
       'Préstamo y consulta bibliográfica',
       'Biblioteca digital y catálogo',
@@ -45,7 +47,7 @@ describe('StudentServicesPage', () => {
     expect(screen.queryAllByRole('form')).toHaveLength(0)
 
     const sourceLinks = screen.getAllByRole('link', { name: /en el portal oficial UPTC/i })
-    expect(sourceLinks).toHaveLength(9)
+    expect(sourceLinks).toHaveLength(11)
     for (const link of sourceLinks) {
       const sourceUrl = new URL(link.getAttribute('href') ?? '')
       expect(sourceUrl.protocol).toBe('https:')
@@ -63,8 +65,16 @@ describe('StudentServicesPage', () => {
     await screen.findByRole('heading', { name: 'Servicios para acompañar tu vida universitaria' })
 
     // Assert
-    expect(screen.getAllByRole('article')).toHaveLength(9)
+    expect(screen.getAllByRole('article')).toHaveLength(11)
     const officialRoutes = [
+      {
+        title: 'Cultura',
+        href: 'https://www.uptc.edu.co/sitio/portal/sitios/universidad/rectoria/bie_uni/lineas_accion/cultura/',
+      },
+      {
+        title: 'Actividad Física',
+        href: 'https://www.uptc.edu.co/sitio/portal/sitios/universidad/rectoria/bie_uni/lineas_accion/act_fisica/index.html',
+      },
       {
         title: 'Horarios y calificaciones en UPTConecta',
         href: 'https://www.uptc.edu.co/sitio/portal/cal_not_eve/noticias/det/UPTConecta-la-App-institucional-incorpora-nuevos-servicios-para-la-comunidad-upetecista/',
@@ -95,6 +105,29 @@ describe('StudentServicesPage', () => {
 
     expect(screen.queryAllByRole('form')).toHaveLength(0)
     expect(screen.queryByLabelText(/contraseña|documento|código estudiantil/i)).not.toBeInTheDocument()
+  })
+
+  it('finds the new wellbeing lines by distinct accent-insensitive terms', async () => {
+    // Arrange
+    const user = userEvent.setup()
+    renderStudentServicesPage()
+    await screen.findByRole('heading', { name: 'Servicios para acompañar tu vida universitaria' })
+    const search = screen.getByRole('searchbox', { name: 'Buscar servicios estudiantiles' })
+
+    // Act
+    await user.type(search, 'interculturalidad')
+
+    // Assert
+    expect(screen.getAllByRole('article')).toHaveLength(1)
+    expect(screen.getByRole('heading', { name: 'Cultura' })).toBeVisible()
+
+    // Act
+    await user.clear(search)
+    await user.type(search, 'musculacion')
+
+    // Assert
+    expect(screen.getAllByRole('article')).toHaveLength(1)
+    expect(screen.getByRole('heading', { name: 'Actividad Física' })).toBeVisible()
   })
 
   it('filters institutional systems by category and accent-insensitive text', async () => {
@@ -183,7 +216,7 @@ describe('StudentServicesPage', () => {
     expect(screen.getByText('0', { selector: 'strong' })).toBeVisible()
     expect(screen.getByRole('status')).toHaveTextContent('No encontramos servicios con esos filtros.')
     await user.click(screen.getByRole('button', { name: 'Limpiar búsqueda y filtros' }))
-    expect(screen.getAllByRole('article')).toHaveLength(9)
+    expect(screen.getAllByRole('article')).toHaveLength(11)
     expect(search).toHaveValue('')
     expect(search).toHaveFocus()
     expect(screen.getByRole('button', { name: 'Todos' })).toHaveAttribute('aria-pressed', 'true')
